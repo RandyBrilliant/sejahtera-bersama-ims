@@ -291,6 +291,7 @@ Create example:
   "net_mass_grams": 250,
   "remaining_stock": "50.000",
   "base_price_idr": 18000,
+  "list_price_idr": 25000,
   "sku": "BG-ORG-250",
   "is_active": true
 }
@@ -517,5 +518,5 @@ Role usage guidance:
 
 - Use pagination params (`page`, `page_size`) for list endpoints.
 - Keep all numeric stock values as strings when using decimals in JSON.
-- Price uses integer Rupiah (`base_price_idr`) with no decimal.
+- Price uses integer Rupiah (`base_price_idr`, optional `list_price_idr` for default selling price) with no decimal.
 - `created_by`/`updated_by` are auto-filled by backend from current auth user.

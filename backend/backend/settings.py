@@ -63,6 +63,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "account.apps.AccountConfig",
     "inventory.apps.InventoryConfig",
+    "purchase.apps.PurchaseConfig",
+    "expenses.apps.ExpensesConfig",
     "main.apps.MainConfig",
 ]
 

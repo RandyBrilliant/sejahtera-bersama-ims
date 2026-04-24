@@ -71,6 +71,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "net_mass_grams",
             "remaining_stock",
             "base_price_idr",
+            "list_price_idr",
             "stock_value_idr",
             "sku",
             "is_active",

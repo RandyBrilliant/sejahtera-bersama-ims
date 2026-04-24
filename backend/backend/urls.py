@@ -25,6 +25,8 @@ urlpatterns = [
     path("health/", health, name="health"),
     path("api/account/", include("account.urls")),
     path("api/inventory/", include("inventory.urls")),
+    path("api/purchase/", include("purchase.urls")),
+    path("api/expenses/", include("expenses.urls")),
 ]
 
 if settings.DEBUG and settings.MEDIA_ROOT:

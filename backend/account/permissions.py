@@ -174,3 +174,112 @@ class SalesAccess(permissions.BasePermission):
                 UserRole.FINANCE_STAFF,
             )
         return has_role(request.user, UserRole.ADMIN, UserRole.SALES_STAFF)
+
+
+class CustomerAccess(permissions.BasePermission):
+    """
+    Customer master data:
+    - Read: all internal roles + owner
+    - Write (create/update): Sales/Admin/Owner
+    - Delete: Admin/Owner only
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.SALES_STAFF,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+            )
+        if request.method == "DELETE":
+            return has_role(request.user, UserRole.ADMIN)
+        return has_role(request.user, UserRole.ADMIN, UserRole.SALES_STAFF)
+
+
+class CustomerSpecialPriceAccess(permissions.BasePermission):
+    """
+    Per-customer product selling prices (admin special pricing):
+    - Read: all internal roles + owner
+    - Write: Admin/Owner only
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.SALES_STAFF,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+            )
+        return has_role(request.user, UserRole.ADMIN)
+
+
+class PurchaseInOrderAccess(permissions.BasePermission):
+    """
+    Ingredient procurement (order in):
+    - Read: all internal roles + owner
+    - Write: Warehouse/Admin/Owner
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.SALES_STAFF,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+            )
+        return has_role(request.user, UserRole.ADMIN, UserRole.WAREHOUSE_STAFF)
+
+
+class SalesOrderAccess(permissions.BasePermission):
+    """
+    Customer sales order (order out):
+    - Read: all internal roles + owner
+    - Write: Sales/Admin/Owner
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.SALES_STAFF,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+            )
+        return has_role(request.user, UserRole.ADMIN, UserRole.SALES_STAFF)
+
+
+class SalesRevenueReportAccess(permissions.BasePermission):
+    """
+    Verified sales revenue reports:
+    - Finance, Admin, Owner (and superuser) only.
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        return has_role(request.user, UserRole.ADMIN, UserRole.FINANCE_STAFF) or user_is_owner(request.user)

@@ -101,6 +101,14 @@ class ProductPackaging(AuditModel):
         validators=[MinValueValidator(1)],
         help_text=_("Base purchase price in Rupiah, without decimals."),
     )
+    list_price_idr = models.PositiveBigIntegerField(
+        _("list selling price (IDR)"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_("Default selling price in Rupiah; used when no customer special price is set."),
+        db_index=True,
+    )
     sku = models.CharField(_("SKU"), max_length=50, blank=True)
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
