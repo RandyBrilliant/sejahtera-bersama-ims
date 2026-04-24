@@ -1,0 +1,158 @@
+# Quick Start Guide
+
+**Supported:** Ubuntu 22.04 LTS, Ubuntu 24.04 LTS.
+
+## 🚀 Fast Deployment (5 Steps)
+
+### 1. Initial Setup (One-Time)
+```bash
+sudo ./deploy/setup.sh
+```
+
+### 2. Configure Environment
+```bash
+cp env.example .env
+nano .env  # Edit with your settings (ALLOWED_HOSTS=data.sejahterabersama.my.id, etc.)
+```
+
+### 3. Deploy
+```bash
+sudo ./deploy/deploy.sh
+```
+
+### 4. Create Admin User (Optional)
+```bash
+docker compose -f docker-compose.prod.yml exec api python manage.py createsuperuser
+```
+
+### 5. Setup SSL (After DNS is configured)
+```bash
+sudo ./deploy/ssl-setup.sh
+```
+
+Then update `.env`:
+```bash
+SECURE_SSL_REDIRECT=1
+SESSION_COOKIE_SECURE=1
+CSRF_COOKIE_SECURE=1
+```
+
+Restart API:
+```bash
+docker compose -f docker-compose.prod.yml restart api
+```
+
+---
+
+## 🔄 Updating Code
+
+After a code change, run the update script once (it pulls code, rebuilds, restarts, runs migrations and collectstatic):
+
+```bash
+cd ~/sejahtera-bersama-ims/backend
+sudo ./deploy/update.sh
+```
+
+The script automatically uses Block Storage if `docker-compose.prod.block.yml` exists, so you don’t need to pass extra compose files.
+
+---
+
+## 🔄 Resetting Database / Environment
+
+**⚠️ WARNING: This will DELETE ALL DATA in the database!**
+
+If you've reset migrations or want a full clean deployment environment:
+```bash
+sudo ./deploy/fresh-reset.sh
+```
+
+**After reset:**
+1. Create a new superuser:
+   ```bash
+   docker compose -f docker-compose.prod.yml exec api python manage.py createsuperuser
+   ```
+
+2. Verify migrations:
+   ```bash
+   docker compose -f docker-compose.prod.yml exec api python manage.py showmigrations
+   ```
+
+---
+
+## 📊 Common Commands
+
+```bash
+# Check status
+docker compose -f docker-compose.prod.yml ps
+
+# View logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Restart services
+docker compose -f docker-compose.prod.yml restart
+
+# Check resource usage
+docker stats
+free -h
+```
+
+---
+
+## 🆘 Quick Troubleshooting
+
+**Services won't start?**
+```bash
+docker compose -f docker-compose.prod.yml logs
+```
+
+**Out of memory?**
+```bash
+docker system prune -a
+docker compose -f docker-compose.prod.yml restart
+```
+
+**SSL issues?**
+```bash
+sudo certbot certificates
+docker compose -f docker-compose.prod.yml logs nginx
+```
+
+---
+
+## 📦 Spaces for media (optional, better performance)
+
+To serve media (documents, photos) from DigitalOcean Spaces + CDN for faster delivery to mobile users:
+
+1. Create a Space in DO (same region as Droplet), enable CDN.
+2. Create Spaces API keys; set `DO_SPACES_*` in `.env` (see `env.example`).
+3. Set `DO_SPACES_CDN_DOMAIN` and `DO_SPACES_ACL=public-read`.
+4. Redeploy: `sudo ./deploy/update.sh`.
+
+Full steps: [SPACES.md](./SPACES.md)
+
+---
+
+## 💾 Block Storage (optional)
+
+**Using only the Droplet (no block volume):**  
+Deploy and update scripts use Block Storage only if `docker-compose.prod.block.yml` exists. To run without block storage (all data on the Droplet), run once:
+
+```bash
+sudo ./deploy/reset-no-block.sh
+```
+
+Then deploy as usual: `sudo ./deploy/deploy.sh`. Updates with `sudo ./deploy/update.sh` will also use the Droplet only.
+
+**To use Block Storage** for database and media:
+
+1. Create a Volume in DO and attach it to your Droplet.
+2. `sudo ./deploy/mount-block-storage.sh`
+3. Ensure `docker-compose.prod.block.yml` exists (if you had run reset-no-block.sh, rename it back).
+4. Start with override or run `deploy.sh` (it auto-detects the block file).
+
+Full steps: [BLOCK_STORAGE.md](./BLOCK_STORAGE.md)
+
+---
+
+For detailed instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+

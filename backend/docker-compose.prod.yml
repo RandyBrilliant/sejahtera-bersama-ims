@@ -1,0 +1,147 @@
+# Sejahtera Bersama IMS - production
+# Usage: docker compose -f docker-compose.prod.yml up -d --build
+# .env: SECRET_KEY, DEBUG=False, ALLOWED_HOSTS, SQL_*, DATABASE_URL, CELERY_BROKER_URL (or defaults)
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ims-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - kms-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: ims-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/data.sejahterabersama.my.id.http-only.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certbot-www:/var/www/certbot
+      - media_volume:/app/media:ro
+      - static_volume:/app/staticfiles:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - kms-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: ims-api
+    command: ./entrypoint.sh gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 120 --access-logfile - --error-logfile -
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${SQL_USER:-postgres}:${SQL_PASSWORD:-}@db:5432/${SQL_DATABASE:-sejahteraims}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - kms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: ims-celery
+    user: "1000:1000"
+    command: celery -A backend worker -l info
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${SQL_USER:-postgres}:${SQL_PASSWORD:-}@db:5432/${SQL_DATABASE:-sejahteraims}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - kms-network
+    healthcheck:
+      disable: true
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: ims-celery-beat
+    user: "1000:1000"
+    command: celery -A backend beat -l info
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${SQL_USER:-postgres}:${SQL_PASSWORD:-}@db:5432/${SQL_DATABASE:-sejahteraims}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - kms-network
+    healthcheck:
+      disable: true
+
+  db:
+    image: postgres:15-alpine
+    container_name: ims-db
+    environment:
+      POSTGRES_DB: ${SQL_DATABASE:-sejahteraims}
+      POSTGRES_USER: ${SQL_USER:-postgres}
+      POSTGRES_PASSWORD: ${SQL_PASSWORD:-}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - kms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SQL_USER:-postgres} -d ${SQL_DATABASE:-sejahteraims}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  media_volume:
+  static_volume:
+  redis_data:
+
+networks:
+  kms-network:
+    driver: bridge
