@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -8,22 +9,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
+from .filters import UserListFilterSet
 from .serializers import EmployeeProfileSerializer, UserSerializer
 from .models import EmployeeProfile, UserRole
 from .permissions import IsAdminOrOwner, user_is_owner
+from .user_payload import build_user_payload
 
 User = get_user_model()
 
 
 def _user_payload(user):
-    return {
-        "id": user.id,
-        "username": user.username,
-        "full_name": user.full_name,
-        "role": user.role,
-        "phone_number": user.phone_number,
-        "is_active": user.is_active,
-    }
+    return build_user_payload(user)
 
 
 class MeView(APIView):
@@ -61,7 +57,8 @@ class MeView(APIView):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsAdminOrOwner]
-    filter_backends = [SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = UserListFilterSet
     search_fields = ["username", "full_name", "phone_number"]
     ordering_fields = ["username", "full_name", "created_at", "updated_at", "date_joined"]
     ordering = ["username"]

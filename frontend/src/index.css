@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -43,28 +44,48 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Dashboard UI (surface / M3-style tokens) */
+  --color-on-background: var(--dashboard-on-background);
+  --color-on-surface: var(--dashboard-on-surface);
+  --color-on-surface-variant: var(--dashboard-on-surface-variant);
+  --color-surface-app: var(--dashboard-surface);
+  --color-surface-container-lowest: var(--dashboard-surface-container-lowest);
+  --color-surface-container-low: var(--dashboard-surface-container-low);
+  --color-surface-container-high: var(--dashboard-surface-container-high);
+  --color-surface-dim: var(--dashboard-surface-dim);
+  --color-outline-variant: var(--dashboard-outline-variant);
+  --color-primary-container: var(--dashboard-primary-container);
+  --color-on-primary-container: var(--dashboard-on-primary-container);
+  --color-error-app: var(--dashboard-error);
+  --color-error-container-app: var(--dashboard-error-container);
+  --color-on-error-container-app: var(--dashboard-on-error-container);
+  --color-trend-positive: var(--dashboard-trend-positive);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 0.5rem;
+  --background: oklch(0.989 0.006 275);
+  --foreground: oklch(0.23 0.03 268);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.23 0.03 268);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.23 0.03 268);
+  --primary: #1f108e;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.53 0.2 287);
+  --secondary-foreground: oklch(0.99 0.01 270);
+  --muted: oklch(0.96 0.01 275);
+  --muted-foreground: oklch(0.46 0.02 272);
+  --accent: oklch(0.94 0.02 275);
+  --accent-foreground: oklch(0.23 0.03 268);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.88 0.01 275);
+  --input: oklch(0.88 0.01 275);
+  --ring: oklch(0.55 0.16 283);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -78,6 +99,22 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --dashboard-on-background: #0b1c30;
+  --dashboard-on-surface: #0b1c30;
+  --dashboard-on-surface-variant: #464553;
+  --dashboard-surface: #f8f9ff;
+  --dashboard-surface-container-lowest: #ffffff;
+  --dashboard-surface-container-low: #eff4ff;
+  --dashboard-surface-container-high: #dce9ff;
+  --dashboard-surface-dim: #cbdbf5;
+  --dashboard-outline-variant: #c8c4d5;
+  --dashboard-primary-container: #3730a3;
+  --dashboard-on-primary-container: #a9a7ff;
+  --dashboard-error: #ba1a1a;
+  --dashboard-error-container: #ffdad6;
+  --dashboard-on-error-container: #93000a;
+  --dashboard-trend-positive: #4648d4;
 }
 
 .dark {
@@ -120,7 +157,48 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.01em;
+  }
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-enter 320ms ease-out both;
+}
+
+.glass-panel {
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.ambient-shadow {
+  box-shadow: 0 4px 12px rgb(31 16 142 / 0.08);
 }
 
 [data-rich-colors='true'][data-sonner-toast][data-type='success'] {

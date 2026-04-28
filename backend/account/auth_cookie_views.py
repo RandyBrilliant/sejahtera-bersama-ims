@@ -19,6 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
 from .models import UserRole
+from .user_payload import build_user_payload
 from .permissions import has_role
 from .throttles import AuthRateThrottle
 
@@ -92,13 +93,7 @@ def _delete_cookie(response, key, cookie_settings):
 
 
 def _user_summary(user):
-    return {
-        "id": user.id,
-        "username": user.username,
-        "full_name": getattr(user, "full_name", "") or "",
-        "role": user.role,
-        "is_active": user.is_active,
-    }
+    return build_user_payload(user)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
