@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Bell, HelpCircle, LayoutGrid, LogOut, Menu, Search, User } from 'lucide-react'
+import { LayoutGrid, LogOut, Menu, Search, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { LogoutConfirmModal } from '@/components/auth/logout-confirm-modal'
+import { AdminQuickActionsDropdown } from '@/components/dashboard/admin/admin-quick-actions'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,27 +68,18 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
-        <button
-          type="button"
-          className="text-on-surface-variant hover:bg-surface-container-low flex size-10 items-center justify-center rounded-full transition-colors"
-          aria-label="Notifikasi"
-        >
-          <Bell className="size-5" />
-        </button>
-        <button
-          type="button"
-          className="text-on-surface-variant hover:bg-surface-container-low hidden size-10 items-center justify-center rounded-full transition-colors sm:flex"
-          aria-label="Bantuan"
-        >
-          <HelpCircle className="size-5" />
-        </button>
-        <button
-          type="button"
-          className="text-on-surface-variant hover:bg-surface-container-low hidden size-10 items-center justify-center rounded-full transition-colors md:flex"
-          aria-label="Aplikasi"
-        >
-          <LayoutGrid className="size-5" />
-        </button>
+        <AdminQuickActionsDropdown
+          align="end"
+          trigger={
+            <button
+              type="button"
+              className="text-on-surface-variant hover:bg-surface-container-low flex size-10 items-center justify-center rounded-full transition-colors"
+              aria-label="Aksi cepat — pintasan transaksi harian"
+            >
+              <LayoutGrid className="size-5" />
+            </button>
+          }
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -114,6 +106,15 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
               ) : null}
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-outline-variant" />
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              onSelect={() => {
+                navigate('/admin/pengaturan')
+              }}
+            >
+              <Settings className="size-4" />
+              Pengaturan
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer gap-2"
               onSelect={() => {

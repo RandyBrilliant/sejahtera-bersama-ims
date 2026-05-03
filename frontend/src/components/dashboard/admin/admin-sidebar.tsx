@@ -2,20 +2,22 @@ import { useState } from 'react'
 
 import {
   BarChart3,
+  Contact,
   LayoutDashboard,
   LogOut,
   Package,
   Settings,
   ShoppingCart,
-  Truck,
   User,
   Users,
+  Wallet,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { LogoutConfirmModal } from '@/components/auth/logout-confirm-modal'
+import { AdminQuickActionsDropdown } from '@/components/dashboard/admin/admin-quick-actions'
 import { cn } from '@/lib/utils'
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
@@ -24,8 +26,9 @@ const navItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/admin/staf', label: 'Pengguna & staf', icon: Users },
   { to: '/admin/inventaris', label: 'Inventaris', icon: Package },
+  { to: '/admin/pelanggan', label: 'Pelanggan', icon: Contact },
+  { to: '/admin/kas', label: 'Kas operasional', icon: Wallet },
   { to: '/admin/pesanan', label: 'Pesanan', icon: ShoppingCart },
-  { to: '/admin/pengiriman', label: 'Pengiriman', icon: Truck },
   { to: '/admin/gudang', label: 'Gudang', icon: Warehouse },
   { to: '/admin/analitik', label: 'Analitik', icon: BarChart3 },
 ]
@@ -84,20 +87,34 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
       </div>
 
       <div className="mt-auto px-4 py-4">
-        <button
-          type="button"
-          className="ambient-shadow bg-primary text-primary-foreground hover:opacity-90 w-full rounded-lg py-2 text-[11px] font-semibold tracking-wider uppercase transition-opacity"
-        >
-          Aksi cepat
-        </button>
+        <AdminQuickActionsDropdown
+          side="top"
+          align="center"
+          sideOffset={8}
+          onNavigate={onNavigate}
+          trigger={
+            <button
+              type="button"
+              className="ambient-shadow bg-primary text-primary-foreground hover:opacity-90 w-full rounded-lg py-2 text-[11px] font-semibold tracking-wider uppercase transition-opacity"
+            >
+              Aksi cepat
+            </button>
+          }
+        />
         <div className="border-outline-variant mt-4 flex flex-col gap-1 border-t pt-4">
-          <button
-            type="button"
-            className="text-on-surface-variant hover:bg-surface-container-lowest flex items-center gap-2 rounded-lg px-4 py-2 transition-colors"
+          <NavLink
+            to="/admin/pengaturan"
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cn(
+                'text-on-surface-variant hover:bg-surface-container-lowest flex items-center gap-2 rounded-lg px-4 py-2 transition-colors',
+                isActive && 'bg-surface-container-low text-on-surface'
+              )
+            }
           >
             <Settings className="size-5" />
             <span>Pengaturan</span>
-          </button>
+          </NavLink>
           <NavLink
             to="/admin/profil"
             onClick={onNavigate}

@@ -150,7 +150,8 @@ class OperationalCashSummaryView(APIView):
 class OperationalCashReportView(APIView):
     """
     Full operational cash report for a date range.
-    Query: start_date, end_date (required); format=json|csv|pdf (default json).
+    Query: start_date, end_date (required); export=json|csv|pdf (default json).
+    Gunakan nama param export — query param format adalah milik DRF dan bisa mengganggu csv/pdf.
     """
 
     permission_classes = [FinanceAccess]
@@ -159,7 +160,11 @@ class OperationalCashReportView(APIView):
         start_d, end_d, err = _parse_date_range(request)
         if err:
             return err
-        fmt = (request.query_params.get("format") or "json").lower().strip()
+        # Avoid query param name `format` — DRF uses it for content negotiation and `format=pdf`
+        # can prevent the view from matching / behaving as expected.
+        fmt = (
+            request.query_params.get("export") or request.query_params.get("format") or "json"
+        ).lower().strip()
         qs = entries_queryset_for_range(start_d, end_d)
         income, expense, net = aggregate_summary(qs)
         by_category = by_category_rows(qs)
@@ -270,6 +275,9 @@ class OperationalCashReportView(APIView):
             )
 
         return Response(
-            {"detail": "Parameter format harus json, csv, atau pdf.", "code": "validation_error"},
+            {
+                "detail": "Parameter export (atau format) harus json, csv, atau pdf.",
+                "code": "validation_error",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )

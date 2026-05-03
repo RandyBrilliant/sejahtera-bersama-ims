@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Cast, Coalesce
 from django.http import FileResponse
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -39,7 +39,14 @@ from .filters import (
     SalesOrderFilter,
 )
 from .invoice_pdf import build_sales_order_invoice_pdf
-from .models import OrderStatus, PurchaseInOrder, SalesOrder, SalesOrderLine
+from .models import (
+    Customer,
+    CustomerProductPrice,
+    OrderStatus,
+    PurchaseInOrder,
+    SalesOrder,
+    SalesOrderLine,
+)
 from .serializers import (
     CustomerProductPriceSerializer,
     CustomerSerializer,
@@ -269,6 +276,15 @@ class SalesRevenueReportView(APIView):
         line_qs = SalesOrderLine.objects.filter(order__in=base_qs).select_related(
             "product_packaging__product",
         )
+        # quantity is Decimal; unit_price_idr is integer — cast price before multiply (Django 6 ORM).
+        qty_field = DecimalField(max_digits=12, decimal_places=3)
+        money_dec = DecimalField(max_digits=24, decimal_places=3)
+        zero_qty = Value(Decimal("0"), output_field=qty_field)
+        zero_idr = Value(Decimal("0"), output_field=money_dec)
+        line_revenue_expr = ExpressionWrapper(
+            F("quantity") * Cast(F("unit_price_idr"), DecimalField(max_digits=24, decimal_places=0)),
+            output_field=money_dec,
+        )
         by_packaging = list(
             line_qs.values(
                 "product_packaging_id",
@@ -276,16 +292,8 @@ class SalesRevenueReportView(APIView):
                 "product_packaging__product__variant_name",
             )
             .annotate(
-                total_quantity=Coalesce(Sum("quantity"), Value(0)),
-                revenue_idr=Coalesce(
-                    Sum(
-                        ExpressionWrapper(
-                            F("quantity") * F("unit_price_idr"),
-                            output_field=DecimalField(max_digits=24, decimal_places=3),
-                        )
-                    ),
-                    Value(0),
-                ),
+                total_quantity=Coalesce(Sum("quantity"), zero_qty),
+                revenue_idr=Coalesce(Sum(line_revenue_expr), zero_idr),
             )
             .order_by("-revenue_idr")
         )

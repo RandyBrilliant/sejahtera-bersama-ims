@@ -118,6 +118,8 @@ class InventoryAccess(permissions.BasePermission):
             return False
 
         if request.method in permissions.SAFE_METHODS:
+            if user_is_owner(request.user):
+                return True
             return has_role(
                 request.user,
                 UserRole.ADMIN,
@@ -142,6 +144,8 @@ class FinanceAccess(permissions.BasePermission):
             return False
 
         if request.method in permissions.SAFE_METHODS:
+            if user_is_owner(request.user):
+                return True
             return has_role(
                 request.user,
                 UserRole.ADMIN,
@@ -149,6 +153,8 @@ class FinanceAccess(permissions.BasePermission):
                 UserRole.WAREHOUSE_STAFF,
                 UserRole.SALES_STAFF,
             )
+        if user_is_owner(request.user):
+            return True
         return has_role(request.user, UserRole.ADMIN, UserRole.FINANCE_STAFF)
 
 
@@ -189,6 +195,8 @@ class CustomerAccess(permissions.BasePermission):
     def has_permission(self, request, view):
         if not is_authenticated(request.user):
             return False
+        if user_is_owner(request.user):
+            return True
         if request.method in permissions.SAFE_METHODS:
             return has_role(
                 request.user,

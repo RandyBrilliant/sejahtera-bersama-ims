@@ -17,11 +17,6 @@ const AdminAppShell = lazy(() =>
 const AdminHomePage = lazy(() =>
   import('@/pages/admin/admin-home-page').then((m) => ({ default: m.AdminHomePage }))
 )
-const AdminPlaceholderPage = lazy(() =>
-  import('@/pages/admin/admin-placeholder-page').then((m) => ({
-    default: m.AdminPlaceholderPage,
-  }))
-)
 const AdminProfilePage = lazy(() =>
   import('@/pages/admin/admin-profile-page').then((m) => ({ default: m.AdminProfilePage }))
 )
@@ -33,6 +28,180 @@ const AdminStaffNewPage = lazy(() =>
 )
 const AdminStaffEditPage = lazy(() =>
   import('@/pages/admin/admin-staff-edit-page').then((m) => ({ default: m.AdminStaffEditPage }))
+)
+const AdminCustomersPage = lazy(() =>
+  import('@/pages/admin/admin-customers-page').then((m) => ({ default: m.AdminCustomersPage }))
+)
+const AdminCustomerNewPage = lazy(() =>
+  import('@/pages/admin/admin-customer-new-page').then((m) => ({
+    default: m.AdminCustomerNewPage,
+  }))
+)
+const AdminCustomerEditPage = lazy(() =>
+  import('@/pages/admin/admin-customer-edit-page').then((m) => ({
+    default: m.AdminCustomerEditPage,
+  }))
+)
+const AdminKasLayout = lazy(() =>
+  import('@/pages/admin/admin-kas-layout').then((m) => ({ default: m.AdminKasLayout }))
+)
+const AdminKasCategoriesPage = lazy(() =>
+  import('@/pages/admin/admin-kas-categories-page').then((m) => ({
+    default: m.AdminKasCategoriesPage,
+  }))
+)
+const AdminKasCategoryNewPage = lazy(() =>
+  import('@/pages/admin/admin-kas-category-new-page').then((m) => ({
+    default: m.AdminKasCategoryNewPage,
+  }))
+)
+const AdminKasCategoryEditPage = lazy(() =>
+  import('@/pages/admin/admin-kas-category-edit-page').then((m) => ({
+    default: m.AdminKasCategoryEditPage,
+  }))
+)
+const AdminKasEntriesPage = lazy(() =>
+  import('@/pages/admin/admin-kas-entries-page').then((m) => ({
+    default: m.AdminKasEntriesPage,
+  }))
+)
+const AdminKasEntryNewPage = lazy(() =>
+  import('@/pages/admin/admin-kas-entry-new-page').then((m) => ({
+    default: m.AdminKasEntryNewPage,
+  }))
+)
+const AdminKasEntryEditPage = lazy(() =>
+  import('@/pages/admin/admin-kas-entry-edit-page').then((m) => ({
+    default: m.AdminKasEntryEditPage,
+  }))
+)
+const AdminInventoryPage = lazy(() =>
+  import('@/pages/admin/admin-inventory-page').then((m) => ({ default: m.AdminInventoryPage }))
+)
+const AdminInventoryNewPage = lazy(() =>
+  import('@/pages/admin/admin-inventory-new-page').then((m) => ({
+    default: m.AdminInventoryNewPage,
+  }))
+)
+const AdminInventoryEditPage = lazy(() =>
+  import('@/pages/admin/admin-inventory-edit-page').then((m) => ({
+    default: m.AdminInventoryEditPage,
+  }))
+)
+const AdminInventoryPackagingNewPage = lazy(() =>
+  import('@/pages/admin/admin-inventory-packaging-new-page').then((m) => ({
+    default: m.AdminInventoryPackagingNewPage,
+  }))
+)
+const AdminInventoryPackagingEditPage = lazy(() =>
+  import('@/pages/admin/admin-inventory-packaging-edit-page').then((m) => ({
+    default: m.AdminInventoryPackagingEditPage,
+  }))
+)
+const AdminIngredientsPage = lazy(() =>
+  import('@/pages/admin/admin-ingredients-page').then((m) => ({
+    default: m.AdminIngredientsPage,
+  }))
+)
+const AdminIngredientNewPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-new-page').then((m) => ({
+    default: m.AdminIngredientNewPage,
+  }))
+)
+const AdminIngredientEditPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-edit-page').then((m) => ({
+    default: m.AdminIngredientEditPage,
+  }))
+)
+const AdminIngredientInventoryPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-inventory-page').then((m) => ({
+    default: m.AdminIngredientInventoryPage,
+  }))
+)
+const AdminIngredientInventoryEditPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-inventory-edit-page').then((m) => ({
+    default: m.AdminIngredientInventoryEditPage,
+  }))
+)
+const AdminIngredientMovementsPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-movements-page').then((m) => ({
+    default: m.AdminIngredientMovementsPage,
+  }))
+)
+const AdminIngredientMovementNewPage = lazy(() =>
+  import('@/pages/admin/admin-ingredient-movement-new-page').then((m) => ({
+    default: m.AdminIngredientMovementNewPage,
+  }))
+)
+const AdminProductMovementsPage = lazy(() =>
+  import('@/pages/admin/admin-product-movements-page').then((m) => ({
+    default: m.AdminProductMovementsPage,
+  }))
+)
+const AdminProductMovementNewPage = lazy(() =>
+  import('@/pages/admin/admin-product-movement-new-page').then((m) => ({
+    default: m.AdminProductMovementNewPage,
+  }))
+)
+const AdminWarehousePage = lazy(() =>
+  import('@/pages/admin/admin-warehouse-page').then((m) => ({
+    default: m.AdminWarehousePage,
+  }))
+)
+const AdminAnalyticsPage = lazy(() =>
+  import('@/pages/admin/admin-analytics-page').then((m) => ({
+    default: m.AdminAnalyticsPage,
+  }))
+)
+const AdminSettingsPage = lazy(() =>
+  import('@/pages/admin/admin-settings-page').then((m) => ({
+    default: m.AdminSettingsPage,
+  }))
+)
+const AdminOrdersLayout = lazy(() =>
+  import('@/pages/admin/admin-orders-layout').then((m) => ({
+    default: m.AdminOrdersLayout,
+  }))
+)
+const AdminPurchaseOrdersListPage = lazy(() =>
+  import('@/pages/admin/admin-purchase-orders-list-page').then((m) => ({
+    default: m.AdminPurchaseOrdersListPage,
+  }))
+)
+const AdminSalesOrdersListPage = lazy(() =>
+  import('@/pages/admin/admin-sales-orders-list-page').then((m) => ({
+    default: m.AdminSalesOrdersListPage,
+  }))
+)
+const AdminPurchaseOrderNewPage = lazy(() =>
+  import('@/pages/admin/admin-purchase-order-new-page').then((m) => ({
+    default: m.AdminPurchaseOrderNewPage,
+  }))
+)
+const AdminPurchaseOrderEditPage = lazy(() =>
+  import('@/pages/admin/admin-purchase-order-edit-page').then((m) => ({
+    default: m.AdminPurchaseOrderEditPage,
+  }))
+)
+const AdminPurchaseOrderDetailPage = lazy(() =>
+  import('@/pages/admin/admin-purchase-order-detail-page').then((m) => ({
+    default: m.AdminPurchaseOrderDetailPage,
+  }))
+)
+const AdminSalesOrderNewPage = lazy(() =>
+  import('@/pages/admin/admin-sales-order-new-page').then((m) => ({
+    default: m.AdminSalesOrderNewPage,
+  }))
+)
+const AdminSalesOrderEditPage = lazy(() =>
+  import('@/pages/admin/admin-sales-order-edit-page').then((m) => ({
+    default: m.AdminSalesOrderEditPage,
+  }))
+)
+const AdminSalesOrderDetailPage = lazy(() =>
+  import('@/pages/admin/admin-sales-order-detail-page').then((m) => ({
+    default: m.AdminSalesOrderDetailPage,
+  }))
 )
 const WarehouseDashboardPage = lazy(() =>
   import('@/pages/warehouse-dashboard-page').then((m) => ({
@@ -71,51 +240,64 @@ export default function App() {
               <Route path="staf/baru" element={<AdminStaffNewPage />} />
               <Route path="staf/:id/edit" element={<AdminStaffEditPage />} />
               <Route path="staf" element={<AdminStaffPage />} />
+              <Route path="pelanggan/baru" element={<AdminCustomerNewPage />} />
+              <Route path="pelanggan/:id/edit" element={<AdminCustomerEditPage />} />
+              <Route path="pelanggan" element={<AdminCustomersPage />} />
+              <Route path="kas" element={<AdminKasLayout />}>
+                <Route index element={<Navigate to="entri" replace />} />
+                <Route path="kategori/baru" element={<AdminKasCategoryNewPage />} />
+                <Route path="kategori/:id/edit" element={<AdminKasCategoryEditPage />} />
+                <Route path="kategori" element={<AdminKasCategoriesPage />} />
+                <Route path="entri/baru" element={<AdminKasEntryNewPage />} />
+                <Route path="entri/:id/edit" element={<AdminKasEntryEditPage />} />
+                <Route path="entri" element={<AdminKasEntriesPage />} />
+              </Route>
+              <Route path="inventaris/baru" element={<AdminInventoryNewPage />} />
               <Route
-                path="inventaris"
-                element={
-                  <AdminPlaceholderPage
-                    title="Inventaris"
-                    description="Kelola master barang, level stok minimum, dan kategori. Siap untuk tabel data, filter, dan aksi massal begitu API tersedia."
-                  />
-                }
+                path="inventaris/kemasan/:packagingId/edit"
+                element={<AdminInventoryPackagingEditPage />}
               />
               <Route
-                path="pesanan"
-                element={
-                  <AdminPlaceholderPage
-                    title="Pesanan"
-                    description="Alur pembelian & penjualan serta status pesanan akan ditampilkan di sini untuk tim admin dan pimpinan."
-                  />
-                }
+                path="inventaris/:productId/kemasan/baru"
+                element={<AdminInventoryPackagingNewPage />}
               />
+              <Route path="inventaris/:productId/edit" element={<AdminInventoryEditPage />} />
+              <Route path="inventaris" element={<AdminInventoryPage />} />
+              <Route path="gudang/bahan-baku/baru" element={<AdminIngredientNewPage />} />
               <Route
-                path="pengiriman"
-                element={
-                  <AdminPlaceholderPage
-                    title="Pengiriman"
-                    description="Pantau pengiriman, kurir, dan SLA logistik — placeholder layout hingga integrasi pengiriman."
-                  />
-                }
+                path="gudang/bahan-baku/:ingredientId/edit"
+                element={<AdminIngredientEditPage />}
               />
+              <Route path="gudang/bahan-baku" element={<AdminIngredientsPage />} />
               <Route
-                path="gudang"
-                element={
-                  <AdminPlaceholderPage
-                    title="Gudang"
-                    description="Operasi gudang: lokasi rak, pergerakan barang, dan slot penyimpanan. Struktur halaman mengikuti kebutuhan IMS."
-                  />
-                }
+                path="gudang/stok-bahan/:inventoryId/edit"
+                element={<AdminIngredientInventoryEditPage />}
               />
-              <Route
-                path="analitik"
-                element={
-                  <AdminPlaceholderPage
-                    title="Analitik"
-                    description="Ringkasan KPI mendalam, tren penjualan, dan laporan eksekutif. Grafik dapat ditambahkan setelah sumber data siap."
-                  />
-                }
-              />
+              <Route path="gudang/stok-bahan" element={<AdminIngredientInventoryPage />} />
+              <Route path="gudang/mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
+              <Route path="gudang/mutasi-bahan" element={<AdminIngredientMovementsPage />} />
+              <Route path="gudang/mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
+              <Route path="gudang/mutasi-produk" element={<AdminProductMovementsPage />} />
+              <Route path="gudang" element={<AdminWarehousePage />} />
+              <Route path="pesanan" element={<AdminOrdersLayout />}>
+                <Route index element={<Navigate to="penjualan" replace />} />
+                <Route path="pembelian/baru" element={<AdminPurchaseOrderNewPage />} />
+                <Route
+                  path="pembelian/:orderId/edit"
+                  element={<AdminPurchaseOrderEditPage />}
+                />
+                <Route
+                  path="pembelian/:orderId"
+                  element={<AdminPurchaseOrderDetailPage />}
+                />
+                <Route path="pembelian" element={<AdminPurchaseOrdersListPage />} />
+                <Route path="penjualan/baru" element={<AdminSalesOrderNewPage />} />
+                <Route path="penjualan/:orderId/edit" element={<AdminSalesOrderEditPage />} />
+                <Route path="penjualan/:orderId" element={<AdminSalesOrderDetailPage />} />
+                <Route path="penjualan" element={<AdminSalesOrdersListPage />} />
+              </Route>
+              <Route path="analitik" element={<AdminAnalyticsPage />} />
+              <Route path="pengaturan" element={<AdminSettingsPage />} />
             </Route>
             <Route
               path="/warehouse/dashboard"

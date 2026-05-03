@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.db import models, transaction
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Cast, Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -47,6 +47,30 @@ from .serializers import (
 )
 
 
+def _decimal_zero(max_digits: int = 12, decimal_places: int = 3) -> Value:
+    """Coalesce default compatible with DecimalField aggregates (avoid int/decimal mix)."""
+    return Value(Decimal("0"), output_field=DecimalField(max_digits=max_digits, decimal_places=decimal_places))
+
+
+def _estimated_packaging_line_value():
+    """(produced + bonus) × harga pokok — Cast harga ke Decimal agar tidak mixed Integer × Decimal."""
+    qty_plus_bonus = F("quantity_produced") + F("bonus_quantity")
+    price_dec = Cast(F("product_packaging__base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
+    return ExpressionWrapper(
+        qty_plus_bonus * price_dec,
+        output_field=DecimalField(max_digits=24, decimal_places=3),
+    )
+
+
+_DECIMAL_QTY12 = DecimalField(max_digits=12, decimal_places=3)
+# Default untuk Coalesce pada Sum field Decimal — Value(0) memicu FieldError mixed Decimal/Integer (Django 6).
+ZERO_QTY12 = _decimal_zero(12, 3)
+PACKAGING_OUTPUT_SUM = ExpressionWrapper(
+    F("quantity_produced") + F("bonus_quantity"),
+    output_field=_DECIMAL_QTY12,
+)
+
+
 class AuditTrailMixin:
     """Populate created_by/updated_by fields from request user."""
 
@@ -73,19 +97,16 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="packaging-summary")
     def packaging_summary(self, request, pk=None):
         product = self.get_object()
+        price_dec = Cast(F("base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
+        stock_times_price = ExpressionWrapper(
+            F("remaining_stock") * price_dec,
+            output_field=DecimalField(max_digits=24, decimal_places=3),
+        )
         aggregates = product.packaging_variants.aggregate(
             total_packaging=Count("id"),
             active_packaging=Count("id", filter=models.Q(is_active=True)),
-            total_stock=Coalesce(Sum("remaining_stock"), Value(0)),
-            stock_value_idr=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        F("remaining_stock") * F("base_price_idr"),
-                        output_field=DecimalField(max_digits=24, decimal_places=3),
-                    )
-                ),
-                Value(0),
-            ),
+            total_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
+            stock_value_idr=Coalesce(Sum(stock_times_price), _decimal_zero(24, 3)),
         )
         return Response(status=status.HTTP_200_OK, data=success_response(data=aggregates))
 
@@ -147,24 +168,21 @@ class InventorySummaryView(APIView):
     permission_classes = [InventoryAccess]
 
     def get(self, request):
+        price_dec = Cast(F("base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
+        stock_times_price = ExpressionWrapper(
+            F("remaining_stock") * price_dec,
+            output_field=DecimalField(max_digits=24, decimal_places=3),
+        )
         product_aggregates = ProductPackaging.objects.aggregate(
             total_packaging=Count("id"),
             active_packaging=Count("id", filter=models.Q(is_active=True)),
-            total_product_stock=Coalesce(Sum("remaining_stock"), Value(0)),
-            total_product_stock_value_idr=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        F("remaining_stock") * F("base_price_idr"),
-                        output_field=DecimalField(max_digits=24, decimal_places=3),
-                    )
-                ),
-                Value(0),
-            ),
+            total_product_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
+            total_product_stock_value_idr=Coalesce(Sum(stock_times_price), _decimal_zero(24, 3)),
         )
         ingredient_aggregates = IngredientInventory.objects.aggregate(
             total_ingredient_items=Count("id"),
             low_stock_items=Count("id", filter=models.Q(remaining_stock__lt=F("minimum_stock"))),
-            total_ingredient_stock=Coalesce(Sum("remaining_stock"), Value(0)),
+            total_ingredient_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
         )
         payload = {"products": product_aggregates, "ingredients": ingredient_aggregates}
         return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
@@ -196,7 +214,7 @@ class DailyInventoryRecapView(APIView):
                 "ingredient_inventory__ingredient__name",
                 "ingredient_inventory__ingredient__default_unit",
             )
-            .annotate(total_used=Coalesce(Sum("quantity_used"), Value(0)))
+            .annotate(total_used=Coalesce(Sum("quantity_used"), ZERO_QTY12))
             .order_by("ingredient_inventory__ingredient__name")
         )
 
@@ -209,37 +227,27 @@ class DailyInventoryRecapView(APIView):
                 "product_packaging__base_price_idr",
             )
             .annotate(
-                total_produced=Coalesce(Sum("quantity_produced"), Value(0)),
-                total_bonus=Coalesce(Sum("bonus_quantity"), Value(0)),
-                total_output=Coalesce(Sum(F("quantity_produced") + F("bonus_quantity")), Value(0)),
+                total_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
+                total_bonus=Coalesce(Sum("bonus_quantity"), ZERO_QTY12),
+                total_output=Coalesce(Sum(PACKAGING_OUTPUT_SUM), ZERO_QTY12),
                 estimated_value_idr=Coalesce(
-                    Sum(
-                        ExpressionWrapper(
-                            (F("quantity_produced") + F("bonus_quantity")) * F("product_packaging__base_price_idr"),
-                            output_field=DecimalField(max_digits=24, decimal_places=3),
-                        )
-                    ),
-                    Value(0),
+                    Sum(_estimated_packaging_line_value()),
+                    _decimal_zero(24, 3),
                 ),
             )
             .order_by("product_packaging__product__variant_name", "product_packaging__label")
         )
 
         ingredient_summary = ProductionIngredientUsage.objects.filter(batch__production_date=recap_date).aggregate(
-            total_ingredients_used=Coalesce(Sum("quantity_used"), Value(0)),
+            total_ingredients_used=Coalesce(Sum("quantity_used"), ZERO_QTY12),
         )
         packaging_summary = ProductionPackagingOutput.objects.filter(batch__production_date=recap_date).aggregate(
-            total_packages_produced=Coalesce(Sum("quantity_produced"), Value(0)),
-            total_bonus_packages=Coalesce(Sum("bonus_quantity"), Value(0)),
-            total_packages_output=Coalesce(Sum(F("quantity_produced") + F("bonus_quantity")), Value(0)),
+            total_packages_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
+            total_bonus_packages=Coalesce(Sum("bonus_quantity"), ZERO_QTY12),
+            total_packages_output=Coalesce(Sum(PACKAGING_OUTPUT_SUM), ZERO_QTY12),
             estimated_production_value_idr=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        (F("quantity_produced") + F("bonus_quantity")) * F("product_packaging__base_price_idr"),
-                        output_field=DecimalField(max_digits=24, decimal_places=3),
-                    )
-                ),
-                Value(0),
+                Sum(_estimated_packaging_line_value()),
+                _decimal_zero(24, 3),
             ),
         )
 
@@ -321,7 +329,7 @@ class RangeInventoryRecapView(APIView):
                 "ingredient_inventory__ingredient__name",
                 "ingredient_inventory__ingredient__default_unit",
             )
-            .annotate(total_used=Coalesce(Sum("quantity_used"), Value(0)))
+            .annotate(total_used=Coalesce(Sum("quantity_used"), ZERO_QTY12))
             .order_by("ingredient_inventory__ingredient__name")
         )
 
@@ -333,37 +341,27 @@ class RangeInventoryRecapView(APIView):
                 "product_packaging__base_price_idr",
             )
             .annotate(
-                total_produced=Coalesce(Sum("quantity_produced"), Value(0)),
-                total_bonus=Coalesce(Sum("bonus_quantity"), Value(0)),
-                total_output=Coalesce(Sum(F("quantity_produced") + F("bonus_quantity")), Value(0)),
+                total_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
+                total_bonus=Coalesce(Sum("bonus_quantity"), ZERO_QTY12),
+                total_output=Coalesce(Sum(PACKAGING_OUTPUT_SUM), ZERO_QTY12),
                 estimated_value_idr=Coalesce(
-                    Sum(
-                        ExpressionWrapper(
-                            (F("quantity_produced") + F("bonus_quantity")) * F("product_packaging__base_price_idr"),
-                            output_field=DecimalField(max_digits=24, decimal_places=3),
-                        )
-                    ),
-                    Value(0),
+                    Sum(_estimated_packaging_line_value()),
+                    _decimal_zero(24, 3),
                 ),
             )
             .order_by("product_packaging__product__variant_name", "product_packaging__label")
         )
 
         ingredient_summary = ingredient_base_qs.aggregate(
-            total_ingredients_used=Coalesce(Sum("quantity_used"), Value(0)),
+            total_ingredients_used=Coalesce(Sum("quantity_used"), ZERO_QTY12),
         )
         packaging_summary = packaging_base_qs.aggregate(
-            total_packages_produced=Coalesce(Sum("quantity_produced"), Value(0)),
-            total_bonus_packages=Coalesce(Sum("bonus_quantity"), Value(0)),
-            total_packages_output=Coalesce(Sum(F("quantity_produced") + F("bonus_quantity")), Value(0)),
+            total_packages_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
+            total_bonus_packages=Coalesce(Sum("bonus_quantity"), ZERO_QTY12),
+            total_packages_output=Coalesce(Sum(PACKAGING_OUTPUT_SUM), ZERO_QTY12),
             estimated_production_value_idr=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        (F("quantity_produced") + F("bonus_quantity")) * F("product_packaging__base_price_idr"),
-                        output_field=DecimalField(max_digits=24, decimal_places=3),
-                    )
-                ),
-                Value(0),
+                Sum(_estimated_packaging_line_value()),
+                _decimal_zero(24, 3),
             ),
         )
         total_batches = ProductionBatch.objects.filter(
