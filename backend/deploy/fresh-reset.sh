@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # Get current directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
-DOMAIN="${DOMAIN:-data.sejahterabersama.my.id}"
+DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
 HTTP_CONF="./nginx/${DOMAIN}.http-only.conf"
 SSL_CONF="./nginx/${DOMAIN}.conf"
 

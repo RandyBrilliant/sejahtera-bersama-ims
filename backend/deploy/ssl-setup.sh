@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SSL Certificate Setup Script
-# Sets up Let's Encrypt SSL certificate for data.sejahterabersama.my.id
+# Let's Encrypt via webroot for DOMAIN (default: api.sejahterabersama.my.id)
 
 set -e
 
@@ -17,6 +17,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${APP_DIR:-$PROJECT_DIR}"
 
+COMPOSE_OPTS="-f docker-compose.prod.yml"
+[ -f "$APP_DIR/docker-compose.prod.block.yml" ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.prod.block.yml"
+
 echo -e "${BLUE}=========================================="
 echo "SSL Certificate Setup"
 echo "==========================================${NC}"
@@ -28,8 +31,10 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+cd "$APP_DIR"
+
 # Domain configuration
-DOMAIN="${DOMAIN:-data.sejahterabersama.my.id}"
+DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
 EMAIL="${SSL_EMAIL:-admin@sejahterabersama.my.id}"
 HTTP_CONF="./nginx/${DOMAIN}.http-only.conf"
 SSL_CONF="./nginx/${DOMAIN}.conf"
@@ -70,7 +75,7 @@ fi
 # Check if services are running
 echo ""
 echo -e "${BLUE}[2/6] Checking if services are running...${NC}"
-if ! docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+if ! docker compose $COMPOSE_OPTS ps | grep -q "Up"; then
     echo -e "${RED}Error: Services are not running!${NC}"
     echo "Please run: sudo ./deploy/deploy.sh first"
     exit 1
@@ -80,7 +85,6 @@ echo -e "${GREEN}✓ Services are running${NC}"
 # Ensure nginx is using HTTP-only config
 echo ""
 echo -e "${BLUE}[3/6] Ensuring Nginx is in HTTP mode...${NC}"
-cd "$APP_DIR"
 echo -e "${GREEN}✓ Using HTTP mode for ACME challenge${NC}"
 
 # Generate certificate via webroot (no downtime)
@@ -130,24 +134,24 @@ echo -e "${GREEN}✓ Configuration updated${NC}"
 # Restart nginx with SSL
 echo ""
 echo -e "${BLUE}[6/6] Starting Nginx with SSL...${NC}"
-docker compose -f docker-compose.prod.yml up -d nginx
+docker compose $COMPOSE_OPTS up -d nginx
 sleep 5
 
 # Verify nginx configuration
-if docker compose -f docker-compose.prod.yml exec -T nginx nginx -t > /dev/null 2>&1; then
+if docker compose $COMPOSE_OPTS exec -T nginx nginx -t > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
 else
     echo -e "${RED}Error: Nginx configuration is invalid!${NC}"
-    docker compose -f docker-compose.prod.yml exec -T nginx nginx -t
+    docker compose $COMPOSE_OPTS exec -T nginx nginx -t
     exit 1
 fi
 
 # Verify nginx is running
-if docker compose -f docker-compose.prod.yml ps nginx | grep -q "Up"; then
+if docker compose $COMPOSE_OPTS ps nginx | grep -q "Up"; then
     echo -e "${GREEN}✓ Nginx started successfully${NC}"
 else
     echo -e "${RED}Error: Nginx failed to start${NC}"
-    docker compose -f docker-compose.prod.yml logs nginx | tail -20
+    docker compose $COMPOSE_OPTS logs nginx | tail -20
     exit 1
 fi
 
@@ -158,7 +162,7 @@ echo -e "${BLUE}Setting up certificate auto-renewal...${NC}"
 cat > /etc/cron.weekly/renew-ssl-cert <<EOF
 #!/bin/bash
 set -e
-certbot renew --quiet --webroot -w "$WEBROOT_DIR" --deploy-hook "cd $APP_DIR && cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem nginx/ssl/$DOMAIN/fullchain.pem && cp /etc/letsencrypt/live/$DOMAIN/privkey.pem nginx/ssl/$DOMAIN/privkey.pem && cp /etc/letsencrypt/live/$DOMAIN/chain.pem nginx/ssl/$DOMAIN/chain.pem && docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload"
+certbot renew --quiet --webroot -w "$WEBROOT_DIR" --deploy-hook "cd $APP_DIR && cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem nginx/ssl/$DOMAIN/fullchain.pem && cp /etc/letsencrypt/live/$DOMAIN/privkey.pem nginx/ssl/$DOMAIN/privkey.pem && cp /etc/letsencrypt/live/$DOMAIN/chain.pem nginx/ssl/$DOMAIN/chain.pem && docker compose $COMPOSE_OPTS exec -T nginx nginx -s reload"
 EOF
 chmod +x /etc/cron.weekly/renew-ssl-cert
 echo -e "${GREEN}✓ Auto-renewal configured${NC}"

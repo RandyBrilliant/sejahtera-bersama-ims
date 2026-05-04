@@ -26,7 +26,7 @@ fi
 
 echo -e "${BLUE}=========================================="
 echo "Sejahtera Bersama IMS - Server Setup"
-echo "Optimized for: 1 vCPU, 2GB RAM"
+echo "Typical target: 1–2 vCPU, 2GB RAM"
 echo "==========================================${NC}"
 if [ "$UBUNTU_VERSION" != "unknown" ]; then
     echo -e "${BLUE}Detected: $PRETTY_NAME${NC}"
@@ -51,14 +51,14 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo -e "${BLUE}[1/8] Updating system packages...${NC}"
+echo -e "${BLUE}[1/9] Updating system packages...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get upgrade -y -qq
 echo -e "${GREEN}✓ System updated${NC}"
 
 echo ""
-echo -e "${BLUE}[2/8] Installing essential packages...${NC}"
+echo -e "${BLUE}[2/9] Installing essential packages...${NC}"
 apt-get install -y -qq \
     curl \
     wget \
