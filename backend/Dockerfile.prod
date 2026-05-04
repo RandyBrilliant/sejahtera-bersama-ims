@@ -34,8 +34,10 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 RUN apt-get update && apt-get install -y --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user (UID 1000; entrypoint will chown volumes to this)
-RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
+# Fixed uid/gid 1000 so docker-compose user: "1000:1000" matches /etc/passwd + /etc/group (celery).
+# Home /app — Gunicorn control socket uses $HOME; avoid missing /home/appuser permission errors.
+RUN groupadd --gid 1000 appuser \
+    && useradd --uid 1000 --gid appuser --home-dir /app --no-create-home --shell /usr/sbin/nologin appuser
 
 # Copy application code
 COPY . .
