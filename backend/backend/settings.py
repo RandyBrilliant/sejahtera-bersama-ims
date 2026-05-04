@@ -1,5 +1,4 @@
 import os
-import re
 from datetime import timedelta
 from pathlib import Path
 
@@ -50,9 +49,10 @@ SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
 CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", False)
 CSRF_TRUSTED_ORIGINS = _env_csv("CSRF_TRUSTED_ORIGINS")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-# Gunicorn health checks use http://127.0.0.1 (no X-Forwarded-Proto); exempt from HTTPS redirect.
+# Docker healthchecks hit Gunicorn over HTTP without X-Forwarded-Proto. SecurityMiddleware compares
+# SECURE_REDIRECT_EXEMPT against request.path.lstrip("/") (no leading slash), not the full path.
 SECURE_REDIRECT_EXEMPT = [
-    re.compile(r"^/health/?$"),
+    r"^health/?$",
 ]
 
 INSTALLED_APPS = [
