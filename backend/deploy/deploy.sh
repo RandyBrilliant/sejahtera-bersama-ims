@@ -127,14 +127,15 @@ echo ""
 echo -e "${GREEN}✓ Database ready${NC}"
 
 echo ""
-echo -e "${BLUE}[7/7] Running database migrations...${NC}"
-if ! docker compose $COMPOSE_OPTS exec -T api python manage.py migrate --noinput; then
-    echo -e "${RED}Error: Migrations failed${NC}"
-    echo -e "${YELLOW}Showing last 30 lines of API logs:${NC}"
-    docker compose $COMPOSE_OPTS logs api | tail -30
+echo -e "${BLUE}[7/7] Confirming API startup...${NC}"
+echo "  (Migrations run inside the API container entrypoint, before Gunicorn — this script does not run migrate, to avoid concurrent migrate with entrypoint.)"
+if ! docker compose $COMPOSE_OPTS ps api 2>/dev/null | grep -q "Up"; then
+    echo -e "${RED}Error: API container is not running — migrations may have failed in entrypoint.${NC}"
+    echo -e "${YELLOW}Last API logs:${NC}"
+    docker compose $COMPOSE_OPTS logs api | tail -40
     exit 1
 fi
-echo -e "${GREEN}✓ Migrations completed${NC}"
+echo -e "${GREEN}✓ API container is up${NC}"
 
 echo ""
 echo -e "${BLUE}Collecting static files...${NC}"

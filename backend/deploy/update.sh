@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Update script: pull code, rebuild, restart, migrate, collectstatic.
+# Update script: pull code, rebuild, restart, collectstatic.
+# Migrations run in the API entrypoint (do not run migrate here — avoids racing a second migrator).
 # Uses block storage override automatically if docker-compose.prod.block.yml exists.
 
 set -e
@@ -67,12 +68,14 @@ docker compose $COMPOSE_OPTS up -d
 echo -e "${GREEN}✓ Services started${NC}"
 
 echo ""
-echo -e "${BLUE}[5/5] Running migrations...${NC}"
-sleep 5
-docker compose $COMPOSE_OPTS exec -T api python manage.py migrate --noinput || {
-    echo -e "${YELLOW}⚠ Migrations had issues${NC}"
-}
-echo -e "${GREEN}✓ Migrations completed${NC}"
+echo -e "${BLUE}[5/5] Waiting for API (migrations apply in container entrypoint)...${NC}"
+sleep 8
+if ! docker compose $COMPOSE_OPTS ps api 2>/dev/null | grep -q "Up"; then
+    echo -e "${RED}Error: API container is not running.${NC}"
+    docker compose $COMPOSE_OPTS logs api | tail -40
+    exit 1
+fi
+echo -e "${GREEN}✓ API is up${NC}"
 
 echo ""
 echo -e "${BLUE}Collecting static files...${NC}"
