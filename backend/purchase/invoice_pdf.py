@@ -1,5 +1,6 @@
 """Generate simple PDF invoices for sales orders (ReportLab)."""
 
+from decimal import Decimal
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -12,6 +13,12 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 def _format_idr(value: int) -> str:
     s = f"{int(value):,}".replace(",", ".")
     return f"Rp {s}"
+
+
+def _packaging_net_mass_label(pp) -> str:
+    kg = Decimal(str(pp.net_mass_kg)).normalize()
+    txt = format(kg, "f").rstrip("0").rstrip(".") or "0"
+    return f"{txt} kg"
 
 
 def build_sales_order_invoice_pdf(order) -> BytesIO:
@@ -45,7 +52,6 @@ def build_sales_order_invoice_pdf(order) -> BytesIO:
         ["No. order", order.order_code],
         ["Status", order.get_status_display()],
         ["Pelanggan", cust.name],
-        ["Perusahaan", cust.company_name or "-"],
         ["Telepon", cust.phone or "-"],
         ["Alamat", cust.address or "-"],
         ["No. invoice", order.invoice_number or "-"],
@@ -75,7 +81,8 @@ def build_sales_order_invoice_pdf(order) -> BytesIO:
     for line in lines:
         pp = line.product_packaging
         variant = pp.product.variant_name if pp.product_id else ""
-        desc = f"{variant} — {pp.label} ({pp.net_mass_grams} g)" if variant else f"{pp.label} ({pp.net_mass_grams} g)"
+        mass_bit = _packaging_net_mass_label(pp)
+        desc = f"{variant} — {pp.label} ({mass_bit})" if variant else f"{pp.label} ({mass_bit})"
         line_total = int(line.quantity * line.unit_price_idr)
         table_data.append(
             [

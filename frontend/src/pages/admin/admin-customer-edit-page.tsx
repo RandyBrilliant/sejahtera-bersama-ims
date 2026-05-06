@@ -1,6 +1,7 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { CustomerForm } from '@/components/admin/customers/customer-form'
+import { CustomerMetadataAside } from '@/components/admin/customers/customer-metadata-aside'
 import { useCustomerQuery } from '@/hooks/use-purchase-query'
 
 export function AdminCustomerEditPage() {
@@ -51,12 +52,15 @@ export function AdminCustomerEditPage() {
         </p>
       </div>
 
-      <CustomerForm
-        mode="edit"
-        initial={customer}
-        onCancel={() => navigate('/admin/pelanggan')}
-        onSaved={() => navigate('/admin/pelanggan')}
-      />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <CustomerForm
+          mode="edit"
+          initial={customer}
+          onCancel={() => navigate('/admin/pelanggan')}
+          onSaved={() => navigate('/admin/pelanggan')}
+        />
+        <CustomerMetadataAside customer={customer} />
+      </div>
     </div>
   )
 }

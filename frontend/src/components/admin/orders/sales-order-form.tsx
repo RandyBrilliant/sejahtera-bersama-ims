@@ -1,11 +1,22 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RegionalPhoneInput } from '@/components/ui/regional-phone-input'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import {
   Select,
   SelectContent,
@@ -13,28 +24,56 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { alert } from '@/lib/alert'
+import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import {
+  useCreateCustomerMutation,
   useCreateSalesOrderMutation,
   useCustomersQuery,
   useSalesOrderQuery,
   useUpdateSalesOrderMutation,
 } from '@/hooks/use-purchase-query'
-import { canEditOrderLines, ORDER_STATUS_LABEL } from '@/constants/order-status'
-import type { OrderStatus, SalesOrder, SalesOrderLineInput } from '@/types/purchase'
+import { canEditOrderLines } from '@/constants/order-status'
+import type { SalesOrder, SalesOrderLineInput } from '@/types/purchase'
 
 const listParams = { page: 1, page_size: 500 } as const
 
-const EDITABLE_STATUS: OrderStatus[] = ['DRAFT', 'SUBMITTED', 'AWAITING_PAYMENT']
+function isoTomorrowLocal(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
 
-const NO_CUSTOMER = '__none__' as const
+function defaultSalesInvoiceNumber(): string {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `INV-SO-${yyyy}${mm}${dd}-${hh}${mi}${ss}`
+}
 
 type LineDraft = {
   product_packaging: number | ''
   quantity: string
   unit_price_idr: string
+}
+
+function RequiredAsterisk() {
+  return (
+    <span className="text-destructive" aria-hidden>
+      {' '}
+      *
+    </span>
+  )
 }
 
 function linesFromInitial(order: SalesOrder | null): LineDraft[] {
@@ -60,32 +99,44 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const customersQuery = useCustomersQuery({ ...listParams, is_active: true })
   const packagingQuery = useProductPackagingListQuery(listParams)
 
-  const customers = customersQuery.data?.results ?? []
+  const customers = useMemo(() => customersQuery.data?.results ?? [], [customersQuery.data?.results])
   const packagingRows = packagingQuery.data?.results ?? []
 
   const [customerId, setCustomerId] = useState<number | ''>(() =>
     initial?.customer != null ? initial.customer : ''
   )
-  const [status, setStatus] = useState<OrderStatus>(() => {
-    const s = initial?.status
-    if (s && EDITABLE_STATUS.includes(s)) return s
-    return 'DRAFT'
+  const [invoiceNumber, setInvoiceNumber] = useState(() => {
+    if (initial?.invoice_number) return initial.invoice_number
+    return mode === 'create' ? defaultSalesInvoiceNumber() : ''
   })
-  const [invoiceNumber, setInvoiceNumber] = useState(() => initial?.invoice_number ?? '')
   const [invoiceDate, setInvoiceDate] = useState(() =>
-    initial?.invoice_date ? initial.invoice_date.slice(0, 10) : ''
-  )
-  const [dueDate, setDueDate] = useState(() =>
-    initial?.due_date ? initial.due_date.slice(0, 10) : ''
-  )
-  const [taxAmount, setTaxAmount] = useState(() =>
-    initial ? String(initial.tax_amount_idr ?? 0) : '0'
+    initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
   const [notes, setNotes] = useState(() => initial?.notes ?? '')
   const [lines, setLines] = useState<LineDraft[]>(() => linesFromInitial(initial))
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false)
+  const [customerModalOpen, setCustomerModalOpen] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [newCustomerPhone, setNewCustomerPhone] = useState('')
+  const [newCustomerAddress, setNewCustomerAddress] = useState('')
+  const [newCustomerNotes, setNewCustomerNotes] = useState('')
 
+  const createCustomerMut = useCreateCustomerMutation()
   const createMut = useCreateSalesOrderMutation()
   const updateMut = useUpdateSalesOrderMutation(orderId ?? 0)
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase()
+    if (!q) return customers
+    return customers.filter((c) => {
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q) ||
+        c.address.toLowerCase().includes(q)
+      )
+    })
+  }, [customerSearch, customers])
 
   function addLine() {
     setLines((rows) => [...rows, { product_packaging: '', quantity: '', unit_price_idr: '' }])
@@ -97,6 +148,46 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
   function updateLine(idx: number, patch: Partial<LineDraft>) {
     setLines((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
+  }
+
+  function toFiniteNumber(value: string): number | null {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+
+  async function handleCreateCustomerFromModal(e: React.FormEvent) {
+    e.preventDefault()
+    const name = newCustomerName.trim()
+    const address = newCustomerAddress.trim()
+    if (!name) {
+      alert.error('Validasi', 'Nama pelanggan wajib diisi.')
+      return
+    }
+    if (!address) {
+      alert.error('Validasi', 'Alamat pelanggan wajib diisi.')
+      return
+    }
+    try {
+      const created = await createCustomerMut.mutateAsync({
+        name,
+        phone: newCustomerPhone.trim() || undefined,
+        address,
+        notes: newCustomerNotes.trim() || undefined,
+        is_active: true,
+      })
+      setCustomerId(created.id)
+      setCustomerSearch(created.name)
+      setCustomerDropdownOpen(false)
+      setCustomerModalOpen(false)
+      setNewCustomerName('')
+      setNewCustomerPhone('')
+      setNewCustomerAddress('')
+      setNewCustomerNotes('')
+      void customersQuery.refetch()
+      alert.success('Berhasil', 'Pelanggan baru ditambahkan.')
+    } catch (err) {
+      alert.error('Gagal menambah pelanggan', parsePurchaseMutationError(err))
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -130,11 +221,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
     const body = {
       customer: customerId as number,
-      status,
       invoice_number: invoiceNumber.trim() || undefined,
       invoice_date: invoiceDate || null,
-      due_date: dueDate || null,
-      tax_amount_idr: Number(taxAmount) || 0,
       notes: notes.trim(),
       lines: payloadLines,
     }
@@ -168,49 +256,101 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
         </CardHeader>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
           <div className="grid gap-2 sm:col-span-2">
-            <Label>Pelanggan</Label>
-            {customersQuery.isLoading ? (
-              <p className="text-on-surface-variant text-sm">Memuat pelanggan…</p>
-            ) : (
-              <Select
-                value={customerId === '' ? NO_CUSTOMER : String(customerId)}
-                onValueChange={(v) => setCustomerId(v === NO_CUSTOMER ? '' : Number(v))}
-                disabled={pending}
+            <Label htmlFor="so-customer-search">
+              Pelanggan
+              <RequiredAsterisk />
+            </Label>
+            <DropdownMenu open={customerDropdownOpen} onOpenChange={setCustomerDropdownOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-outline-variant w-full justify-between font-normal"
+                  disabled={pending || customersQuery.isLoading}
+                >
+                  <span className="truncate text-left">
+                    {customerId !== ''
+                      ? customers.find((c) => c.id === customerId)?.name ?? `#${customerId}`
+                      : 'Pilih pelanggan…'}
+                  </span>
+                  <span className="text-on-surface-variant text-xs">Cari</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                className="border-outline-variant bg-surface-container-lowest w-[min(44rem,calc(100vw-2rem))] p-2"
               >
-                <SelectTrigger className="border-outline-variant w-full">
-                  <SelectValue placeholder="Pilih pelanggan…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CUSTOMER}>— Pilih —</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+                <div className="grid gap-2">
+                  <Input
+                    id="so-customer-search"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Cari pelanggan (nama, telepon, alamat)…"
+                    className="border-outline-variant"
+                  />
+                  <div className="border-outline-variant max-h-56 overflow-auto rounded-md border">
+                    {filteredCustomers.length === 0 ? (
+                      <div className="text-on-surface-variant p-3 text-sm">
+                        Pelanggan tidak ditemukan.
+                      </div>
+                    ) : (
+                      filteredCustomers.map((c) => {
+                        const selected = customerId === c.id
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={cn(
+                              'w-full border-b px-3 py-2 text-left text-sm last:border-b-0',
+                              selected
+                                ? 'bg-primary/10 border-primary/30 text-primary'
+                                : 'hover:bg-surface-container-low border-outline-variant text-on-surface'
+                            )}
+                            onClick={() => {
+                              setCustomerId(c.id)
+                              setCustomerSearch(c.name)
+                              setCustomerDropdownOpen(false)
+                            }}
+                            disabled={pending}
+                          >
+                            <div className="font-medium">{c.name}</div>
+                            <div className="text-on-surface-variant truncate text-xs">
+                              {c.phone || 'Tanpa telepon'} · {c.address || 'Tanpa alamat'}
+                            </div>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCustomerDropdownOpen(false)
+                      setCustomerModalOpen(true)
+                    }}
+                    disabled={pending}
+                    className="justify-start"
+                  >
+                    + Tambah pelanggan baru
+                  </Button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="flex flex-wrap items-center gap-2">
+              {customerId !== '' ? (
+                <span className="text-on-surface-variant text-xs">
+                  Dipilih:{' '}
+                  <span className="text-on-surface font-medium">
+                    {customers.find((c) => c.id === customerId)?.name ?? `#${customerId}`}
+                  </span>
+                </span>
+              ) : null}
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <Select
-              value={status}
-              onValueChange={(v) => setStatus(v as OrderStatus)}
-              disabled={pending}
-            >
-              <SelectTrigger className="border-outline-variant w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EDITABLE_STATUS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {ORDER_STATUS_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
+          <div className="grid gap-2 sm:col-span-2">
             <Label htmlFor="so-inv">Nomor faktur</Label>
             <Input
               id="so-inv"
@@ -218,39 +358,16 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               onChange={(e) => setInvoiceNumber(e.target.value)}
               disabled={pending}
               className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="so-tax">Pajak (IDR)</Label>
-            <Input
-              id="so-tax"
-              inputMode="numeric"
-              value={taxAmount}
-              onChange={(e) => setTaxAmount(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
+              placeholder="Otomatis dibuat, bisa diubah manual"
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="so-inv-date">Tanggal faktur</Label>
-            <Input
+            <DatePickerInput
               id="so-inv-date"
-              type="date"
               value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
+              onChange={setInvoiceDate}
               disabled={pending}
-              className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="so-due">Jatuh tempo</Label>
-            <Input
-              id="so-due"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
             />
           </div>
           <div className="grid gap-2 sm:col-span-2">
@@ -287,65 +404,102 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             <p className="text-on-surface-variant text-sm">Memuat kemasan…</p>
           ) : (
             lines.map((row, idx) => (
-              <div
-                key={idx}
-                className="border-outline-variant grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_minmax(0,7rem)_minmax(0,9rem)_auto]"
-              >
-                <div className="grid gap-1">
-                  <Label className="text-xs">Kemasan (SKU)</Label>
-                  <Select
-                    value={row.product_packaging === '' ? '' : String(row.product_packaging)}
-                    onValueChange={(v) =>
-                      updateLine(idx, { product_packaging: v ? Number(v) : '' })
-                    }
-                    disabled={pending}
-                  >
-                    <SelectTrigger className="border-outline-variant w-full min-w-0">
-                      <SelectValue placeholder="Pilih kemasan…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {packagingRows.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.product_variant_name} · {p.label} · {p.sku}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-xs">Kuantitas</Label>
-                  <Input
-                    inputMode="decimal"
-                    value={row.quantity}
-                    onChange={(e) => updateLine(idx, { quantity: e.target.value })}
-                    disabled={pending}
-                    className="border-outline-variant"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-xs">Harga satuan (IDR, opsional)</Label>
-                  <Input
-                    inputMode="numeric"
-                    value={row.unit_price_idr}
-                    onChange={(e) => updateLine(idx, { unit_price_idr: e.target.value })}
-                    disabled={pending}
-                    placeholder="Auto"
-                    className="border-outline-variant"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    disabled={pending || lines.length <= 1}
-                    onClick={() => removeLine(idx)}
-                  >
-                    Hapus
-                  </Button>
-                </div>
-              </div>
+              (() => {
+                const qty = toFiniteNumber(row.quantity)
+                const unitPrice = toFiniteNumber(row.unit_price_idr)
+                const showSubtotal = qty !== null && unitPrice !== null && qty > 0 && unitPrice >= 0
+
+                return (
+                  <div key={idx} className="border-outline-variant bg-background space-y-3 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-surface-container text-on-surface-variant rounded-md px-2 py-0.5 text-xs font-medium">
+                          Baris {idx + 1}
+                        </span>
+                        <span className="text-on-surface-variant text-xs">
+                          {showSubtotal
+                            ? `Subtotal: ${formatIdr((qty as number) * (unitPrice as number))}`
+                            : 'Subtotal: otomatis'}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        disabled={pending || lines.length <= 1}
+                        onClick={() => removeLine(idx)}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-12">
+                      <div className="grid gap-1 md:col-span-7">
+                        <Label className="text-xs">
+                          Kemasan (SKU)
+                          <RequiredAsterisk />
+                        </Label>
+                        <Select
+                          value={row.product_packaging === '' ? '' : String(row.product_packaging)}
+                          onValueChange={(v) =>
+                            updateLine(idx, { product_packaging: v ? Number(v) : '' })
+                          }
+                          disabled={pending}
+                        >
+                          <SelectTrigger className="border-outline-variant w-full min-w-0">
+                            <SelectValue placeholder="Pilih kemasan…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {packagingRows.map((p) => {
+                              const kg = Number(String(p.net_mass_kg).replace(',', '.'))
+                              const kgLabel = Number.isFinite(kg)
+                                ? `${kg.toLocaleString('id-ID', { maximumFractionDigits: 6 })} kg`
+                                : p.net_mass_kg
+                              return (
+                                <SelectItem key={p.id} value={String(p.id)}>
+                                  {p.product_variant_name} · {p.label} · {kgLabel} · {p.sku}
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-1 md:col-span-2">
+                        <Label className="text-xs">
+                          Kuantitas
+                          <RequiredAsterisk />
+                        </Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={row.quantity}
+                          onChange={(e) =>
+                            updateLine(idx, { quantity: e.target.value.replace(/[^0-9.]/g, '') })
+                          }
+                          disabled={pending}
+                          className="border-outline-variant"
+                          placeholder="0"
+                          min="0"
+                          step="any"
+                        />
+                      </div>
+
+                      <div className="grid gap-1 md:col-span-3">
+                        <Label className="text-xs">Harga satuan (IDR, opsional)</Label>
+                        <CurrencyInput
+                          value={row.unit_price_idr}
+                          onChange={(v) => updateLine(idx, { unit_price_idr: v })}
+                          disabled={pending}
+                          placeholder="Auto"
+                          className="border-outline-variant"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()
             ))
           )}
         </CardContent>
@@ -362,6 +516,79 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
           {pending ? 'Menyimpan…' : 'Simpan'}
         </Button>
       </div>
+
+      <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tambah pelanggan baru</DialogTitle>
+            <DialogDescription>
+              Tambah pelanggan langsung dari form penjualan, lalu pilih otomatis.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={handleCreateCustomerFromModal}>
+            <div className="grid gap-1.5">
+              <Label htmlFor="quick-customer-name">
+                Nama pelanggan
+                <RequiredAsterisk />
+              </Label>
+              <Input
+                id="quick-customer-name"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                disabled={createCustomerMut.isPending}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="quick-customer-phone">Telepon</Label>
+              <RegionalPhoneInput
+                id="quick-customer-phone"
+                value={newCustomerPhone}
+                onChange={setNewCustomerPhone}
+                disabled={createCustomerMut.isPending}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="quick-customer-address">
+                Alamat
+                <RequiredAsterisk />
+              </Label>
+              <textarea
+                id="quick-customer-address"
+                value={newCustomerAddress}
+                onChange={(e) => setNewCustomerAddress(e.target.value)}
+                disabled={createCustomerMut.isPending}
+                rows={3}
+                className={cn(
+                  'border-outline-variant bg-background min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                  'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
+                )}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="quick-customer-notes">Catatan</Label>
+              <Input
+                id="quick-customer-notes"
+                value={newCustomerNotes}
+                onChange={(e) => setNewCustomerNotes(e.target.value)}
+                disabled={createCustomerMut.isPending}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCustomerModalOpen(false)}
+                disabled={createCustomerMut.isPending}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={createCustomerMut.isPending}>
+                {createCustomerMut.isPending ? 'Menyimpan…' : 'Simpan pelanggan'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }

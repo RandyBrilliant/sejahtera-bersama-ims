@@ -26,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useProductStockMovementsQuery } from '@/hooks/use-inventory-query'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { ProductStockMovement, ProductStockMovementListParams, StockMovementType } from '@/types/inventory'
 
@@ -38,15 +39,9 @@ const ORDERING: { value: string; label: string }[] = [
   { value: 'movement_at', label: 'Waktu mutasi terlama' },
   { value: '-movement_at', label: 'Waktu mutasi terbaru' },
   { value: '-created_at', label: 'Dicatat terbaru' },
-  { value: 'quantity', label: 'Kuantitas terendah' },
-  { value: '-quantity', label: 'Kuantitas tertinggi' },
+  { value: 'mass_grams', label: 'Massa utama terendah' },
+  { value: '-mass_grams', label: 'Massa utama tertinggi' },
 ]
-
-function fmtQty(v: string) {
-  const n = Number(v)
-  if (Number.isNaN(n)) return v
-  return n.toLocaleString('id-ID', { maximumFractionDigits: 3 })
-}
 
 function fmtDt(iso: string) {
   const d = new Date(iso)
@@ -84,12 +79,14 @@ export function ProductStockMovementsTable() {
     () => [
       {
         id: 'product',
-        header: 'Produk / kemasan',
+        header: 'Produk / konteks',
         cell: ({ row }) => (
           <div>
             <span className="font-medium">{row.original.product_variant_name}</span>
             <span className="text-on-surface-variant block text-xs">
-              {row.original.product_packaging_label}
+              {row.original.product_packaging_label.trim()
+                ? row.original.product_packaging_label
+                : 'Mutasi massa (tanpa SKU)'}
             </span>
           </div>
         ),
@@ -105,22 +102,30 @@ export function ProductStockMovementsTable() {
           ),
       },
       {
-        accessorKey: 'quantity',
-        header: 'Qty utama',
-        cell: ({ row }) => <span className="tabular-nums">{fmtQty(row.original.quantity)}</span>,
-      },
-      {
-        accessorKey: 'bonus_quantity',
-        header: 'Bonus',
+        accessorKey: 'mass_grams',
+        header: 'Massa utama (kg)',
         cell: ({ row }) => (
-          <span className="tabular-nums">{fmtQty(row.original.bonus_quantity)}</span>
+          <span className="tabular-nums">
+            {formatProductMassKgFromGrams(row.original.mass_grams)} kg
+          </span>
         ),
       },
       {
-        accessorKey: 'total_increase_quantity',
-        header: 'Total tambah',
+        accessorKey: 'bonus_mass_grams',
+        header: 'Bonus (kg)',
         cell: ({ row }) => (
-          <span className="tabular-nums">{fmtQty(row.original.total_increase_quantity)}</span>
+          <span className="tabular-nums">
+            {formatProductMassKgFromGrams(row.original.bonus_mass_grams)} kg
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'total_mass_grams',
+        header: 'Total baris (kg)',
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {formatProductMassKgFromGrams(row.original.total_mass_grams)} kg
+          </span>
         ),
       },
       {
@@ -161,7 +166,7 @@ export function ProductStockMovementsTable() {
           <div className="relative max-w-md flex-1">
             <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
-              placeholder="Cari varian, label kemasan…"
+              placeholder="Cari varian, label kemasan, catatan…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}

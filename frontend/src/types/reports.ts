@@ -56,8 +56,6 @@ export type OperationalCashEntryReportRow = {
   reference: string
   sales_order_id: number | null
   sales_order_code: string | null
-  purchase_in_order_id: number | null
-  purchase_in_order_code: string | null
 }
 
 export type OperationalCashEntriesReportEnvelope = {
@@ -69,7 +67,6 @@ export type OperationalCashEntriesReportEnvelope = {
 
 export type OperationalCashLinkedBreakdown = {
   linked_to_sales_order: { total_idr: string | number; line_count: number }
-  linked_to_purchase_in_order: { total_idr: string | number; line_count: number }
   unlinked: { income_idr: number; expense_idr: number; line_count: number }
 }
 

@@ -13,6 +13,8 @@ import { resolveMediaUrl } from '@/lib/media-url'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CurrencyInput } from '@/components/ui/currency-input'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -49,9 +51,6 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
   const [salesOrderId, setSalesOrderId] = useState(
     initial?.sales_order != null ? String(initial.sales_order) : ''
   )
-  const [purchaseInOrderId, setPurchaseInOrderId] = useState(
-    initial?.purchase_in_order != null ? String(initial.purchase_in_order) : ''
-  )
   const [file, setFile] = useState<File | null>(null)
 
   const catParams = useMemo(
@@ -83,7 +82,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
       alert.error('Validasi', 'Pilih kategori.')
       return
     }
-    const amt = Number.parseInt(amount.replace(/\s/g, ''), 10)
+    const amt = amount.trim() ? Number.parseInt(amount, 10) : NaN
     if (!Number.isFinite(amt) || amt < 1) {
       alert.error('Validasi', 'Jumlah (Rp) wajib berupa bilangan bulat positif.')
       return
@@ -96,58 +95,37 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
 
     const refStr = reference.trim()
     const soId = parseOptionalInt(salesOrderId)
-    const piId = parseOptionalInt(purchaseInOrderId)
 
     try {
       if (mode === 'create') {
+        const base = {
+          direction,
+          category: categoryId as number,
+          amount_idr: amt,
+          occurred_on: occurredOn,
+          description: desc,
+          reference: refStr || undefined,
+        }
         const body =
           direction === 'INCOME'
-            ? {
-                direction,
-                category: categoryId as number,
-                amount_idr: amt,
-                occurred_on: occurredOn,
-                description: desc,
-                reference: refStr || undefined,
-                sales_order: soId,
-                purchase_in_order: null,
-              }
-            : {
-                direction,
-                category: categoryId as number,
-                amount_idr: amt,
-                occurred_on: occurredOn,
-                description: desc,
-                reference: refStr || undefined,
-                purchase_in_order: piId,
-                sales_order: null,
-              }
+            ? { ...base, sales_order: soId }
+            : { ...base, sales_order: null }
         await createMutation.mutateAsync(body)
         alert.success('Berhasil', 'Transaksi kas ditambahkan.')
       } else {
         if (!initial) return
+        const base = {
+          direction,
+          category: categoryId as number,
+          amount_idr: amt,
+          occurred_on: occurredOn,
+          description: desc,
+          reference: refStr || undefined,
+        }
         const body =
           direction === 'INCOME'
-            ? {
-                direction,
-                category: categoryId as number,
-                amount_idr: amt,
-                occurred_on: occurredOn,
-                description: desc,
-                reference: refStr || undefined,
-                sales_order: soId,
-                purchase_in_order: null,
-              }
-            : {
-                direction,
-                category: categoryId as number,
-                amount_idr: amt,
-                occurred_on: occurredOn,
-                description: desc,
-                reference: refStr || undefined,
-                purchase_in_order: piId,
-                sales_order: null,
-              }
+            ? { ...base, sales_order: soId }
+            : { ...base, sales_order: null }
         await updateMutation.mutateAsync(body)
         alert.success('Berhasil', 'Transaksi diperbarui.')
       }
@@ -184,8 +162,8 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
               {mode === 'create' ? 'Transaksi baru' : 'Detail transaksi'}
             </CardTitle>
             <CardDescription>
-              Kategori harus sesuai jenis pemasukan/pengeluaran. Tautan order opsional (lihat ID di
-              menu Pesanan).
+              Kategori harus sesuai jenis pemasukan/pengeluaran. Untuk pemasukan, Anda boleh menautkan
+              ID pesanan penjualan (opsional).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
@@ -233,24 +211,22 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="amt">Jumlah (Rp)</Label>
-                <Input
+                <CurrencyInput
                   id="amt"
-                  inputMode="numeric"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={setAmount}
                   disabled={submitting}
                   className="border-outline-variant tabular-nums"
+                  placeholder="0"
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="occ">Tanggal</Label>
-                <Input
+                <DatePickerInput
                   id="occ"
-                  type="date"
                   value={occurredOn}
-                  onChange={(e) => setOccurredOn(e.target.value)}
+                  onChange={setOccurredOn}
                   disabled={submitting}
-                  className="border-outline-variant"
                 />
               </div>
               <div className="grid gap-2 md:col-span-2">
@@ -294,26 +270,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
                     untuk mencari ID order.
                   </p>
                 </div>
-              ) : (
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="pi">ID pesanan pembelian bahan (opsional)</Label>
-                  <Input
-                    id="pi"
-                    inputMode="numeric"
-                    value={purchaseInOrderId}
-                    onChange={(e) => setPurchaseInOrderId(e.target.value)}
-                    disabled={submitting}
-                    className="border-outline-variant"
-                    placeholder="Contoh: 5"
-                  />
-                  <p className="text-on-surface-variant text-xs">
-                    <Link to="/admin/pesanan/pembelian" className="text-primary font-medium">
-                      Lihat daftar pembelian
-                    </Link>{' '}
-                    untuk mencari ID order.
-                  </p>
-                </div>
-              )}
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2 pt-2">
               <Button type="submit" disabled={submitting} className="ambient-shadow">

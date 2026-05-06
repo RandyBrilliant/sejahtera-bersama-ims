@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RegionalPhoneInput } from '@/components/ui/regional-phone-input'
 import type { Customer } from '@/types/purchase'
 
 type Props = {
@@ -20,13 +21,19 @@ type Props = {
   onSaved: () => void
 }
 
+function RequiredAsterisk() {
+  return (
+    <span className="text-destructive" aria-hidden>
+      {' '}
+      *
+    </span>
+  )
+}
+
 export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [phone, setPhone] = useState(initial?.phone ?? '')
-  const [companyName, setCompanyName] = useState(initial?.company_name ?? '')
-  const [email, setEmail] = useState(initial?.email ?? '')
   const [address, setAddress] = useState(initial?.address ?? '')
-  const [taxId, setTaxId] = useState(initial?.tax_id ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
@@ -41,18 +48,16 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
       alert.error('Validasi', 'Nama pelanggan wajib diisi.')
       return
     }
-    if (!p) {
-      alert.error('Validasi', 'Nomor telepon wajib diisi.')
+    const a = address.trim()
+    if (!a) {
+      alert.error('Validasi', 'Alamat wajib diisi.')
       return
     }
 
     const payload = {
       name: n,
-      phone: p,
-      company_name: companyName.trim() || undefined,
-      email: email.trim() || undefined,
-      address: address.trim() || undefined,
-      tax_id: taxId.trim() || undefined,
+      phone: p || undefined,
+      address: a,
       notes: notes.trim() || undefined,
       is_active: isActive,
     }
@@ -82,13 +87,16 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
             {mode === 'create' ? 'Pelanggan baru' : 'Data pelanggan'}
           </CardTitle>
           <CardDescription>
-            Dipakai untuk penjualan dan invoice. NPWP opsional; alamat membantu pengiriman.
+            Dipakai untuk penjualan dan invoice. Alamat wajib untuk pengiriman.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="cust-name">Nama pelanggan</Label>
+              <Label htmlFor="cust-name">
+                Nama pelanggan
+                <RequiredAsterisk />
+              </Label>
               <Input
                 id="cust-name"
                 value={name}
@@ -99,49 +107,21 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="cust-phone">Telepon</Label>
-              <Input
+              <Label htmlFor="cust-phone">
+                Telepon
+              </Label>
+              <RegionalPhoneInput
                 id="cust-phone"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={setPhone}
                 disabled={submitting}
-                className="border-outline-variant"
-                inputMode="tel"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="cust-email">Email</Label>
-              <Input
-                id="cust-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={submitting}
-                className="border-outline-variant"
               />
             </div>
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="cust-company">Nama perusahaan</Label>
-              <Input
-                id="cust-company"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                disabled={submitting}
-                className="border-outline-variant"
-              />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="cust-tax">NPWP / ID pajak</Label>
-              <Input
-                id="cust-tax"
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-                disabled={submitting}
-                className="border-outline-variant"
-              />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="cust-address">Alamat</Label>
+              <Label htmlFor="cust-address">
+                Alamat
+                <RequiredAsterisk />
+              </Label>
               <textarea
                 id="cust-address"
                 value={address}

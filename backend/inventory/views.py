@@ -36,6 +36,11 @@ from .models import (
     ProductionPackagingOutput,
     StockMovementType,
 )
+from .product_stock import (
+    annotate_packaging_derived_remaining,
+    grams_delta_from_mass_fields,
+    product_financial_value_idr,
+)
 from .serializers import (
     IngredientInventorySerializer,
     IngredientSerializer,
@@ -88,7 +93,7 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
-    ordering_fields = ["name", "variant_name", "created_at", "updated_at"]
+    ordering_fields = ["name", "variant_name", "remaining_mass_grams", "created_at", "updated_at"]
     ordering = ["variant_name"]
 
     def get_queryset(self):
@@ -97,18 +102,14 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="packaging-summary")
     def packaging_summary(self, request, pk=None):
         product = self.get_object()
-        price_dec = Cast(F("base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
-        stock_times_price = ExpressionWrapper(
-            F("remaining_stock") * price_dec,
-            output_field=DecimalField(max_digits=24, decimal_places=3),
-        )
-        aggregates = product.packaging_variants.aggregate(
-            total_packaging=Count("id"),
-            active_packaging=Count("id", filter=models.Q(is_active=True)),
-            total_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
-            stock_value_idr=Coalesce(Sum(stock_times_price), _decimal_zero(24, 3)),
-        )
-        return Response(status=status.HTTP_200_OK, data=success_response(data=aggregates))
+        variants_qs = product.packaging_variants.all()
+        data = {
+            "total_packaging": variants_qs.count(),
+            "active_packaging": variants_qs.filter(is_active=True).count(),
+            "remaining_mass_grams": product.remaining_mass_grams,
+            "stock_value_idr": product_financial_value_idr(product),
+        }
+        return Response(status=status.HTTP_200_OK, data=success_response(data=data))
 
 
 class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
@@ -120,16 +121,17 @@ class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
     ordering_fields = [
         "label",
-        "net_mass_grams",
+        "net_mass_kg",
         "remaining_stock",
         "base_price_idr",
         "created_at",
         "updated_at",
     ]
-    ordering = ["product__variant_name", "net_mass_grams"]
+    ordering = ["product__variant_name", "net_mass_kg"]
 
     def get_queryset(self):
-        return ProductPackaging.objects.select_related("product", "created_by", "updated_by")
+        qs = ProductPackaging.objects.select_related("product", "created_by", "updated_by")
+        return annotate_packaging_derived_remaining(qs)
 
 
 class IngredientViewSet(AuditTrailMixin, viewsets.ModelViewSet):
@@ -168,23 +170,36 @@ class InventorySummaryView(APIView):
     permission_classes = [InventoryAccess]
 
     def get(self, request):
-        price_dec = Cast(F("base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
-        stock_times_price = ExpressionWrapper(
-            F("remaining_stock") * price_dec,
-            output_field=DecimalField(max_digits=24, decimal_places=3),
-        )
         product_aggregates = ProductPackaging.objects.aggregate(
             total_packaging=Count("id"),
             active_packaging=Count("id", filter=models.Q(is_active=True)),
-            total_product_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
-            total_product_stock_value_idr=Coalesce(Sum(stock_times_price), _decimal_zero(24, 3)),
         )
+        mass_total = Product.objects.aggregate(
+            total_product_mass_grams=Coalesce(Sum("remaining_mass_grams"), _decimal_zero()),
+        )
+
+        inventory_value_total = sum(
+            product_financial_value_idr(p)
+            for p in Product.objects.prefetch_related("packaging_variants").only(
+                "id",
+                "remaining_mass_grams",
+            )
+        )
+
         ingredient_aggregates = IngredientInventory.objects.aggregate(
             total_ingredient_items=Count("id"),
             low_stock_items=Count("id", filter=models.Q(remaining_stock__lt=F("minimum_stock"))),
             total_ingredient_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
         )
-        payload = {"products": product_aggregates, "ingredients": ingredient_aggregates}
+
+        payload = {
+            "products": {
+                **product_aggregates,
+                **mass_total,
+                "total_product_stock_value_idr": str(inventory_value_total),
+            },
+            "ingredients": ingredient_aggregates,
+        }
         return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
 
 
@@ -461,13 +476,20 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductStockMovementFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["product_packaging__product__variant_name", "product_packaging__label", "note"]
-    ordering_fields = ["movement_at", "created_at", "quantity", "bonus_quantity"]
+    search_fields = [
+        "product__variant_name",
+        "product_packaging__label",
+        "product_packaging__product__variant_name",
+        "note",
+    ]
+    ordering_fields = ["movement_at", "created_at", "mass_grams", "bonus_mass_grams"]
     ordering = ["-movement_at"]
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
         return ProductStockMovement.objects.select_related(
+            "product",
+            "product_packaging",
             "product_packaging__product",
             "created_by",
             "updated_by",
@@ -476,27 +498,33 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     @transaction.atomic
     def perform_create(self, serializer):
         movement = serializer.validated_data["movement_type"]
-        qty = serializer.validated_data["quantity"]
-        bonus_qty = serializer.validated_data.get("bonus_quantity") or Decimal("0")
-        packaging = (
-            ProductPackaging.objects.select_for_update()
-            .select_related("product")
-            .get(pk=serializer.validated_data["product_packaging"].pk)
+        mass = serializer.validated_data["mass_grams"]
+        bonus_mass = serializer.validated_data.get("bonus_mass_grams") or Decimal("0")
+        prod = serializer.validated_data["product"]
+
+        product = Product.objects.select_for_update().get(pk=prod.pk)
+
+        if movement == StockMovementType.OUT and bonus_mass > 0:
+            raise ValueError("Bonus massa hanya untuk stock in.")
+
+        delta_mass = grams_delta_from_mass_fields(
+            movement_type=movement,
+            mass_grams=mass,
+            bonus_mass_grams=bonus_mass,
         )
 
-        if movement == StockMovementType.OUT and packaging.remaining_stock < qty:
-            raise ValueError("Stok produk tidak mencukupi untuk stock out.")
+        next_mass = (product.remaining_mass_grams or Decimal("0")) + delta_mass
+        if next_mass < 0:
+            raise ValueError(
+                "Stok produk (massa utama) tidak mencukupi untuk pengeluaran ini."
+            )
 
-        if movement == StockMovementType.OUT and bonus_qty > 0:
-            raise ValueError("Bonus quantity hanya untuk stock in.")
-
-        delta = (qty + bonus_qty) if movement == StockMovementType.IN else -qty
-        packaging.remaining_stock = packaging.remaining_stock + delta
-        packaging.updated_by = self.request.user
-        packaging.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
+        product.remaining_mass_grams = next_mass
+        product.updated_by = self.request.user
+        product.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
 
         serializer.save(
-            product_packaging=packaging,
+            product_packaging=None,
             created_by=self.request.user,
             updated_by=self.request.user,
         )
@@ -569,15 +597,29 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     updated_by=request.user,
                 )
 
+            mass_in_by_pid: dict[int, Decimal] = {}
+            for row in packaging_outputs:
+                pkg = row["product_packaging"]
+                quantity_produced = row["quantity_produced"]
+                bonus_quantity = row.get("bonus_quantity") or Decimal("0")
+                gm = Decimal(str(pkg.net_mass_kg)) * Decimal("1000") * (quantity_produced + bonus_quantity)
+                pid = pkg.product_id
+                mass_in_by_pid[pid] = mass_in_by_pid.get(pid, Decimal("0")) + gm
+
+            for pid in sorted(mass_in_by_pid.keys()):
+                prod = Product.objects.select_for_update().get(pk=pid)
+                base = prod.remaining_mass_grams or Decimal("0")
+                prod.remaining_mass_grams = base + mass_in_by_pid[pid]
+                prod.updated_by = request.user
+                prod.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+
             for row in packaging_outputs:
                 packaging = ProductPackaging.objects.select_for_update().get(pk=row["product_packaging"].pk)
                 quantity_produced = row["quantity_produced"]
                 bonus_quantity = row.get("bonus_quantity") or Decimal("0")
-
-                total_in = quantity_produced + bonus_quantity
-                packaging.remaining_stock = packaging.remaining_stock + total_in
-                packaging.updated_by = request.user
-                packaging.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
+                grams_per_pkg = Decimal(str(packaging.net_mass_kg)) * Decimal("1000")
+                mass_main = grams_per_pkg * quantity_produced
+                mass_bonus = grams_per_pkg * bonus_quantity
 
                 ProductionPackagingOutput.objects.create(
                     batch=batch,
@@ -586,10 +628,11 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     bonus_quantity=bonus_quantity,
                 )
                 ProductStockMovement.objects.create(
+                    product=packaging.product,
                     product_packaging=packaging,
                     movement_type=StockMovementType.IN,
-                    quantity=quantity_produced,
-                    bonus_quantity=bonus_quantity,
+                    mass_grams=mass_main,
+                    bonus_mass_grams=mass_bonus,
                     note=f"Hasil produksi batch #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,

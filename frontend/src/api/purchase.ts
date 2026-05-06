@@ -23,6 +23,8 @@ function buildPurchaseInQuery(params: PurchaseInOrdersListParams): string {
   if (params.search) search.set('search', params.search)
   if (params.ordering) search.set('ordering', params.ordering)
   if (params.status) search.set('status', params.status)
+  if (params.start_date) search.set('start_date', params.start_date)
+  if (params.end_date) search.set('end_date', params.end_date)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }
@@ -35,6 +37,8 @@ function buildSalesOrderQuery(params: SalesOrdersListParams): string {
   if (params.ordering) search.set('ordering', params.ordering)
   if (params.status) search.set('status', params.status)
   if (params.customer != null) search.set('customer', String(params.customer))
+  if (params.start_date) search.set('start_date', params.start_date)
+  if (params.end_date) search.set('end_date', params.end_date)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }

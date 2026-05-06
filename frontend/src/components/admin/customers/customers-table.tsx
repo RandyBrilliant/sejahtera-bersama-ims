@@ -96,19 +96,14 @@ export function CustomersTable() {
         ),
       },
       {
-        accessorKey: 'company_name',
-        header: 'Perusahaan',
-        cell: ({ row }) => row.original.company_name || '—',
-      },
-      {
         accessorKey: 'phone',
         header: 'Telepon',
         cell: ({ row }) => row.original.phone || '—',
       },
       {
-        accessorKey: 'email',
-        header: 'Email',
-        cell: ({ row }) => row.original.email || '—',
+        accessorKey: 'address',
+        header: 'Alamat',
+        cell: ({ row }) => row.original.address || '—',
       },
       {
         id: 'status',
@@ -173,7 +168,7 @@ export function CustomersTable() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-              placeholder="Cari nama, perusahaan, telepon…"
+              placeholder="Cari nama, telepon, alamat…"
               className="border-outline-variant pl-10"
             />
           </div>

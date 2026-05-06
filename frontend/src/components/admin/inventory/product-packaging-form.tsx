@@ -5,10 +5,10 @@ import {
   useUpdateProductPackagingMutation,
 } from '@/hooks/use-inventory-query'
 import { alert } from '@/lib/alert'
-import { formatIdr } from '@/lib/format-idr'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -25,11 +25,8 @@ type Props = {
 
 export function ProductPackagingForm({ mode, productId, initial, onCancel, onSaved }: Props) {
   const [label, setLabel] = useState(initial?.label ?? '')
-  const [netMass, setNetMass] = useState(
-    initial ? String(initial.net_mass_grams) : ''
-  )
-  const [remainingStock, setRemainingStock] = useState(
-    initial ? String(initial.remaining_stock) : '0'
+  const [netMassKg, setNetMassKg] = useState(
+    initial ? String(initial.net_mass_kg) : ''
   )
   const [basePrice, setBasePrice] = useState(
     initial ? String(initial.base_price_idr) : ''
@@ -49,9 +46,10 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
       alert.error('Validasi', 'Label kemasan wajib diisi.')
       return
     }
-    const mass = Number(netMass)
-    if (!Number.isFinite(mass) || mass < 1) {
-      alert.error('Validasi', 'Berat bersih (gram) harus minimal 1.')
+    const kgRaw = netMassKg.trim().replace(',', '.')
+    const kg = Number(kgRaw)
+    if (!Number.isFinite(kg) || kg < 0.000001) {
+      alert.error('Validasi', 'Berat bersih (kg) harus lebih dari nol.')
       return
     }
     const base = Number(basePrice)
@@ -71,8 +69,7 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
         await createMutation.mutateAsync({
           product: productId,
           label: label.trim(),
-          net_mass_grams: mass,
-          remaining_stock: remainingStock.trim() || '0',
+          net_mass_kg: kgRaw,
           base_price_idr: Math.floor(base),
           list_price_idr: listVal != null && Number.isFinite(listVal) ? Math.floor(listVal) : null,
           sku: sku.trim() || '',
@@ -83,8 +80,7 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
         if (!initial) return
         await updateMutation.mutateAsync({
           label: label.trim(),
-          net_mass_grams: mass,
-          remaining_stock: remainingStock.trim() || '0',
+          net_mass_kg: kgRaw,
           base_price_idr: Math.floor(base),
           list_price_idr: listPrice.trim() ? Math.floor(Number(listPrice)) : null,
           sku: sku.trim() || '',
@@ -108,7 +104,9 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
             {mode === 'create' ? 'Kemasan baru' : 'Edit kemasan'}
           </CardTitle>
           <CardDescription>
-            Satu baris per ukuran (mis. 250g, 500g). Harga dalam Rupiah penuh tanpa desimal.
+            Satu baris per ukuran (mis. 0,25 kg, 10 kg). Harga dalam Rupiah penuh tanpa desimal.
+            Setara kemasan mengikuti stok utama varian (kg) dibagi berat bersih per kemasan (kg)
+            — ubah massa varian lewat mutasi atau produksi.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
@@ -125,34 +123,22 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="pkg-mass">Berat bersih (g)</Label>
+              <Label htmlFor="pkg-mass">Berat bersih (kg)</Label>
               <Input
                 id="pkg-mass"
                 type="number"
-                min={1}
-                step={1}
-                value={netMass}
-                onChange={(e) => setNetMass(e.target.value)}
+                min={0.000001}
+                step="any"
+                value={netMassKg}
+                onChange={(e) => setNetMassKg(e.target.value.replace(/[^0-9.,]/g, ''))}
                 disabled={submitting}
                 className="border-outline-variant"
+                placeholder="10"
               />
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-stock">Stok tersisa (unit)</Label>
-              <Input
-                id="pkg-stock"
-                type="number"
-                min={0}
-                step="0.001"
-                value={remainingStock}
-                onChange={(e) => setRemainingStock(e.target.value)}
-                disabled={submitting}
-                className="border-outline-variant"
-              />
-            </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:col-span-2 md:col-span-1">
               <Label htmlFor="pkg-sku">SKU (opsional)</Label>
               <Input
                 id="pkg-sku"
@@ -166,39 +152,27 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="pkg-base">Harga pokok (IDR)</Label>
-              <Input
+              <CurrencyInput
                 id="pkg-base"
-                type="number"
-                min={1}
-                step={1}
                 value={basePrice}
-                onChange={(e) => setBasePrice(e.target.value)}
+                onChange={setBasePrice}
                 disabled={submitting}
                 className="border-outline-variant"
+                placeholder="Mis. 15.000"
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="pkg-list">Harga jual daftar (IDR, opsional)</Label>
-              <Input
+              <CurrencyInput
                 id="pkg-list"
-                type="number"
-                min={1}
-                step={1}
                 value={listPrice}
-                onChange={(e) => setListPrice(e.target.value)}
+                onChange={setListPrice}
                 disabled={submitting}
                 className="border-outline-variant"
                 placeholder="Kosong jika mengikuti kebijakan lain"
               />
             </div>
           </div>
-          {basePrice.trim() && Number(basePrice) > 0 && remainingStock.trim() ? (
-            <p className="text-on-surface-variant text-xs">
-              Nilai stok perkiraan:{' '}
-              {formatIdr(Number(remainingStock) * Number(basePrice))}{' '}
-              (stok × harga pokok)
-            </p>
-          ) : null}
           <div className="flex items-center gap-2">
             <Checkbox
               id="pkg-active"

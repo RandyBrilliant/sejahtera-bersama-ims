@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { useAdminDashboardQuery } from '@/hooks/use-admin-dashboard-query'
 import { useInventorySummaryQuery } from '@/hooks/use-inventory-query'
 import { formatRangeSubtitle } from '@/lib/dashboard-ranges'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { OrderStatus } from '@/types/purchase'
@@ -81,7 +82,7 @@ export function AdminDashboardHome() {
       : '—'
 
   const stockQtySub = inventory.data
-    ? `${fmtQty(inventory.data.products.total_product_stock)} paket · ${inventory.data.products.active_packaging.toLocaleString('id-ID')} SKU aktif`
+    ? `${formatProductMassKgFromGrams(inventory.data.products.total_product_mass_grams)} kg utama · ${inventory.data.products.active_packaging.toLocaleString('id-ID')} SKU aktif`
     : ''
 
   const revenueTrend = formatTrend(dash.revenueNow, dash.revenueThen, versusPrev)
@@ -350,7 +351,7 @@ export function AdminDashboardHome() {
           <section className="ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
             <div className="border-outline-variant mb-4 flex items-center justify-between border-b pb-3">
               <h2 className="text-on-surface font-heading text-lg font-semibold">
-                Stok kemasan tertinggi
+                Setara unit kemasan tertinggi
               </h2>
               <button
                 type="button"

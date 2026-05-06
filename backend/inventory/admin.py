@@ -15,7 +15,7 @@ from .models import (
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "variant_name", "is_active", "created_at", "updated_at")
+    list_display = ("id", "name", "variant_name", "remaining_mass_grams", "is_active", "created_at", "updated_at")
     list_filter = ("is_active", "created_at", "updated_at")
     search_fields = ("name", "variant_name")
 
@@ -26,13 +26,17 @@ class ProductPackagingAdmin(admin.ModelAdmin):
         "id",
         "product",
         "label",
-        "net_mass_grams",
-        "remaining_stock",
+        "net_mass_kg",
+        "variant_product_mass_g",
         "base_price_idr",
         "is_active",
     )
     list_filter = ("is_active", "created_at", "updated_at")
     search_fields = ("product__name", "product__variant_name", "label", "sku")
+
+    @admin.display(description="Stok utama varian (g)", ordering="product__remaining_mass_grams")
+    def variant_product_mass_g(self, obj):
+        return obj.product.remaining_mass_grams
 
 
 @admin.register(Ingredient)
@@ -60,15 +64,20 @@ class IngredientStockMovementAdmin(admin.ModelAdmin):
 class ProductStockMovementAdmin(admin.ModelAdmin):
     list_display = (
         "id",
+        "product",
         "product_packaging",
         "movement_type",
-        "quantity",
-        "bonus_quantity",
+        "mass_grams",
+        "bonus_mass_grams",
         "movement_at",
         "created_by",
     )
     list_filter = ("movement_type", "movement_at")
-    search_fields = ("product_packaging__product__variant_name", "product_packaging__label", "note")
+    search_fields = (
+        "product__variant_name",
+        "product_packaging__label",
+        "note",
+    )
 
 
 class ProductionIngredientUsageInline(admin.TabularInline):

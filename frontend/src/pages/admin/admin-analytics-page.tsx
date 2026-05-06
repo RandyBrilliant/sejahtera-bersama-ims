@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { AnalyticsCashCharts } from '@/components/admin/analytics/analytics-cash-charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { downloadOperationalCashReportExport } from '@/api/expenses'
@@ -169,22 +169,20 @@ export function AdminAnalyticsPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="grid gap-2">
               <Label htmlFor="analytics-start">Mulai</Label>
-              <Input
+              <DatePickerInput
                 id="analytics-start"
-                type="date"
                 value={startDate}
-                onChange={(e) => onStartChange(e.target.value)}
-                max={endDate}
+                onChange={onStartChange}
+                maxDate={endDate}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="analytics-end">Selesai</Label>
-              <Input
+              <DatePickerInput
                 id="analytics-end"
-                type="date"
                 value={endDate}
-                onChange={(e) => onEndChange(e.target.value)}
-                min={startDate}
+                onChange={onEndChange}
+                minDate={startDate}
               />
             </div>
           </div>
@@ -358,7 +356,7 @@ export function AdminAnalyticsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Tautan ke pesanan</CardTitle>
-                  <CardDescription>Agregat entri kas yang terhubung ke SO / PO masuk.</CardDescription>
+                  <CardDescription>Agregat entri kas yang terhubung ke pesanan penjualan (SO).</CardDescription>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -370,15 +368,6 @@ export function AdminAnalyticsPage() {
                         </td>
                         <td className="text-muted-foreground text-right text-xs">
                           {cash.data.linked_breakdown.linked_to_sales_order.line_count} baris
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted-foreground">Terhubung pembelian masuk</td>
-                        <td className="text-right tabular-nums">
-                          {formatIdr(cash.data.linked_breakdown.linked_to_purchase_in_order.total_idr)}
-                        </td>
-                        <td className="text-right text-xs text-muted-foreground">
-                          {cash.data.linked_breakdown.linked_to_purchase_in_order.line_count} baris
                         </td>
                       </tr>
                       <tr>

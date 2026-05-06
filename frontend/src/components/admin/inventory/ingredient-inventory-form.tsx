@@ -28,20 +28,38 @@ function IngredientInventoryFormFields({
   onCancel: () => void
   onSaved: () => void
 }) {
-  const [remainingStock, setRemainingStock] = useState(() => String(row.remaining_stock))
-  const [minimumStock, setMinimumStock] = useState(() => String(row.minimum_stock))
+  const [minimumStock, setMinimumStock] = useState(() => formatQtyId(row.minimum_stock))
   const mutation = useUpdateIngredientInventoryMutation(inventoryId)
+
+  function formatQtyId(v: string | number) {
+    const n = Number(v)
+    if (!Number.isFinite(n)) return String(v)
+    if (Number.isInteger(n)) return String(n)
+    return n
+      .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+      .replace(/0+$/, '')
+      .replace(/,$/, '')
+  }
+
+  function parseQtyInputToApi(value: string) {
+    const raw = value.trim()
+    if (!raw) return ''
+    const normalized = raw.replace(/\./g, '').replace(',', '.')
+    const parsed = Number(normalized)
+    if (!Number.isFinite(parsed)) return ''
+    return String(parsed)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!remainingStock.trim() || !minimumStock.trim()) {
-      alert.error('Validasi', 'Stok sisa dan stok minimum wajib diisi.')
+    const minimumApi = parseQtyInputToApi(minimumStock)
+    if (!minimumApi) {
+      alert.error('Validasi', 'Stok minimum wajib diisi dengan angka yang valid.')
       return
     }
     try {
       await mutation.mutateAsync({
-        remaining_stock: remainingStock.trim(),
-        minimum_stock: minimumStock.trim(),
+        minimum_stock: minimumApi,
       })
       alert.success('Berhasil', 'Stok bahan diperbarui.')
       onSaved()
@@ -68,10 +86,8 @@ function IngredientInventoryFormFields({
             <Label htmlFor="inv-remaining">Stok sisa ({unitLabel})</Label>
             <Input
               id="inv-remaining"
-              inputMode="decimal"
-              value={remainingStock}
-              onChange={(e) => setRemainingStock(e.target.value)}
-              disabled={pending}
+              value={formatQtyId(row.remaining_stock)}
+              disabled
               className="border-outline-variant"
             />
           </div>
@@ -81,7 +97,19 @@ function IngredientInventoryFormFields({
               id="inv-min"
               inputMode="decimal"
               value={minimumStock}
-              onChange={(e) => setMinimumStock(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value.replace(/[^\d,]/g, '')
+                const firstComma = next.indexOf(',')
+                if (firstComma === -1) {
+                  setMinimumStock(next)
+                  return
+                }
+                const head = next.slice(0, firstComma + 1)
+                const tail = next
+                  .slice(firstComma + 1)
+                  .replace(/,/g, '')
+                setMinimumStock(`${head}${tail}`)
+              }}
               disabled={pending}
               className="border-outline-variant"
             />

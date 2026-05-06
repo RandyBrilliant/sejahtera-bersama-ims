@@ -14,6 +14,7 @@ import { useOperationalCashEntriesQuery } from '@/hooks/use-expenses-query'
 import { formatIdr } from '@/lib/format-idr'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -138,18 +139,6 @@ export function OperationalCashEntriesTable() {
         ),
       },
       {
-        id: 'link',
-        header: 'Tautan',
-        cell: ({ row }) => {
-          const r = row.original
-          if (r.sales_order_code)
-            return <span className="text-xs tabular-nums">SO {r.sales_order_code}</span>
-          if (r.purchase_in_order_code)
-            return <span className="text-xs tabular-nums">PI {r.purchase_in_order_code}</span>
-          return '—'
-        },
-      },
-      {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
@@ -238,26 +227,26 @@ export function OperationalCashEntriesTable() {
           </SelectContent>
         </Select>
         <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="date"
+          <DatePickerInput
             value={fromDate}
-            onChange={(e) => {
-              setFromDate(e.target.value)
+            onChange={(v) => {
+              setFromDate(v)
               setParams((p) => ({ ...p, page: 1 }))
             }}
-            className="border-outline-variant w-[150px]"
-            aria-label="Dari tanggal"
+            className="w-[150px]"
+            ariaLabel="Dari tanggal"
+            maxDate={toDate || undefined}
           />
           <span className="text-on-surface-variant text-sm">s/d</span>
-          <Input
-            type="date"
+          <DatePickerInput
             value={toDate}
-            onChange={(e) => {
-              setToDate(e.target.value)
+            onChange={(v) => {
+              setToDate(v)
               setParams((p) => ({ ...p, page: 1 }))
             }}
-            className="border-outline-variant w-[150px]"
-            aria-label="Sampai tanggal"
+            className="w-[150px]"
+            ariaLabel="Sampai tanggal"
+            minDate={fromDate || undefined}
           />
         </div>
         <Select

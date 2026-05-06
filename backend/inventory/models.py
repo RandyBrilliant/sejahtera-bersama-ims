@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.validators import MinValueValidator
 from django.conf import settings
 from django.db import models
@@ -44,10 +46,21 @@ class Product(AuditModel):
 
     Each row represents one bawang goreng type/variant (e.g., Original, Pedas),
     and each variant can have multiple packaging sizes via ProductPackaging.
+
+    Bulk physical stock for the variant lives in remaining_mass_grams; kemasan store
+    berat bersih in kg — grams per unit = net_mass_kg × 1000.
     """
 
     name = models.CharField(_("product name"), max_length=150, default="Bawang Goreng")
     variant_name = models.CharField(_("bawang goreng type"), max_length=100, db_index=True)
+    remaining_mass_grams = models.DecimalField(
+        _("remaining mass (grams)"),
+        max_digits=14,
+        decimal_places=3,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_("Total bulk stock for this variant (shared across all kemasan)."),
+    )
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
     class Meta:
@@ -75,7 +88,8 @@ class ProductPackaging(AuditModel):
     """
     Packaging variant for a product.
 
-    Example: Same product with 250g, 500g, and 1000g packaging.
+    Net weight (berat bersih) is stored in kilograms. Internal stock for the
+    product variant remains in grams (remaining_mass_grams on Product).
     """
 
     product = models.ForeignKey(
@@ -85,16 +99,11 @@ class ProductPackaging(AuditModel):
         verbose_name=_("product"),
     )
     label = models.CharField(_("packaging label"), max_length=100)
-    net_mass_grams = models.PositiveIntegerField(
-        _("net mass (grams)"),
-        validators=[MinValueValidator(1)],
-    )
-    remaining_stock = models.DecimalField(
-        _("remaining stock"),
+    net_mass_kg = models.DecimalField(
+        _("net mass (kg)"),
         max_digits=12,
-        decimal_places=3,
-        validators=[MinValueValidator(0)],
-        default=0,
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal("0.000001"))],
     )
     base_price_idr = models.PositiveBigIntegerField(
         _("base price (IDR)"),
@@ -115,14 +124,14 @@ class ProductPackaging(AuditModel):
     class Meta:
         verbose_name = _("product packaging")
         verbose_name_plural = _("product packaging")
-        ordering = ["product__name", "net_mass_grams", "label"]
+        ordering = ["product__name", "net_mass_kg", "label"]
         constraints = [
             models.UniqueConstraint(
                 fields=["product", "label"],
                 name="uq_product_packaging_label_per_product",
             ),
             models.UniqueConstraint(
-                fields=["product", "net_mass_grams"],
+                fields=["product", "net_mass_kg"],
                 name="uq_product_packaging_mass_per_product",
             ),
         ]
@@ -130,14 +139,13 @@ class ProductPackaging(AuditModel):
             models.Index(fields=["product", "is_active"]),
             models.Index(fields=["created_by"]),
             models.Index(fields=["updated_by"]),
-            models.Index(fields=["remaining_stock"]),
             models.Index(fields=["base_price_idr"]),
-            models.Index(fields=["net_mass_grams"]),
+            models.Index(fields=["net_mass_kg"]),
             models.Index(fields=["created_at"]),
         ]
 
     def __str__(self) -> str:
-        return f"{self.product.name} - {self.label} ({self.net_mass_grams}g)"
+        return f"{self.product.name} - {self.label} ({self.net_mass_kg} kg)"
 
 
 class StockUnit(models.TextChoices):
@@ -262,13 +270,22 @@ class IngredientStockMovement(AuditModel):
 
 
 class ProductStockMovement(AuditModel):
-    """Immutable product packaging stock movement ledger."""
+    """Immutable finished-goods mass ledger (grams); optional kemasan row for context."""
 
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="stock_movements",
+        verbose_name=_("product"),
+    )
     product_packaging = models.ForeignKey(
         ProductPackaging,
         on_delete=models.PROTECT,
         related_name="stock_movements",
+        null=True,
+        blank=True,
         verbose_name=_("product packaging"),
+        help_text=_("Optional SKU context (production, sales lines); null for manual mass-only entries."),
     )
     movement_type = models.CharField(
         _("movement type"),
@@ -276,19 +293,20 @@ class ProductStockMovement(AuditModel):
         choices=StockMovementType.choices,
         db_index=True,
     )
-    quantity = models.DecimalField(
-        _("quantity"),
-        max_digits=12,
+    mass_grams = models.DecimalField(
+        _("mass (grams)"),
+        max_digits=14,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
+        help_text=_("Main movement amount in grams (always positive)."),
     )
-    bonus_quantity = models.DecimalField(
-        _("bonus quantity"),
-        max_digits=12,
+    bonus_mass_grams = models.DecimalField(
+        _("bonus mass (grams)"),
+        max_digits=14,
         decimal_places=3,
         validators=[MinValueValidator(0)],
         default=0,
-        help_text=_("Extra package quantity produced as bonus."),
+        help_text=_("Additional grams on IN movements only."),
     )
     note = models.TextField(_("note"), blank=True)
     movement_at = models.DateTimeField(_("movement at"), db_index=True)
@@ -298,6 +316,7 @@ class ProductStockMovement(AuditModel):
         verbose_name_plural = _("product stock movements")
         ordering = ["-movement_at", "-id"]
         indexes = [
+            models.Index(fields=["product", "movement_type"]),
             models.Index(fields=["product_packaging", "movement_type"]),
             models.Index(fields=["created_by"]),
             models.Index(fields=["updated_by"]),
@@ -306,7 +325,10 @@ class ProductStockMovement(AuditModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.product_packaging} {self.movement_type} {self.quantity}"
+        pkg = ""
+        if self.product_packaging_id:
+            pkg = f" ({self.product_packaging.label})"
+        return f"{self.product.variant_name}{pkg} {self.movement_type} {self.mass_grams} g"
 
 
 class ProductionBatch(AuditModel):

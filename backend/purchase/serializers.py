@@ -1,6 +1,8 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from inventory.models import ProductPackaging
@@ -23,6 +25,10 @@ def _user_mini(u):
     return {"id": u.id, "username": u.username, "full_name": u.full_name}
 
 
+def _default_invoice_number(order_code: str) -> str:
+    return f"INV-{order_code}"
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
     updated_by = serializers.SerializerMethodField()
@@ -32,11 +38,8 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "company_name",
             "phone",
-            "email",
             "address",
-            "tax_id",
             "notes",
             "is_active",
             "created_at",
@@ -56,6 +59,12 @@ class CustomerSerializer(serializers.ModelSerializer):
         cleaned = (value or "").strip()
         if not cleaned:
             raise serializers.ValidationError("Nama pelanggan wajib diisi.")
+        return cleaned
+
+    def validate_address(self, value: str):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Alamat wajib diisi.")
         return cleaned
 
 
@@ -137,14 +146,10 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "order_code",
-            "supplier_name",
-            "supplier_phone",
             "status",
             "invoice_number",
             "invoice_date",
-            "due_date",
             "subtotal_idr",
-            "tax_amount_idr",
             "total_idr",
             "payment_proof",
             "payment_proof_uploaded_at",
@@ -160,6 +165,7 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "order_code",
+            "status",
             "subtotal_idr",
             "total_idr",
             "payment_proof",
@@ -182,14 +188,11 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
         return _user_mini(obj.updated_by)
 
     def validate(self, attrs):
-        status_val = attrs.get("status", getattr(self.instance, "status", OrderStatus.DRAFT))
         if self.instance and self.instance.status == OrderStatus.VERIFIED:
             raise serializers.ValidationError("Order yang sudah diverifikasi tidak dapat diubah.")
         lines = attrs.get("lines")
         if self.instance is None and (not lines or len(lines) == 0):
             raise serializers.ValidationError({"lines": ["Minimal satu baris bahan wajib ada."]})
-        if status_val == OrderStatus.VERIFIED:
-            raise serializers.ValidationError({"status": ["Status diverifikasi hanya melalui aksi owner."]})
         return attrs
 
     def validate_lines(self, lines_data):
@@ -207,13 +210,21 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else None
+        user = validated_data.pop("created_by", None)
+        if user is None:
+            user = request.user if request and request.user.is_authenticated else None
+        updated_by = validated_data.pop("updated_by", user)
         lines_data = validated_data.pop("lines")
+        validated_data["status"] = OrderStatus.AWAITING_PAYMENT
+        if not validated_data.get("invoice_date"):
+            validated_data["invoice_date"] = timezone.localdate() + timedelta(days=1)
         validated_data["order_code"] = next_order_code(PurchaseInOrder, "PI")
+        if not (validated_data.get("invoice_number") or "").strip():
+            validated_data["invoice_number"] = f"INV-{validated_data['order_code']}"
         order = PurchaseInOrder.objects.create(
             **validated_data,
             created_by=user,
-            updated_by=user,
+            updated_by=updated_by,
         )
         for row in lines_data:
             PurchaseInLine.objects.create(
@@ -222,16 +233,19 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
                 quantity=row["quantity"],
                 unit_cost_idr=row["unit_cost_idr"],
                 created_by=user,
-                updated_by=user,
+                updated_by=updated_by,
             )
         recompute_order_totals(order)
-        order.save(update_fields=["subtotal_idr", "tax_amount_idr", "total_idr", "updated_at"])
+        order.save(update_fields=["subtotal_idr", "total_idr", "updated_at"])
         return order
 
     @transaction.atomic
     def update(self, instance, validated_data):
         request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else None
+        user = validated_data.pop("updated_by", None)
+        if user is None:
+            user = request.user if request and request.user.is_authenticated else None
+        validated_data.pop("status", None)
         lines_data = validated_data.pop("lines", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -251,7 +265,7 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
                     updated_by=user,
                 )
         recompute_order_totals(instance)
-        instance.save(update_fields=["subtotal_idr", "tax_amount_idr", "total_idr", "updated_at", "updated_by"])
+        instance.save(update_fields=["subtotal_idr", "total_idr", "updated_at", "updated_by"])
         return instance
 
 
@@ -280,6 +294,13 @@ def _resolve_sales_unit_price(customer, packaging: ProductPackaging, explicit) -
 class SalesOrderLineSerializer(serializers.ModelSerializer):
     product_variant_name = serializers.CharField(source="product_packaging.product.variant_name", read_only=True)
     packaging_label = serializers.CharField(source="product_packaging.label", read_only=True)
+    net_mass_kg = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=6,
+        source="product_packaging.net_mass_kg",
+        read_only=True,
+        coerce_to_string=True,
+    )
     line_total_idr = serializers.SerializerMethodField()
     unit_price_idr = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
@@ -290,6 +311,7 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
             "product_packaging",
             "product_variant_name",
             "packaging_label",
+            "net_mass_kg",
             "quantity",
             "unit_price_idr",
             "line_total_idr",
@@ -300,6 +322,7 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
             "id",
             "product_variant_name",
             "packaging_label",
+            "net_mass_kg",
             "line_total_idr",
             "created_at",
             "updated_at",
@@ -345,7 +368,10 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             "id",
             "order_code",
             "customer_name",
+            "status",
+            "due_date",
             "subtotal_idr",
+            "tax_amount_idr",
             "total_idr",
             "payment_proof",
             "payment_proof_uploaded_at",
@@ -367,14 +393,11 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         return _user_mini(obj.updated_by)
 
     def validate(self, attrs):
-        status_val = attrs.get("status", getattr(self.instance, "status", OrderStatus.DRAFT))
         if self.instance and self.instance.status == OrderStatus.VERIFIED:
             raise serializers.ValidationError("Order yang sudah diverifikasi tidak dapat diubah.")
         lines = attrs.get("lines")
         if self.instance is None and (not lines or len(lines) == 0):
             raise serializers.ValidationError({"lines": ["Minimal satu baris produk wajib ada."]})
-        if status_val == OrderStatus.VERIFIED:
-            raise serializers.ValidationError({"status": ["Status diverifikasi hanya melalui aksi owner."]})
         return attrs
 
     def validate_lines(self, lines_data):
@@ -392,14 +415,24 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else None
+        user = validated_data.pop("created_by", None)
+        if user is None:
+            user = request.user if request and request.user.is_authenticated else None
+        updated_by = validated_data.pop("updated_by", user)
         lines_data = validated_data.pop("lines")
         customer = validated_data["customer"]
+        validated_data["status"] = OrderStatus.AWAITING_PAYMENT
+        validated_data["due_date"] = None
+        validated_data["tax_amount_idr"] = 0
+        if not validated_data.get("invoice_date"):
+            validated_data["invoice_date"] = timezone.localdate() + timedelta(days=1)
         validated_data["order_code"] = next_order_code(SalesOrder, "SO")
+        if not (validated_data.get("invoice_number") or "").strip():
+            validated_data["invoice_number"] = _default_invoice_number(validated_data["order_code"])
         order = SalesOrder.objects.create(
             **validated_data,
             created_by=user,
-            updated_by=user,
+            updated_by=updated_by,
         )
         for row in lines_data:
             packaging = row["product_packaging"]
@@ -411,7 +444,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
                 quantity=row["quantity"],
                 unit_price_idr=unit_price,
                 created_by=user,
-                updated_by=user,
+                updated_by=updated_by,
             )
         recompute_order_totals(order)
         order.save(update_fields=["subtotal_idr", "tax_amount_idr", "total_idr", "updated_at"])
@@ -420,11 +453,18 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else None
+        user = validated_data.pop("updated_by", None)
+        if user is None:
+            user = request.user if request and request.user.is_authenticated else None
         lines_data = validated_data.pop("lines", None)
         customer = validated_data.get("customer", instance.customer)
+        validated_data.pop("status", None)
+        validated_data.pop("due_date", None)
+        validated_data.pop("tax_amount_idr", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.due_date = None
+        instance.tax_amount_idr = 0
         instance.updated_by = user
         instance.save()
         if lines_data is not None:

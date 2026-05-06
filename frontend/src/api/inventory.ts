@@ -183,6 +183,9 @@ function buildProductMovementQuery(params: ProductStockMovementListParams): stri
   if (params.page_size != null) search.set('page_size', String(params.page_size))
   if (params.search) search.set('search', params.search)
   if (params.ordering) search.set('ordering', params.ordering)
+  if (params.product != null) {
+    search.set('product', String(params.product))
+  }
   if (params.product_packaging != null) {
     search.set('product_packaging', String(params.product_packaging))
   }

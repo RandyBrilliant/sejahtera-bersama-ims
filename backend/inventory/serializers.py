@@ -14,6 +14,7 @@ from .models import (
     ProductionPackagingOutput,
     StockMovementType,
 )
+from .product_stock import net_kg_to_grams, packaging_line_stock_value_idr
 
 
 class AuditUserMiniSerializer(serializers.Serializer):
@@ -32,13 +33,21 @@ class ProductSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "variant_name",
+            "remaining_mass_grams",
             "is_active",
             "created_at",
             "updated_at",
             "created_by",
             "updated_by",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+        read_only_fields = [
+            "id",
+            "remaining_mass_grams",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
 
     def validate_name(self, value: str):
         cleaned = (value or "").strip()
@@ -58,6 +67,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     updated_by = AuditUserMiniSerializer(read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
+    remaining_stock = serializers.SerializerMethodField(read_only=True)
     stock_value_idr = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -68,7 +78,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "product_name",
             "product_variant_name",
             "label",
-            "net_mass_grams",
+            "net_mass_kg",
             "remaining_stock",
             "base_price_idr",
             "list_price_idr",
@@ -84,6 +94,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "id",
             "product_name",
             "product_variant_name",
+            "remaining_stock",
             "stock_value_idr",
             "created_at",
             "updated_at",
@@ -91,8 +102,19 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "updated_by",
         ]
 
+    def get_remaining_stock(self, obj):
+        annotated = getattr(obj, "remaining_stock", None)
+        if annotated is not None:
+            return annotated
+        prod = getattr(obj, "product", None)
+        mass = getattr(prod, "remaining_mass_grams", None) or Decimal("0") if prod else Decimal("0")
+        net_g = net_kg_to_grams(Decimal(str(obj.net_mass_kg)))
+        if net_g <= 0:
+            return Decimal("0")
+        return mass / net_g
+
     def get_stock_value_idr(self, obj) -> int:
-        return int((obj.remaining_stock or Decimal("0")) * (obj.base_price_idr or 0))
+        return packaging_line_stock_value_idr(obj)
 
     def validate_label(self, value: str):
         cleaned = (value or "").strip()
@@ -170,6 +192,10 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
         source="ingredient_inventory.ingredient.name",
         read_only=True,
     )
+    ingredient_unit = serializers.CharField(
+        source="ingredient_inventory.ingredient.default_unit",
+        read_only=True,
+    )
 
     class Meta:
         model = IngredientStockMovement
@@ -177,6 +203,7 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
             "id",
             "ingredient_inventory",
             "ingredient_name",
+            "ingredient_unit",
             "movement_type",
             "quantity",
             "note",
@@ -192,24 +219,24 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
 class ProductStockMovementSerializer(serializers.ModelSerializer):
     created_by = AuditUserMiniSerializer(read_only=True)
     updated_by = AuditUserMiniSerializer(read_only=True)
-    product_packaging_label = serializers.CharField(source="product_packaging.label", read_only=True)
-    product_variant_name = serializers.CharField(
-        source="product_packaging.product.variant_name",
-        read_only=True,
-    )
-    total_increase_quantity = serializers.SerializerMethodField(read_only=True)
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    product_packaging = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    product_packaging_label = serializers.SerializerMethodField(read_only=True)
+    product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
+    total_mass_grams = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductStockMovement
         fields = [
             "id",
+            "product",
             "product_packaging",
             "product_packaging_label",
             "product_variant_name",
             "movement_type",
-            "quantity",
-            "bonus_quantity",
-            "total_increase_quantity",
+            "mass_grams",
+            "bonus_mass_grams",
+            "total_mass_grams",
             "note",
             "movement_at",
             "created_at",
@@ -219,17 +246,34 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "product_packaging",
             "product_packaging_label",
             "product_variant_name",
-            "total_increase_quantity",
+            "total_mass_grams",
             "created_at",
             "updated_at",
             "created_by",
             "updated_by",
         ]
 
-    def get_total_increase_quantity(self, obj):
-        return obj.quantity + obj.bonus_quantity
+    def get_product_packaging_label(self, obj):
+        if obj.product_packaging_id:
+            return obj.product_packaging.label
+        return ""
+
+    def get_total_mass_grams(self, obj):
+        return obj.mass_grams + obj.bonus_mass_grams
+
+    def validate(self, attrs):
+        mt = attrs["movement_type"]
+        bonus = attrs.get("bonus_mass_grams")
+        if bonus is None:
+            bonus = Decimal("0")
+        if mt == StockMovementType.OUT and bonus > 0:
+            raise serializers.ValidationError(
+                {"bonus_mass_grams": "Bonus massa hanya untuk mutasi masuk (IN)."}
+            )
+        return attrs
 
 
 class ProductionIngredientUsageInputSerializer(serializers.Serializer):

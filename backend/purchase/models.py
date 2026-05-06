@@ -1,6 +1,10 @@
+from datetime import timedelta
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from inventory.models import AuditModel, IngredientInventory, ProductPackaging
@@ -14,16 +18,23 @@ class OrderStatus(models.TextChoices):
     VERIFIED = "VERIFIED", _("Verified by owner")
     CANCELLED = "CANCELLED", _("Cancelled")
 
+class SalesOrderStatus(models.TextChoices):
+    AWAITING_PAYMENT = OrderStatus.AWAITING_PAYMENT, _("Menunggu pembayaran")
+    PAYMENT_PROOF_UPLOADED = OrderStatus.PAYMENT_PROOF_UPLOADED, _("Sudah bayar")
+    VERIFIED = OrderStatus.VERIFIED, _("Pembayaran diterima")
+    CANCELLED = OrderStatus.CANCELLED, _("Dibatalkan")
+
+
+def _invoice_date_h_plus_one():
+    return timezone.localdate() + timedelta(days=1)
+
 
 class Customer(AuditModel):
     """Customer master data for sales (order out)."""
 
     name = models.CharField(_("customer name"), max_length=200, db_index=True)
-    company_name = models.CharField(_("company name"), max_length=200, blank=True)
-    phone = models.CharField(_("phone"), max_length=50, db_index=True)
-    email = models.EmailField(_("email"), blank=True)
-    address = models.TextField(_("address"), blank=True)
-    tax_id = models.CharField(_("NPWP / tax id"), max_length=30, blank=True, db_index=True)
+    phone = models.CharField(_("phone"), max_length=50, blank=True, db_index=True)
+    address = models.TextField(_("address"))
     notes = models.TextField(_("notes"), blank=True)
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
@@ -98,20 +109,16 @@ class PurchaseInOrder(AuditModel):
     """
 
     order_code = models.CharField(_("order code"), max_length=32, unique=True, db_index=True)
-    supplier_name = models.CharField(_("supplier name"), max_length=200)
-    supplier_phone = models.CharField(_("supplier phone"), max_length=50, blank=True)
     status = models.CharField(
         _("status"),
         max_length=32,
         choices=OrderStatus.choices,
-        default=OrderStatus.DRAFT,
+        default=OrderStatus.AWAITING_PAYMENT,
         db_index=True,
     )
     invoice_number = models.CharField(_("invoice number"), max_length=64, blank=True, db_index=True)
     invoice_date = models.DateField(_("invoice date"), null=True, blank=True)
-    due_date = models.DateField(_("due date"), null=True, blank=True)
     subtotal_idr = models.PositiveBigIntegerField(_("subtotal (IDR)"), default=0)
-    tax_amount_idr = models.PositiveBigIntegerField(_("tax (IDR)"), default=0)
     total_idr = models.PositiveBigIntegerField(_("total (IDR)"), default=0)
     payment_proof = models.FileField(
         _("payment proof (bukti TF)"),
@@ -138,7 +145,6 @@ class PurchaseInOrder(AuditModel):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["status", "created_at"]),
-            models.Index(fields=["supplier_name"]),
             models.Index(fields=["created_by"]),
         ]
 
@@ -163,7 +169,7 @@ class PurchaseInLine(AuditModel):
         _("quantity"),
         max_digits=12,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
     unit_cost_idr = models.PositiveBigIntegerField(
         _("unit cost (IDR)"),
@@ -199,12 +205,12 @@ class SalesOrder(AuditModel):
     status = models.CharField(
         _("status"),
         max_length=32,
-        choices=OrderStatus.choices,
-        default=OrderStatus.DRAFT,
+        choices=SalesOrderStatus.choices,
+        default=OrderStatus.AWAITING_PAYMENT,
         db_index=True,
     )
     invoice_number = models.CharField(_("invoice number"), max_length=64, blank=True, db_index=True)
-    invoice_date = models.DateField(_("invoice date"), null=True, blank=True)
+    invoice_date = models.DateField(_("invoice date"), null=True, blank=True, default=_invoice_date_h_plus_one)
     due_date = models.DateField(_("due date"), null=True, blank=True)
     subtotal_idr = models.PositiveBigIntegerField(_("subtotal (IDR)"), default=0)
     tax_amount_idr = models.PositiveBigIntegerField(_("tax (IDR)"), default=0)
@@ -259,7 +265,7 @@ class SalesOrderLine(AuditModel):
         _("quantity"),
         max_digits=12,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
     unit_price_idr = models.PositiveBigIntegerField(
         _("unit price (IDR)"),

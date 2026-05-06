@@ -88,7 +88,7 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = OperationalCashEntryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["description", "reference", "category__name", "sales_order__order_code", "purchase_in_order__order_code"]
+    search_fields = ["description", "reference", "category__name", "sales_order__order_code"]
     ordering_fields = ["occurred_on", "amount_idr", "direction", "created_at", "updated_at"]
     ordering = ["-occurred_on", "-id"]
 
@@ -96,7 +96,6 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         return OperationalCashEntry.objects.select_related(
             "category",
             "sales_order",
-            "purchase_in_order",
             "created_by",
             "updated_by",
         )
@@ -203,7 +202,6 @@ class OperationalCashReportView(APIView):
                     "description",
                     "reference",
                     "sales_order_code",
-                    "purchase_in_order_code",
                     "created_by_username",
                 ]
             )
@@ -218,7 +216,6 @@ class OperationalCashReportView(APIView):
                         e.description.replace("\r\n", " ").replace("\n", " "),
                         e.reference or "",
                         e.sales_order.order_code if e.sales_order_id else "",
-                        e.purchase_in_order.order_code if e.purchase_in_order_id else "",
                         e.created_by.username if e.created_by_id else "",
                     ]
                 )
@@ -250,8 +247,6 @@ class OperationalCashReportView(APIView):
                     bits.append(f"Ref: {e.reference}")
                 if e.sales_order_id:
                     bits.append(f"SO:{e.sales_order.order_code}")
-                if e.purchase_in_order_id:
-                    bits.append(f"PI:{e.purchase_in_order.order_code}")
                 tail = " | ".join(bits)
                 desc = e.description.replace("\n", " ")[:80]
                 if tail:

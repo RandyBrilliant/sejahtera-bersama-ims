@@ -47,7 +47,12 @@ export function ProductPackagingDeleteModal({ open, onOpenChange, row }: Props) 
           <DialogTitle>Hapus kemasan?</DialogTitle>
           <DialogDescription>
             SKU <span className="font-semibold">{row?.label ?? '—'}</span> (
-            {row?.net_mass_grams ?? '—'} g) akan dihapus. Pastikan tidak ada transaksi terbuka yang
+            {row?.net_mass_kg != null
+              ? `${Number(String(row.net_mass_kg).replace(',', '.')).toLocaleString('id-ID', {
+                  maximumFractionDigits: 6,
+                })} kg`
+              : '—'}
+            ) akan dihapus. Pastikan tidak ada transaksi terbuka yang
             membutuhkan baris ini.
           </DialogDescription>
         </DialogHeader>

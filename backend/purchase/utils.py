@@ -26,9 +26,13 @@ def next_order_code(model_class, prefix: str) -> str:
 def recompute_order_totals(order, *, tax_amount_idr: int | None = None) -> None:
     """Recalculate subtotal/total from related lines (purchase in vs sales)."""
     lines = order.lines.all()
+    has_tax_field = hasattr(order, "tax_amount_idr")
     if not lines.exists():
         order.subtotal_idr = 0
-        order.total_idr = int(tax_amount_idr or order.tax_amount_idr)
+        if has_tax_field:
+            order.total_idr = int(tax_amount_idr or order.tax_amount_idr)
+        else:
+            order.total_idr = 0
         return
     sub = Decimal("0")
     for line in lines:
@@ -37,6 +41,9 @@ def recompute_order_totals(order, *, tax_amount_idr: int | None = None) -> None:
         else:
             sub += Decimal(str(line.quantity)) * int(line.unit_price_idr)
     order.subtotal_idr = int(sub)
-    tax = int(tax_amount_idr) if tax_amount_idr is not None else int(order.tax_amount_idr or 0)
-    order.tax_amount_idr = tax
-    order.total_idr = int(order.subtotal_idr) + tax
+    if has_tax_field:
+        tax = int(tax_amount_idr) if tax_amount_idr is not None else int(order.tax_amount_idr or 0)
+        order.tax_amount_idr = tax
+        order.total_idr = int(order.subtotal_idr) + tax
+    else:
+        order.total_idr = int(order.subtotal_idr)

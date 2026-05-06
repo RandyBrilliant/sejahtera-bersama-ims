@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
+from collections import defaultdict
 from django.db import transaction
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Cast, Coalesce
@@ -27,6 +28,7 @@ from account.permissions import (
 from inventory.models import (
     IngredientInventory,
     IngredientStockMovement,
+    Product,
     ProductPackaging,
     ProductStockMovement,
     StockMovementType,
@@ -61,7 +63,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = CustomerFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["name", "company_name", "phone", "email", "tax_id"]
+    search_fields = ["name", "phone", "address", "notes"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
 
@@ -105,7 +107,7 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = PurchaseInOrderFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["order_code", "supplier_name", "invoice_number", "notes"]
+    search_fields = ["order_code", "invoice_number", "notes"]
     ordering_fields = ["created_at", "updated_at", "status", "total_idr", "order_code"]
     ordering = ["-created_at"]
 
@@ -409,31 +411,51 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             )
         now = timezone.now()
         lines = list(order.lines.select_related("product_packaging__product").all())
-        locked_packaging = []
+        mass_by_product: defaultdict[int, Decimal] = defaultdict(Decimal)
         for line in lines:
-            packaging = (
-                ProductPackaging.objects.select_for_update()
-                .select_related("product")
-                .get(pk=line.product_packaging_id)
+            packaging = line.product_packaging
+            line_mass = (
+                Decimal(str(line.quantity)) * Decimal(str(packaging.net_mass_kg)) * Decimal("1000")
             )
-            if packaging.remaining_stock < line.quantity:
+            mass_by_product[packaging.product_id] += line_mass
+
+        products_locked: dict[int, Product] = {
+            pid: Product.objects.select_for_update().get(pk=pid)
+            for pid in sorted(mass_by_product.keys())
+        }
+
+        for pid, need in mass_by_product.items():
+            prod = products_locked[pid]
+            available = prod.remaining_mass_grams or Decimal("0")
+            if available < need:
                 return Response(
                     {
-                        "detail": f"Stok tidak cukup untuk {packaging}: butuh {line.quantity}, tersedia {packaging.remaining_stock}.",
+                        "detail": (
+                            f"Stok utama tidak cukup untuk varian «{prod.variant_name}»: "
+                            f"butuh {need} g, tersedia {available} g."
+                        ),
                         "code": "validation_error",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            locked_packaging.append((line, packaging))
-        for line, packaging in locked_packaging:
-            packaging.remaining_stock = packaging.remaining_stock - line.quantity
-            packaging.updated_by = request.user
-            packaging.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
+
+        for pid, need in mass_by_product.items():
+            prod = products_locked[pid]
+            prod.remaining_mass_grams = (prod.remaining_mass_grams or Decimal("0")) - need
+            prod.updated_by = request.user
+            prod.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+
+        for line in lines:
+            packaging = line.product_packaging
+            line_mass = (
+                Decimal(str(line.quantity)) * Decimal(str(packaging.net_mass_kg)) * Decimal("1000")
+            )
             ProductStockMovement.objects.create(
+                product=packaging.product,
                 product_packaging=packaging,
                 movement_type=StockMovementType.OUT,
-                quantity=line.quantity,
-                bonus_quantity=Decimal("0"),
+                mass_grams=line_mass,
+                bonus_mass_grams=Decimal("0"),
                 note=f"Pengiriman penjualan {order.order_code}",
                 movement_at=now,
                 created_by=request.user,

@@ -26,6 +26,16 @@ import type { StockMovementType } from '@/types/inventory'
 const listParams = { page: 1, page_size: 500 } as const
 const NO_INV = '__none__' as const
 
+function fmtQty(raw: string | number) {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return String(raw)
+  if (Number.isInteger(n)) return String(n)
+  return n
+    .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    .replace(/0+$/, '')
+    .replace(/,$/, '')
+}
+
 type Props = {
   onCancel: () => void
   onSaved: () => void
@@ -106,7 +116,7 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
                     <SelectItem key={row.id} value={String(row.id)}>
                       {row.ingredient_name} (
                       {STOCK_UNIT_LABEL[row.ingredient_unit] ?? row.ingredient_unit}) — sisa{' '}
-                      {row.remaining_stock}
+                      {fmtQty(row.remaining_stock)} {row.ingredient_unit}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -115,7 +125,8 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
             {selectedRow ? (
               <p className="text-on-surface-variant text-xs">
                 Dipilih: {selectedRow.ingredient_name} (
-                {STOCK_UNIT_LABEL[selectedRow.ingredient_unit] ?? selectedRow.ingredient_unit})
+                {STOCK_UNIT_LABEL[selectedRow.ingredient_unit] ?? selectedRow.ingredient_unit}) — sisa{' '}
+                {fmtQty(selectedRow.remaining_stock)} {selectedRow.ingredient_unit}
               </p>
             ) : null}
           </div>
@@ -138,14 +149,23 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="ing-mov-qty">Kuantitas</Label>
+            <Label htmlFor="ing-mov-qty">
+              Kuantitas
+              {selectedRow
+                ? ` (${STOCK_UNIT_LABEL[selectedRow.ingredient_unit] ?? selectedRow.ingredient_unit})`
+                : ''}
+            </Label>
             <Input
               id="ing-mov-qty"
+              type="number"
               inputMode="decimal"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))}
               disabled={pending}
               className="border-outline-variant"
+              min="0"
+              step="any"
+              placeholder="0"
             />
           </div>
 

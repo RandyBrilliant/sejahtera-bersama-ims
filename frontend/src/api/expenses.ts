@@ -42,9 +42,6 @@ function buildEntryQuery(params: OperationalCashEntryListParams): string {
   if (params.occurred_on_from) search.set('occurred_on_from', params.occurred_on_from)
   if (params.occurred_on_to) search.set('occurred_on_to', params.occurred_on_to)
   if (params.sales_order != null) search.set('sales_order', String(params.sales_order))
-  if (params.purchase_in_order != null) {
-    search.set('purchase_in_order', String(params.purchase_in_order))
-  }
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }

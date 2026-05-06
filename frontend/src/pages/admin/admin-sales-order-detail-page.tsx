@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
@@ -25,6 +25,11 @@ import {
 } from '@/hooks/use-purchase-query'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import {
+  formatDecimalId,
+  formatSalesOrderLineMassKg,
+  salesOrderLinesTotalMassKg,
+} from '@/lib/format-number-id'
 
 function fmtDt(iso: string | null | undefined) {
   if (!iso) return '—'
@@ -48,6 +53,11 @@ export function AdminSalesOrderDetailPage() {
   const cancelMut = useCancelSalesOrderMutation(id)
   const deleteMut = useDeleteSalesOrderMutation()
   const pdfMut = useSalesInvoicePdfMutation()
+
+  const totalMassKg = useMemo(
+    () => (order?.lines ? salesOrderLinesTotalMassKg(order.lines) : 0),
+    [order]
+  )
 
   if (!validId) {
     return <Navigate to="/admin/pesanan/penjualan" replace />
@@ -214,6 +224,13 @@ export function AdminSalesOrderDetailPage() {
             <p>
               <span className="font-medium text-foreground">Catatan:</span> {order.notes || '—'}
             </p>
+            <p>
+              <span className="font-medium text-foreground">Total berat (order):</span>{' '}
+              <span className="tabular-nums">{formatDecimalId(totalMassKg)} kg</span>
+              <span className="text-on-surface-variant block text-xs leading-relaxed">
+                Jumlah kemasan × berat bersih per kemasan (kg).
+              </span>
+            </p>
           </CardContent>
         </Card>
 
@@ -293,6 +310,7 @@ export function AdminSalesOrderDetailPage() {
                 <TableHead>Produk</TableHead>
                 <TableHead>Kemasan</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Berat baris (kg)</TableHead>
                 <TableHead className="text-right">Harga</TableHead>
                 <TableHead className="text-right">Jumlah</TableHead>
               </TableRow>
@@ -302,7 +320,12 @@ export function AdminSalesOrderDetailPage() {
                 <TableRow key={line.id} className="border-outline-variant">
                   <TableCell>{line.product_variant_name}</TableCell>
                   <TableCell>{line.packaging_label}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatDecimalId(line.quantity)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatSalesOrderLineMassKg(line)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatIdr(line.unit_price_idr)}
                   </TableCell>

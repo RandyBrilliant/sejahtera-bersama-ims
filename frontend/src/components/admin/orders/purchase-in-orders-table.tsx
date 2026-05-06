@@ -5,11 +5,21 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight, Eye, Plus, Search } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Plus, Search, XCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
+import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -27,7 +37,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
-import { usePurchaseInOrdersQuery } from '@/hooks/use-purchase-query'
+import {
+  useCancelPurchaseInOrderMutation,
+  usePurchaseInOrdersQuery,
+  useVerifyPurchaseInOrderMutation,
+} from '@/hooks/use-purchase-query'
+import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, PurchaseInOrder, PurchaseInOrdersListParams } from '@/types/purchase'
@@ -57,8 +72,16 @@ export function PurchaseInOrdersTable() {
     page_size: 20,
   })
   const [searchInput, setSearchInput] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState<{
+    action: 'verify' | 'cancel'
+    order: PurchaseInOrder
+  } | null>(null)
 
   const { data, isLoading, isError, error, isFetching } = usePurchaseInOrdersQuery(params)
+  const verifyMut = useVerifyPurchaseInOrderMutation(confirmTarget?.order.id ?? 0)
+  const cancelMut = useCancelPurchaseInOrderMutation(confirmTarget?.order.id ?? 0)
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
@@ -74,6 +97,22 @@ export function PurchaseInOrdersTable() {
     }))
   }, [searchInput])
 
+  async function submitQuickAction() {
+    if (!confirmTarget) return
+    try {
+      if (confirmTarget.action === 'verify') {
+        await verifyMut.mutateAsync()
+        alert.success('Berhasil', `Order ${confirmTarget.order.order_code} ditandai sukses.`)
+      } else {
+        await cancelMut.mutateAsync()
+        alert.success('Berhasil', `Order ${confirmTarget.order.order_code} dibatalkan.`)
+      }
+      setConfirmTarget(null)
+    } catch (err) {
+      alert.error('Gagal memproses aksi', parsePurchaseMutationError(err))
+    }
+  }
+
   const columns = useMemo<ColumnDef<PurchaseInOrder>[]>(
     () => [
       {
@@ -82,11 +121,6 @@ export function PurchaseInOrdersTable() {
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.order_code}</span>
         ),
-      },
-      {
-        accessorKey: 'supplier_name',
-        header: 'Supplier',
-        cell: ({ row }) => row.original.supplier_name,
       },
       {
         accessorKey: 'status',
@@ -111,9 +145,45 @@ export function PurchaseInOrdersTable() {
       },
       {
         id: 'actions',
-        header: '',
+        header: 'Aksi cepat',
         cell: ({ row }) => (
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-1.5">
+            {row.original.payment_proof ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <a href={row.original.payment_proof} target="_blank" rel="noopener noreferrer">
+                  Lihat bukti
+                </a>
+              </Button>
+            ) : null}
+            {(row.original.status === 'PAYMENT_PROOF_UPLOADED' ||
+              (row.original.status === 'AWAITING_PAYMENT' && !!row.original.payment_proof)) ? (
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setConfirmTarget({ action: 'verify', order: row.original })}
+              >
+                <CheckCircle2 className="size-4" />
+                Sukses
+              </Button>
+            ) : null}
+            {row.original.status !== 'VERIFIED' && row.original.status !== 'CANCELLED' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setConfirmTarget({ action: 'cancel', order: row.original })}
+              >
+                <XCircle className="mr-1 size-4" />
+                Batalkan
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -149,7 +219,7 @@ export function PurchaseInOrdersTable() {
           <div className="relative max-w-md flex-1">
             <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
-              placeholder="Cari kode, supplier, faktur…"
+              placeholder="Cari kode, faktur, catatan…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -171,6 +241,30 @@ export function PurchaseInOrdersTable() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <DatePickerInput
+          value={startDate}
+          onChange={(v) => {
+            setStartDate(v)
+            setParams((p) => ({ ...p, page: 1, start_date: v || undefined }))
+          }}
+          className="w-[150px]"
+          ariaLabel="Dari tanggal"
+          maxDate={endDate || undefined}
+          placeholder="Dari tanggal"
+        />
+        <span className="text-on-surface-variant text-sm">s/d</span>
+        <DatePickerInput
+          value={endDate}
+          onChange={(v) => {
+            setEndDate(v)
+            setParams((p) => ({ ...p, page: 1, end_date: v || undefined }))
+          }}
+          className="w-[150px]"
+          ariaLabel="Sampai tanggal"
+          minDate={startDate || undefined}
+          placeholder="Sampai tanggal"
+        />
+
         <Select
           value={statusFilter}
           onValueChange={(v) =>
@@ -320,6 +414,38 @@ export function PurchaseInOrdersTable() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={!!confirmTarget} onOpenChange={(open) => !open && setConfirmTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmTarget?.action === 'verify' ? 'Konfirmasi tandai sukses' : 'Konfirmasi pembatalan'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmTarget?.action === 'verify'
+                ? `Order ${confirmTarget.order.order_code} akan diubah ke status "Pembayaran diterima".`
+                : `Order ${confirmTarget?.order.order_code} akan diubah ke status "Dibatalkan".`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmTarget(null)}
+              disabled={verifyMut.isPending || cancelMut.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitQuickAction()}
+              disabled={verifyMut.isPending || cancelMut.isPending}
+            >
+              {verifyMut.isPending || cancelMut.isPending ? 'Memproses…' : 'Ya, lanjutkan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

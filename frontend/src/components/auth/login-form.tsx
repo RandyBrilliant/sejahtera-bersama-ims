@@ -48,6 +48,7 @@ export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
             <Input
               id="username"
               name="username"
+              forceUppercase={false}
               required
               disabled={isSubmitting}
               className="pl-10"
@@ -65,6 +66,7 @@ export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
               id="password"
               name="password"
               type="password"
+              forceUppercase={false}
               required
               disabled={isSubmitting}
               className="pl-10"

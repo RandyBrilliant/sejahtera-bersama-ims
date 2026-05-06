@@ -1,6 +1,7 @@
 import { Package, Boxes, Scale, AlertTriangle } from 'lucide-react'
 
 import { useInventorySummaryQuery } from '@/hooks/use-inventory-query'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 
@@ -112,13 +113,13 @@ export function InventorySummaryStats() {
         {products.active_packaging.toLocaleString('id-ID')}
       </Card>
       <Card
-        label="Stok paket (jumlah)"
+        label="Stok utama (kg)"
         icon={Scale}
         iconWrap="bg-sky-500/15 text-sky-800 dark:text-sky-300"
         accent="bg-gradient-to-r from-sky-500/85 via-sky-500 to-sky-600/85"
-        sub={`Perkiraan nilai (harga pokok × stok): ${formatIdr(products.total_product_stock_value_idr)}`}
+        sub={`Perkiraan nilai persediaan jadi: ${formatIdr(products.total_product_stock_value_idr)}`}
       >
-        {fmtQty(products.total_product_stock)}
+        {formatProductMassKgFromGrams(products.total_product_mass_grams)}
       </Card>
       <Card
         label="Bahan di bawah minimum"

@@ -10,7 +10,7 @@ from .models import EntryKind, OperationalCashEntry
 def entries_queryset_for_range(start_d, end_d):
     return (
         OperationalCashEntry.objects.filter(occurred_on__gte=start_d, occurred_on__lte=end_d)
-        .select_related("category", "sales_order", "purchase_in_order", "created_by")
+        .select_related("category", "sales_order", "created_by")
         .order_by("occurred_on", "id")
     )
 
@@ -75,11 +75,7 @@ def linked_breakdown(qs):
         total_idr=Coalesce(Sum("amount_idr"), Value(0)),
         line_count=Count("id"),
     )
-    linked_purchase = qs.filter(purchase_in_order__isnull=False).aggregate(
-        total_idr=Coalesce(Sum("amount_idr"), Value(0)),
-        line_count=Count("id"),
-    )
-    unlinked = qs.filter(sales_order__isnull=True, purchase_in_order__isnull=True).aggregate(
+    unlinked = qs.filter(sales_order__isnull=True).aggregate(
         income_idr=Coalesce(
             Sum("amount_idr", filter=models.Q(direction=EntryKind.INCOME)),
             Value(0),
@@ -92,7 +88,6 @@ def linked_breakdown(qs):
     )
     return {
         "linked_to_sales_order": linked_sales,
-        "linked_to_purchase_in_order": linked_purchase,
         "unlinked": {
             "income_idr": int(unlinked["income_idr"] or 0),
             "expense_idr": int(unlinked["expense_idr"] or 0),
@@ -117,8 +112,6 @@ def entries_for_json(qs, limit=500):
                 "reference": e.reference or "",
                 "sales_order_id": e.sales_order_id,
                 "sales_order_code": e.sales_order.order_code if e.sales_order_id else None,
-                "purchase_in_order_id": e.purchase_in_order_id,
-                "purchase_in_order_code": e.purchase_in_order.order_code if e.purchase_in_order_id else None,
             }
         )
     return {"total_count": total, "returned_count": len(rows), "truncated": total > limit, "rows": rows}

@@ -34,8 +34,6 @@ export type OperationalCashEntry = {
   reference: string
   sales_order: number | null
   sales_order_code: string | null
-  purchase_in_order: number | null
-  purchase_in_order_code: string | null
   attachment: string | null
   created_at: string
   updated_at: string
@@ -62,7 +60,6 @@ export type OperationalCashEntryListParams = {
   occurred_on_from?: string
   occurred_on_to?: string
   sales_order?: number
-  purchase_in_order?: number
 }
 
 export type OperationalCategoryCreateInput = {
@@ -83,7 +80,6 @@ export type OperationalCashEntryCreateInput = {
   description: string
   reference?: string
   sales_order?: number | null
-  purchase_in_order?: number | null
 }
 
 export type OperationalCashEntryUpdateInput = Partial<OperationalCashEntryCreateInput>

@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CurrencyInput } from '@/components/ui/currency-input'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -14,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { alert } from '@/lib/alert'
+import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import { useIngredientInventoriesQuery } from '@/hooks/use-inventory-query'
 import {
@@ -21,12 +24,40 @@ import {
   usePurchaseInOrderQuery,
   useUpdatePurchaseInOrderMutation,
 } from '@/hooks/use-purchase-query'
-import { canEditOrderLines, ORDER_STATUS_LABEL } from '@/constants/order-status'
-import type { OrderStatus, PurchaseInLineInput, PurchaseInOrder } from '@/types/purchase'
+import { canEditOrderLines } from '@/constants/order-status'
+import type { PurchaseInLineInput, PurchaseInOrder } from '@/types/purchase'
 
 const invListParams = { page: 1, page_size: 500 } as const
 
-const EDITABLE_STATUS: OrderStatus[] = ['DRAFT', 'SUBMITTED', 'AWAITING_PAYMENT']
+function isoTomorrowLocal(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function defaultPurchaseInvoiceNumber(): string {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `INV-PI-${yyyy}${mm}${dd}-${hh}${mi}${ss}`
+}
+
+function fmtQty(raw: string | number) {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return String(raw)
+  if (Number.isInteger(n)) return String(n)
+  return n
+    .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    .replace(/0+$/, '')
+    .replace(/,$/, '')
+}
 
 type LineDraft = {
   ingredient_inventory: number | ''
@@ -63,22 +94,12 @@ function PurchaseOrderFormInner({
   const invQuery = useIngredientInventoriesQuery(invListParams)
   const inventories = invQuery.data?.results ?? []
 
-  const [supplierName, setSupplierName] = useState(() => initial?.supplier_name ?? '')
-  const [supplierPhone, setSupplierPhone] = useState(() => initial?.supplier_phone ?? '')
-  const [status, setStatus] = useState<OrderStatus>(() => {
-    const s = initial?.status
-    if (s && EDITABLE_STATUS.includes(s)) return s
-    return 'DRAFT'
+  const [invoiceNumber, setInvoiceNumber] = useState(() => {
+    if (initial?.invoice_number) return initial.invoice_number
+    return mode === 'create' ? defaultPurchaseInvoiceNumber() : ''
   })
-  const [invoiceNumber, setInvoiceNumber] = useState(() => initial?.invoice_number ?? '')
   const [invoiceDate, setInvoiceDate] = useState(() =>
-    initial?.invoice_date ? initial.invoice_date.slice(0, 10) : ''
-  )
-  const [dueDate, setDueDate] = useState(() =>
-    initial?.due_date ? initial.due_date.slice(0, 10) : ''
-  )
-  const [taxAmount, setTaxAmount] = useState(() =>
-    initial ? String(initial.tax_amount_idr ?? 0) : '0'
+    initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
   const [notes, setNotes] = useState(() => initial?.notes ?? '')
   const [lines, setLines] = useState<LineDraft[]>(() => linesFromInitial(initial))
@@ -98,12 +119,13 @@ function PurchaseOrderFormInner({
     setLines((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
   }
 
+  function toFiniteNumber(value: string): number | null {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!supplierName.trim()) {
-      alert.error('Validasi', 'Nama supplier wajib diisi.')
-      return
-    }
     const payloadLines: PurchaseInLineInput[] = []
     for (const row of lines) {
       const iid = row.ingredient_inventory === '' ? NaN : Number(row.ingredient_inventory)
@@ -125,13 +147,8 @@ function PurchaseOrderFormInner({
     }
 
     const body = {
-      supplier_name: supplierName.trim(),
-      supplier_phone: supplierPhone.trim(),
-      status,
       invoice_number: invoiceNumber.trim() || undefined,
       invoice_date: invoiceDate || null,
-      due_date: dueDate || null,
-      tax_amount_idr: Number(taxAmount) || 0,
       notes: notes.trim(),
       lines: payloadLines,
     }
@@ -158,92 +175,28 @@ function PurchaseOrderFormInner({
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card className="border-outline-variant bg-card">
         <CardHeader className="border-outline-variant border-b pb-4">
-          <CardTitle className="text-base">Data supplier & faktur</CardTitle>
-          <CardDescription>
-            Order pembelian bahan dari supplier. Total dihitung dari baris + pajak.
-          </CardDescription>
+          <CardTitle className="text-base">Data faktur</CardTitle>
+          <CardDescription>Nomor faktur otomatis dibuat namun tetap bisa diubah manual.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
           <div className="grid gap-2 sm:col-span-2">
-            <Label htmlFor="po-supplier">Nama supplier</Label>
-            <Input
-              id="po-supplier"
-              value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="po-phone">Telepon supplier</Label>
-            <Input
-              id="po-phone"
-              value={supplierPhone}
-              onChange={(e) => setSupplierPhone(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <Select
-              value={status}
-              onValueChange={(v) => setStatus(v as OrderStatus)}
-              disabled={pending}
-            >
-              <SelectTrigger className="border-outline-variant w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EDITABLE_STATUS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {ORDER_STATUS_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="po-inv">Nomor faktur supplier</Label>
+            <Label htmlFor="po-inv">Nomor faktur</Label>
             <Input
               id="po-inv"
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
               disabled={pending}
               className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="po-tax">Pajak (IDR)</Label>
-            <Input
-              id="po-tax"
-              inputMode="numeric"
-              value={taxAmount}
-              onChange={(e) => setTaxAmount(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
+              placeholder="Otomatis dibuat, bisa diubah manual"
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="po-inv-date">Tanggal faktur</Label>
-            <Input
+            <DatePickerInput
               id="po-inv-date"
-              type="date"
               value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
+              onChange={setInvoiceDate}
               disabled={pending}
-              className="border-outline-variant"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="po-due">Jatuh tempo</Label>
-            <Input
-              id="po-due"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={pending}
-              className="border-outline-variant"
             />
           </div>
           <div className="grid gap-2 sm:col-span-2">
@@ -278,64 +231,94 @@ function PurchaseOrderFormInner({
             <p className="text-on-surface-variant text-sm">Memuat daftar stok bahan…</p>
           ) : (
             lines.map((row, idx) => (
-              <div
-                key={idx}
-                className="border-outline-variant grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_minmax(0,7rem)_minmax(0,9rem)_auto]"
-              >
-                <div className="grid gap-1">
-                  <Label className="text-xs">Bahan (stok)</Label>
-                  <Select
-                    value={row.ingredient_inventory === '' ? '' : String(row.ingredient_inventory)}
-                    onValueChange={(v) =>
-                      updateLine(idx, { ingredient_inventory: v ? Number(v) : '' })
-                    }
-                    disabled={pending}
-                  >
-                    <SelectTrigger className="border-outline-variant w-full">
-                      <SelectValue placeholder="Pilih bahan…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {inventories.map((inv) => (
-                        <SelectItem key={inv.id} value={String(inv.id)}>
-                          {inv.ingredient_name} — sisa {inv.remaining_stock}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-xs">Kuantitas</Label>
-                  <Input
-                    inputMode="decimal"
-                    value={row.quantity}
-                    onChange={(e) => updateLine(idx, { quantity: e.target.value })}
-                    disabled={pending}
-                    className="border-outline-variant"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-xs">Harga satuan (IDR)</Label>
-                  <Input
-                    inputMode="numeric"
-                    value={row.unit_cost_idr}
-                    onChange={(e) => updateLine(idx, { unit_cost_idr: e.target.value })}
-                    disabled={pending}
-                    className="border-outline-variant"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    disabled={pending || lines.length <= 1}
-                    onClick={() => removeLine(idx)}
-                  >
-                    Hapus
-                  </Button>
-                </div>
-              </div>
+              (() => {
+                const qty = toFiniteNumber(row.quantity)
+                const unitCost = toFiniteNumber(row.unit_cost_idr)
+                const showSubtotal = qty !== null && unitCost !== null && qty > 0 && unitCost >= 0
+                const selectedInventory = inventories.find((inv) => inv.id === row.ingredient_inventory)
+                const quantityLabel = selectedInventory
+                  ? `Kuantitas (${selectedInventory.ingredient_unit})`
+                  : 'Kuantitas'
+
+                return (
+                  <div key={idx} className="border-outline-variant bg-background space-y-3 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-surface-container text-on-surface-variant rounded-md px-2 py-0.5 text-xs font-medium">
+                          Baris {idx + 1}
+                        </span>
+                        <span className="text-on-surface-variant text-xs">
+                          {showSubtotal
+                            ? `Subtotal: ${formatIdr((qty as number) * (unitCost as number))}`
+                            : 'Subtotal: isi kuantitas & harga'}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        disabled={pending || lines.length <= 1}
+                        onClick={() => removeLine(idx)}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-12">
+                      <div className="grid gap-1 md:col-span-7">
+                        <Label className="text-xs">Bahan (stok)</Label>
+                        <Select
+                          value={row.ingredient_inventory === '' ? '' : String(row.ingredient_inventory)}
+                          onValueChange={(v) =>
+                            updateLine(idx, { ingredient_inventory: v ? Number(v) : '' })
+                          }
+                          disabled={pending}
+                        >
+                          <SelectTrigger className="border-outline-variant w-full">
+                            <SelectValue placeholder="Pilih bahan…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {inventories.map((inv) => (
+                              <SelectItem key={inv.id} value={String(inv.id)}>
+                                {inv.ingredient_name} — sisa {fmtQty(inv.remaining_stock)} {inv.ingredient_unit}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-1 md:col-span-2">
+                        <Label className="text-xs">{quantityLabel}</Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={row.quantity}
+                          onChange={(e) =>
+                            updateLine(idx, { quantity: e.target.value.replace(/[^0-9.]/g, '') })
+                          }
+                          disabled={pending}
+                          className="border-outline-variant"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                        />
+                      </div>
+
+                      <div className="grid gap-1 md:col-span-3">
+                        <Label className="text-xs">Harga satuan (IDR)</Label>
+                        <CurrencyInput
+                          value={row.unit_cost_idr}
+                          onChange={(v) => updateLine(idx, { unit_cost_idr: v })}
+                          disabled={pending}
+                          className="border-outline-variant"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()
             ))
           )}
         </CardContent>

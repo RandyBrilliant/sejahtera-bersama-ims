@@ -1,11 +1,11 @@
 import type { OrderStatus } from '@/types/purchase'
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  DRAFT: 'Draft',
-  SUBMITTED: 'Diajukan',
-  AWAITING_PAYMENT: 'Menunggu bayar',
-  PAYMENT_PROOF_UPLOADED: 'Bukti diunggah',
-  VERIFIED: 'Terverifikasi',
+  DRAFT: 'Menunggu Pembayaran',
+  SUBMITTED: 'Menunggu Pembayaran',
+  AWAITING_PAYMENT: 'Menunggu Pembayaran',
+  PAYMENT_PROOF_UPLOADED: 'Sudah Bayar',
+  VERIFIED: 'Pembayaran Diterima',
   CANCELLED: 'Dibatalkan',
 }
 

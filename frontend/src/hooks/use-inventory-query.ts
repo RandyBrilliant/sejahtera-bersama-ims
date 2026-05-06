@@ -100,11 +100,15 @@ export function useProductQuery(id: number | null, enabled = true) {
   })
 }
 
-export function useProductPackagingListQuery(params: ProductPackagingListParams) {
+export function useProductPackagingListQuery(
+  params: ProductPackagingListParams,
+  enabled: boolean = true
+) {
   return useQuery({
     queryKey: inventoryKeys.packagingList(params),
     queryFn: () => fetchProductPackagingList(params),
     placeholderData: keepPreviousData,
+    enabled,
   })
 }
 

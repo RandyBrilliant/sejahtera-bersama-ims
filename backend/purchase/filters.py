@@ -10,7 +10,7 @@ class CustomerFilter(filters.FilterSet):
             "is_active": ["exact"],
             "name": ["icontains"],
             "phone": ["icontains"],
-            "tax_id": ["icontains"],
+            "address": ["icontains"],
         }
 
 
@@ -25,11 +25,19 @@ class CustomerProductPriceFilter(filters.FilterSet):
 
 
 class PurchaseInOrderFilter(filters.FilterSet):
+    start_date = filters.DateFilter(method="filter_start_date")
+    end_date = filters.DateFilter(method="filter_end_date")
+
+    def filter_start_date(self, queryset, _name, value):
+        return queryset.filter(created_at__date__gte=value)
+
+    def filter_end_date(self, queryset, _name, value):
+        return queryset.filter(created_at__date__lte=value)
+
     class Meta:
         model = PurchaseInOrder
         fields = {
             "status": ["exact"],
-            "supplier_name": ["icontains"],
             "order_code": ["exact", "icontains"],
             "invoice_number": ["icontains"],
             "created_by": ["exact"],
@@ -37,6 +45,15 @@ class PurchaseInOrderFilter(filters.FilterSet):
 
 
 class SalesOrderFilter(filters.FilterSet):
+    start_date = filters.DateFilter(method="filter_start_date")
+    end_date = filters.DateFilter(method="filter_end_date")
+
+    def filter_start_date(self, queryset, _name, value):
+        return queryset.filter(created_at__date__gte=value)
+
+    def filter_end_date(self, queryset, _name, value):
+        return queryset.filter(created_at__date__lte=value)
+
     class Meta:
         model = SalesOrder
         fields = {

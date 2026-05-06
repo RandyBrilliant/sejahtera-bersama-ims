@@ -17,9 +17,9 @@ class PurchaseInLineInline(admin.TabularInline):
 
 @admin.register(PurchaseInOrder)
 class PurchaseInOrderAdmin(admin.ModelAdmin):
-    list_display = ("order_code", "supplier_name", "status", "total_idr", "verified_at", "created_at")
+    list_display = ("order_code", "status", "total_idr", "verified_at", "created_at")
     list_filter = ("status", "created_at")
-    search_fields = ("order_code", "supplier_name", "invoice_number")
+    search_fields = ("order_code", "invoice_number")
     inlines = [PurchaseInLineInline]
 
 
@@ -38,9 +38,9 @@ class SalesOrderAdmin(admin.ModelAdmin):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "company_name", "phone", "is_active", "created_at")
+    list_display = ("id", "name", "phone", "is_active", "created_at")
     list_filter = ("is_active",)
-    search_fields = ("name", "company_name", "phone", "email", "tax_id")
+    search_fields = ("name", "phone", "address")
 
 
 @admin.register(CustomerProductPrice)

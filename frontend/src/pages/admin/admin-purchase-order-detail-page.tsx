@@ -32,6 +32,16 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function fmtQty(raw: string | number) {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return String(raw)
+  if (Number.isInteger(n)) return String(n)
+  return n
+    .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    .replace(/0+$/, '')
+    .replace(/,$/, '')
+}
+
 export function AdminPurchaseOrderDetailPage() {
   const navigate = useNavigate()
   const { orderId: idParam } = useParams<{ orderId: string }>()
@@ -138,7 +148,6 @@ export function AdminPurchaseOrderDetailPage() {
           <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
             {order.order_code}
           </h2>
-          <p className="text-on-surface-variant mt-1 text-sm">{order.supplier_name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canEdit ? (
@@ -175,15 +184,8 @@ export function AdminPurchaseOrderDetailPage() {
               {formatIdr(order.subtotal_idr)}
             </p>
             <p>
-              <span className="font-medium text-foreground">Pajak:</span>{' '}
-              {formatIdr(order.tax_amount_idr)}
-            </p>
-            <p>
               <span className="font-medium text-foreground">Total:</span>{' '}
               {formatIdr(order.total_idr)}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Telepon:</span> {order.supplier_phone || '—'}
             </p>
             <p>
               <span className="font-medium text-foreground">Faktur:</span> {order.invoice_number || '—'}
@@ -279,7 +281,7 @@ export function AdminPurchaseOrderDetailPage() {
               {order.lines.map((line) => (
                 <TableRow key={line.id} className="border-outline-variant">
                   <TableCell>{line.ingredient_name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtQty(line.quantity)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatIdr(line.unit_cost_idr)}
                   </TableCell>

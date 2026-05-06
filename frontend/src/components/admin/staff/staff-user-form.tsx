@@ -144,6 +144,7 @@ export function StaffUserForm({
               id="su-username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              forceUppercase={false}
               disabled={submitting || mode === 'edit'}
               autoComplete="username"
               className="border-outline-variant"
@@ -197,6 +198,7 @@ export function StaffUserForm({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              forceUppercase={false}
               disabled={submitting}
               autoComplete="new-password"
               placeholder={mode === 'edit' ? 'Biarkan kosong untuk tidak mengubah' : ''}

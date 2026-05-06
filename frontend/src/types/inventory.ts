@@ -9,6 +9,8 @@ export type Product = {
   id: number
   name: string
   variant_name: string
+  /** Bulk stock for this variant (API: grams; tampilan UI: kg). */
+  remaining_mass_grams: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -22,7 +24,8 @@ export type ProductPackaging = {
   product_name: string
   product_variant_name: string
   label: string
-  net_mass_grams: number
+  /** Berat bersih per kemasan (kg). */
+  net_mass_kg: string
   remaining_stock: string
   base_price_idr: number
   list_price_idr: number | null
@@ -70,8 +73,7 @@ export type ProductUpdateInput = Partial<ProductCreateInput>
 export type ProductPackagingCreateInput = {
   product: number
   label: string
-  net_mass_grams: number
-  remaining_stock?: string | number
+  net_mass_kg: string | number
   base_price_idr: number
   list_price_idr?: number | null
   sku?: string
@@ -88,7 +90,7 @@ export type InventorySummaryPayload = {
   products: {
     total_packaging: number
     active_packaging: number
-    total_product_stock: string
+    total_product_mass_grams: string
     total_product_stock_value_idr: string
   }
   ingredients: {
@@ -132,6 +134,7 @@ export type IngredientStockMovement = {
   id: number
   ingredient_inventory: number
   ingredient_name: string
+  ingredient_unit: StockUnit
   movement_type: StockMovementType
   quantity: string
   note: string
@@ -144,13 +147,14 @@ export type IngredientStockMovement = {
 
 export type ProductStockMovement = {
   id: number
-  product_packaging: number
+  product: number
+  product_packaging: number | null
   product_packaging_label: string
   product_variant_name: string
   movement_type: StockMovementType
-  quantity: string
-  bonus_quantity: string
-  total_increase_quantity: string
+  mass_grams: string
+  bonus_mass_grams: string
+  total_mass_grams: string
   note: string
   movement_at: string
   created_at: string
@@ -190,6 +194,7 @@ export type ProductStockMovementListParams = {
   page_size?: number
   search?: string
   ordering?: string
+  product?: number
   product_packaging?: number
   movement_type?: StockMovementType | ''
 }
@@ -216,10 +221,10 @@ export type IngredientStockMovementCreateInput = {
 }
 
 export type ProductStockMovementCreateInput = {
-  product_packaging: number
+  product: number
   movement_type: StockMovementType
-  quantity: string | number
-  bonus_quantity?: string | number
+  mass_grams: string | number
+  bonus_mass_grams?: string | number
   note?: string
   movement_at: string
 }

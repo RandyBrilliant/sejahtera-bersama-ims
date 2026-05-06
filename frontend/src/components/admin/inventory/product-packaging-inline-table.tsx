@@ -27,6 +27,12 @@ function fmtStock(v: string) {
   return n.toLocaleString('id-ID', { maximumFractionDigits: 3 })
 }
 
+function fmtKg(v: string) {
+  const n = Number(String(v).replace(',', '.'))
+  if (Number.isNaN(n)) return v
+  return n.toLocaleString('id-ID', { maximumFractionDigits: 6 })
+}
+
 export function ProductPackagingInlineTable({ productId }: Props) {
   const navigate = useNavigate()
   const [deleteRow, setDeleteRow] = useState<ProductPackaging | null>(null)
@@ -34,7 +40,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
   const { data, isLoading, isError } = useProductPackagingListQuery({
     product: productId,
     page_size: 100,
-    ordering: 'net_mass_grams',
+    ordering: 'net_mass_kg',
   })
 
   const rows = data?.results ?? []
@@ -83,8 +89,8 @@ export function ProductPackagingInlineTable({ productId }: Props) {
             <TableHeader>
               <TableRow className="border-outline-variant hover:bg-transparent">
                 <TableHead className="text-on-surface-variant">Label</TableHead>
-                <TableHead className="text-on-surface-variant">Berat (g)</TableHead>
-                <TableHead className="text-on-surface-variant">Stok</TableHead>
+                <TableHead className="text-on-surface-variant">Berat (kg)</TableHead>
+                <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
                 <TableHead className="text-on-surface-variant">Harga pokok</TableHead>
                 <TableHead className="text-on-surface-variant">Harga jual</TableHead>
                 <TableHead className="text-on-surface-variant">SKU</TableHead>
@@ -96,7 +102,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
               {rows.map((row) => (
                 <TableRow key={row.id} className="border-outline-variant">
                   <TableCell className="font-medium">{row.label}</TableCell>
-                  <TableCell className="tabular-nums">{row.net_mass_grams}</TableCell>
+                  <TableCell className="tabular-nums">{fmtKg(row.net_mass_kg)}</TableCell>
                   <TableCell className="tabular-nums">{fmtStock(row.remaining_stock)}</TableCell>
                   <TableCell className="tabular-nums">{formatIdr(row.base_price_idr)}</TableCell>
                   <TableCell className="tabular-nums">

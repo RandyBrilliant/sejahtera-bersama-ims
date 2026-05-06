@@ -1,4 +1,5 @@
 import { formatAuditDateTime } from '@/lib/format-audit-datetime'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import type { Product } from '@/types/inventory'
 
 export function ProductMetadataAside({ product }: { product: Product }) {
@@ -20,6 +21,12 @@ export function ProductMetadataAside({ product }: { product: Product }) {
           <div>
             <dt className="text-on-surface-variant text-xs font-medium uppercase">Varian</dt>
             <dd className="text-on-surface mt-0.5">{product.variant_name}</dd>
+          </div>
+          <div>
+            <dt className="text-on-surface-variant text-xs font-medium uppercase">Stok utama</dt>
+            <dd className="text-on-surface mt-0.5 tabular-nums">
+              {formatProductMassKgFromGrams(product.remaining_mass_grams)} kg
+            </dd>
           </div>
           <div>
             <dt className="text-on-surface-variant text-xs font-medium uppercase">Status</dt>

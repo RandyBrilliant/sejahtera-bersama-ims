@@ -42,7 +42,7 @@ class ProductPackagingFilter(filters.FilterSet):
             "sku": ["exact", "icontains"],
             "created_by": ["exact"],
             "updated_by": ["exact"],
-            "net_mass_grams": ["exact", "gte", "lte"],
+            "net_mass_kg": ["exact", "gte", "lte"],
             "base_price_idr": ["exact", "gte", "lte"],
         }
 
@@ -107,7 +107,9 @@ class ProductStockMovementFilter(filters.FilterSet):
     class Meta:
         model = ProductStockMovement
         fields = {
+            "product": ["exact"],
             "product_packaging": ["exact"],
+            "product_packaging__product": ["exact"],
             "movement_type": ["exact"],
             "created_by": ["exact"],
             "movement_at": ["exact"],

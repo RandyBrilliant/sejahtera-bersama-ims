@@ -46,7 +46,11 @@ const ORDERING: { value: string; label: string }[] = [
 function fmtQty(v: string) {
   const n = Number(v)
   if (Number.isNaN(n)) return v
-  return n.toLocaleString('id-ID', { maximumFractionDigits: 3 })
+  if (Number.isInteger(n)) return String(n)
+  return n
+    .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    .replace(/0+$/, '')
+    .replace(/,$/, '')
 }
 
 export function IngredientInventoryTable() {
@@ -91,14 +95,18 @@ export function IngredientInventoryTable() {
         accessorKey: 'remaining_stock',
         header: 'Stok sisa',
         cell: ({ row }) => (
-          <span className="tabular-nums">{fmtQty(row.original.remaining_stock)}</span>
+          <span className="tabular-nums">
+            {fmtQty(row.original.remaining_stock)} {row.original.ingredient_unit}
+          </span>
         ),
       },
       {
         accessorKey: 'minimum_stock',
         header: 'Minimum',
         cell: ({ row }) => (
-          <span className="tabular-nums">{fmtQty(row.original.minimum_stock)}</span>
+          <span className="tabular-nums">
+            {fmtQty(row.original.minimum_stock)} {row.original.ingredient_unit}
+          </span>
         ),
       },
       {

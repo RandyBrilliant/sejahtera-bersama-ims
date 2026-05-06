@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useProductsQuery } from '@/hooks/use-inventory-query'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { Product, ProductsListParams } from '@/types/inventory'
 
@@ -36,6 +37,8 @@ const PAGE_SIZES = [10, 20, 50] as const
 const ORDERING_OPTIONS: { value: string; label: string }[] = [
   { value: 'variant_name', label: 'Varian A–Z' },
   { value: '-variant_name', label: 'Varian Z–A' },
+  { value: '-remaining_mass_grams', label: 'Stok utama tertinggi' },
+  { value: 'remaining_mass_grams', label: 'Stok utama terendah' },
   { value: '-created_at', label: 'Terbaru dibuat' },
   { value: 'created_at', label: 'Terlama dibuat' },
 ]
@@ -79,6 +82,15 @@ export function ProductsTable() {
         accessorKey: 'name',
         header: 'Nama produk',
         cell: ({ row }) => row.original.name,
+      },
+      {
+        accessorKey: 'remaining_mass_grams',
+        header: 'Stok utama',
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {formatProductMassKgFromGrams(row.original.remaining_mass_grams)} kg
+          </span>
+        ),
       },
       {
         accessorKey: 'is_active',

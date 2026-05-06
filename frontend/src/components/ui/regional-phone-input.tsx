@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { cn } from '@/lib/utils'
 import {
   joinRegionalPhone,
@@ -22,19 +24,25 @@ export function RegionalPhoneInput({
   error,
   className,
 }: RegionalPhoneInputProps) {
-  const { dial, nationalDigits } = splitStoredPhone(value)
+  const { dial: parsedDial, nationalDigits } = splitStoredPhone(value)
+  const [draftDial, setDraftDial] = useState(parsedDial)
+  const selectedDial = nationalDigits ? parsedDial : draftDial
 
   function handleDialChange(nextDial: string) {
-    onChange(joinRegionalPhone(nextDial, nationalDigits))
+    setDraftDial(nextDial)
+    if (nationalDigits) {
+      onChange(joinRegionalPhone(nextDial, nationalDigits))
+    }
   }
 
   function handleNationalChange(raw: string) {
     const digits = raw.replace(/\D/g, '')
-    onChange(joinRegionalPhone(dial, digits))
+    onChange(joinRegionalPhone(selectedDial, digits))
   }
 
   const selectedFlag =
-    REGIONAL_PHONE_OPTIONS.find((r) => r.dial === dial)?.flag ?? REGIONAL_PHONE_OPTIONS[0].flag
+    REGIONAL_PHONE_OPTIONS.find((r) => r.dial === selectedDial)?.flag ??
+    REGIONAL_PHONE_OPTIONS[0].flag
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -46,7 +54,7 @@ export function RegionalPhoneInput({
           <select
             id={id ? `${id}-country` : undefined}
             className="focus-visible:ring-ring h-9 max-w-[min(13rem,44vw)] cursor-pointer rounded-md bg-transparent py-2 pr-8 pl-2 text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-            value={dial}
+            value={selectedDial}
             onChange={(e) => handleDialChange(e.target.value)}
             disabled={disabled}
             aria-label="Negara dan kode telepon"
@@ -77,7 +85,8 @@ export function RegionalPhoneInput({
       </div>
       {nationalDigits ? (
         <p className="text-muted-foreground text-xs">
-          Disimpan: <span className="font-mono">{joinRegionalPhone(dial, nationalDigits)}</span>
+          Disimpan:{' '}
+          <span className="font-mono">{joinRegionalPhone(selectedDial, nationalDigits)}</span>
         </p>
       ) : null}
       {error ? <p className="text-destructive text-xs">{error}</p> : null}

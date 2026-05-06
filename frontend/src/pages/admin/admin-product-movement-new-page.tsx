@@ -19,7 +19,8 @@ export function AdminProductMovementNewPage() {
           Catat mutasi produk
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Pilih kemasan, arah mutasi, dan kuantitas. Bonus hanya berlaku untuk masuk (IN).
+          Pilih varian, arah mutasi, dan kuantitas dalam kilogram. Bonus hanya berlaku untuk
+          masuk (IN).
         </p>
       </div>
 

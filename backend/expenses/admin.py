@@ -19,7 +19,6 @@ class OperationalCashEntryAdmin(admin.ModelAdmin):
         "category",
         "amount_idr",
         "sales_order",
-        "purchase_in_order",
         "reference",
         "created_at",
     )

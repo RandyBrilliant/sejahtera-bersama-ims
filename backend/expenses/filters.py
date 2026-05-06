@@ -25,5 +25,4 @@ class OperationalCashEntryFilter(filters.FilterSet):
             "occurred_on": ["exact", "gte", "lte"],
             "created_by": ["exact"],
             "sales_order": ["exact"],
-            "purchase_in_order": ["exact"],
         }

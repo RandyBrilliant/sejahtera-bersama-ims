@@ -105,33 +105,17 @@ class OperationalCashEntry(AuditModel):
         verbose_name=_("linked sales order"),
         help_text=_("Optional link when this line relates to a customer sale (pemasukan)."),
     )
-    purchase_in_order = models.ForeignKey(
-        "purchase.PurchaseInOrder",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="operational_cash_entries",
-        verbose_name=_("linked purchase in order"),
-        help_text=_("Optional link when this line relates to ingredient procurement (pengeluaran)."),
-    )
 
     class Meta:
         verbose_name = _("operational cash entry")
         verbose_name_plural = _("operational cash entries")
         ordering = ["-occurred_on", "-id"]
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(sales_order__isnull=True) | models.Q(purchase_in_order__isnull=True),
-                name="expenses_entry_at_most_one_order_link",
-            ),
-        ]
         indexes = [
             models.Index(fields=["occurred_on", "direction"]),
             models.Index(fields=["category", "occurred_on"]),
             models.Index(fields=["created_by"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["sales_order"]),
-            models.Index(fields=["purchase_in_order"]),
         ]
 
     def __str__(self) -> str:

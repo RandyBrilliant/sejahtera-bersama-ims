@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
 import { useIngredientStockMovementsQuery } from '@/hooks/use-inventory-query'
 import { cn } from '@/lib/utils'
 import type { IngredientStockMovement, IngredientStockMovementListParams, StockMovementType } from '@/types/inventory'
@@ -45,7 +46,11 @@ const ORDERING: { value: string; label: string }[] = [
 function fmtQty(v: string) {
   const n = Number(v)
   if (Number.isNaN(n)) return v
-  return n.toLocaleString('id-ID', { maximumFractionDigits: 3 })
+  if (Number.isInteger(n)) return String(n)
+  return n
+    .toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    .replace(/0+$/, '')
+    .replace(/,$/, '')
 }
 
 function fmtDt(iso: string) {
@@ -100,7 +105,12 @@ export function IngredientStockMovementsTable() {
       {
         accessorKey: 'quantity',
         header: 'Kuantitas',
-        cell: ({ row }) => <span className="tabular-nums">{fmtQty(row.original.quantity)}</span>,
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {fmtQty(row.original.quantity)}{' '}
+            {STOCK_UNIT_LABEL[row.original.ingredient_unit] ?? row.original.ingredient_unit}
+          </span>
+        ),
       },
       {
         accessorKey: 'note',

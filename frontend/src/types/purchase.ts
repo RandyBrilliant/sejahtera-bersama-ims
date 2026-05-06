@@ -18,11 +18,8 @@ export type Paginated<T> = {
 export type Customer = {
   id: number
   name: string
-  company_name: string
   phone: string
-  email: string
   address: string
-  tax_id: string
   notes: string
   is_active: boolean
   created_at: string
@@ -45,14 +42,10 @@ export type PurchaseInLine = {
 export type PurchaseInOrder = {
   id: number
   order_code: string
-  supplier_name: string
-  supplier_phone: string
   status: OrderStatus
   invoice_number: string
   invoice_date: string | null
-  due_date: string | null
   subtotal_idr: number
-  tax_amount_idr: number
   total_idr: number
   payment_proof: string | null
   payment_proof_uploaded_at: string | null
@@ -71,6 +64,8 @@ export type SalesOrderLine = {
   product_packaging: number
   product_variant_name: string
   packaging_label: string
+  /** Berat bersih per kemasan (kg), untuk menghitung total kg order. */
+  net_mass_kg?: string
   quantity: string
   unit_price_idr: number
   line_total_idr: number
@@ -108,6 +103,8 @@ export type PurchaseInOrdersListParams = {
   search?: string
   ordering?: string
   status?: OrderStatus
+  start_date?: string
+  end_date?: string
 }
 
 export type SalesOrdersListParams = {
@@ -117,6 +114,8 @@ export type SalesOrdersListParams = {
   ordering?: string
   status?: OrderStatus
   customer?: number
+  start_date?: string
+  end_date?: string
 }
 
 export type CustomersListParams = {
@@ -129,11 +128,8 @@ export type CustomersListParams = {
 
 export type CustomerCreateInput = {
   name: string
-  phone: string
-  company_name?: string
-  email?: string
-  address?: string
-  tax_id?: string
+  phone?: string
+  address: string
   notes?: string
   is_active?: boolean
 }
@@ -147,13 +143,9 @@ export type PurchaseInLineInput = {
 }
 
 export type PurchaseInOrderCreateInput = {
-  supplier_name: string
-  supplier_phone?: string
   status?: OrderStatus
   invoice_number?: string
   invoice_date?: string | null
-  due_date?: string | null
-  tax_amount_idr?: number
   notes?: string
   lines: PurchaseInLineInput[]
 }
