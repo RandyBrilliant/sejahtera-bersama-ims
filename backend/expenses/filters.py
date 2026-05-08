@@ -21,6 +21,7 @@ class OperationalCashEntryFilter(filters.FilterSet):
         model = OperationalCashEntry
         fields = {
             "direction": ["exact"],
+            "payment_method": ["exact"],
             "category": ["exact"],
             "occurred_on": ["exact", "gte", "lte"],
             "created_by": ["exact"],

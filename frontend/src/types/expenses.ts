@@ -1,6 +1,7 @@
 import type { AuditUserMini } from '@/types/inventory'
 
 export type EntryKind = 'INCOME' | 'EXPENSE'
+export type PaymentMethod = 'CASH' | 'TRANSFER'
 
 export type Paginated<T> = {
   count: number
@@ -26,6 +27,7 @@ export type OperationalCategory = {
 export type OperationalCashEntry = {
   id: number
   direction: EntryKind
+  payment_method: PaymentMethod
   category: number
   category_name: string
   amount_idr: number
@@ -56,6 +58,7 @@ export type OperationalCashEntryListParams = {
   search?: string
   ordering?: string
   direction?: EntryKind
+  payment_method?: PaymentMethod
   category?: number
   occurred_on_from?: string
   occurred_on_to?: string
@@ -74,6 +77,7 @@ export type OperationalCategoryUpdateInput = Partial<OperationalCategoryCreateIn
 
 export type OperationalCashEntryCreateInput = {
   direction: EntryKind
+  payment_method: PaymentMethod
   category: number
   amount_idr: number
   occurred_on: string

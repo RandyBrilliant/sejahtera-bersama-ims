@@ -88,8 +88,21 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = OperationalCashEntryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["description", "reference", "category__name", "sales_order__order_code"]
-    ordering_fields = ["occurred_on", "amount_idr", "direction", "created_at", "updated_at"]
+    search_fields = [
+        "description",
+        "reference",
+        "category__name",
+        "sales_order__order_code",
+        "payment_method",
+    ]
+    ordering_fields = [
+        "occurred_on",
+        "amount_idr",
+        "direction",
+        "payment_method",
+        "created_at",
+        "updated_at",
+    ]
     ordering = ["-occurred_on", "-id"]
 
     def get_queryset(self):
@@ -197,6 +210,7 @@ class OperationalCashReportView(APIView):
                     "id",
                     "occurred_on",
                     "direction",
+                    "payment_method",
                     "category",
                     "amount_idr",
                     "description",
@@ -211,6 +225,7 @@ class OperationalCashReportView(APIView):
                         e.id,
                         e.occurred_on.isoformat(),
                         e.direction,
+                        e.payment_method,
                         e.category.name,
                         e.amount_idr,
                         e.description.replace("\r\n", " ").replace("\n", " "),
@@ -240,7 +255,7 @@ class OperationalCashReportView(APIView):
                         _format_idr_cell(d["net_idr"]),
                     ]
                 )
-            entry_table = [["Tanggal", "Arah", "Kategori", "Jumlah", "Keterangan + tautan"]]
+            entry_table = [["Tanggal", "Arah", "Metode", "Kategori", "Jumlah", "Keterangan + tautan"]]
             for e in qs[:200]:
                 bits = []
                 if e.reference:
@@ -255,6 +270,7 @@ class OperationalCashReportView(APIView):
                     [
                         e.occurred_on.isoformat(),
                         e.direction,
+                        e.payment_method,
                         e.category.name[:28],
                         _format_idr_cell(e.amount_idr),
                         desc[:200],

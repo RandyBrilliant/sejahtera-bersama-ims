@@ -49,6 +49,7 @@ export type OperationalCashEntryReportRow = {
   id: number
   occurred_on: string
   direction: string
+  payment_method: string
   category_id: number
   category_name: string
   amount_idr: number

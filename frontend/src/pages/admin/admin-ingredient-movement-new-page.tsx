@@ -1,7 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 
 import { IngredientStockMovementForm } from '@/components/admin/inventory/ingredient-stock-movement-form'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 
 export function AdminIngredientMovementNewPage() {
   const navigate = useNavigate()
@@ -22,8 +21,6 @@ export function AdminIngredientMovementNewPage() {
           Pilih baris stok bahan, arah mutasi, dan kuantitas. Stok keluar ditolak jika tidak cukup.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientStockMovementForm
         onCancel={() => navigate('/admin/gudang/mutasi-bahan')}

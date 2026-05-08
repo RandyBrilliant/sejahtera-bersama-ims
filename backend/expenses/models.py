@@ -13,6 +13,11 @@ class EntryKind(models.TextChoices):
     EXPENSE = "EXPENSE", _("Pengeluaran")
 
 
+class PaymentMethod(models.TextChoices):
+    CASH = "CASH", _("Cash")
+    TRANSFER = "TRANSFER", _("Transfer")
+
+
 def _attachment_upload_to(instance, filename: str) -> str:
     return f"expenses/attachments/{instance.occurred_on.year}/{instance.occurred_on.month:02d}/{filename}"
 
@@ -69,6 +74,13 @@ class OperationalCashEntry(AuditModel):
         _("direction"),
         max_length=10,
         choices=EntryKind.choices,
+        db_index=True,
+    )
+    payment_method = models.CharField(
+        _("payment method"),
+        max_length=10,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
         db_index=True,
     )
     category = models.ForeignKey(

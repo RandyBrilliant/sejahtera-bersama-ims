@@ -127,6 +127,10 @@ class InventoryAccess(permissions.BasePermission):
                 UserRole.FINANCE_STAFF,
                 UserRole.SALES_STAFF,
             )
+        if request.method == "DELETE":
+            # Warehouse staff can create/read/update inventory-related data,
+            # but deletion stays restricted to admin/owner.
+            return has_role(request.user, UserRole.ADMIN)
         return has_role(request.user, UserRole.ADMIN, UserRole.WAREHOUSE_STAFF)
 
 
@@ -249,7 +253,6 @@ class PurchaseInOrderAccess(permissions.BasePermission):
             return has_role(
                 request.user,
                 UserRole.ADMIN,
-                UserRole.SALES_STAFF,
                 UserRole.WAREHOUSE_STAFF,
                 UserRole.FINANCE_STAFF,
             )

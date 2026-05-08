@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ENTRY_KIND_LABEL } from '@/constants/expenses'
+import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import {
   useCreateOperationalCashEntryMutation,
   useOperationalCategoriesQuery,
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { EntryKind, OperationalCashEntry } from '@/types/expenses'
+import type { EntryKind, OperationalCashEntry, PaymentMethod } from '@/types/expenses'
 
 type Props = {
   mode: 'create' | 'edit'
@@ -39,6 +39,9 @@ function todayIso() {
 
 export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: Props) {
   const [direction, setDirection] = useState<EntryKind>(initial?.direction ?? 'EXPENSE')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    initial?.payment_method ?? 'CASH'
+  )
   const [categoryId, setCategoryId] = useState<number | ''>(
     initial?.category != null ? initial.category : ''
   )
@@ -100,6 +103,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
       if (mode === 'create') {
         const base = {
           direction,
+          payment_method: paymentMethod,
           category: categoryId as number,
           amount_idr: amt,
           occurred_on: occurredOn,
@@ -116,6 +120,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
         if (!initial) return
         const base = {
           direction,
+          payment_method: paymentMethod,
           category: categoryId as number,
           amount_idr: amt,
           occurred_on: occurredOn,
@@ -185,6 +190,25 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
                     {(Object.keys(ENTRY_KIND_LABEL) as EntryKind[]).map((k) => (
                       <SelectItem key={k} value={k}>
                         {ENTRY_KIND_LABEL[k]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Metode pembayaran</Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                  disabled={submitting}
+                >
+                  <SelectTrigger className="border-outline-variant w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {PAYMENT_METHOD_LABEL[k]}
                       </SelectItem>
                     ))}
                   </SelectContent>

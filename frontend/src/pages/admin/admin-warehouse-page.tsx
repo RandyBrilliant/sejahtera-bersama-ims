@@ -1,5 +1,4 @@
 import { IngredientSummaryStats } from '@/components/admin/inventory/ingredient-summary-stats'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 
 export function AdminWarehousePage() {
   return (
@@ -14,8 +13,6 @@ export function AdminWarehousePage() {
           <span className="text-on-surface font-medium">Inventaris</span>.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientSummaryStats />
 

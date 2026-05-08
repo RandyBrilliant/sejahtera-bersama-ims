@@ -1,8 +1,12 @@
 import { Outlet } from 'react-router-dom'
 
 import { OrderSubnav } from '@/components/admin/orders/order-subnav'
+import { useAuth } from '@/hooks/use-auth'
 
 export function AdminOrdersLayout() {
+  const { user } = useAuth()
+  const showSubnav = user?.role !== 'SALES_STAFF' && user?.role !== 'FINANCE_STAFF'
+
   return (
     <div className="space-y-8">
       <div>
@@ -15,7 +19,7 @@ export function AdminOrdersLayout() {
         </p>
       </div>
 
-      <OrderSubnav />
+      {showSubnav ? <OrderSubnav /> : null}
 
       <Outlet />
     </div>

@@ -1,7 +1,6 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { IngredientForm } from '@/components/admin/inventory/ingredient-form'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { useIngredientQuery } from '@/hooks/use-inventory-query'
 
 export function AdminIngredientEditPage() {
@@ -50,8 +49,6 @@ export function AdminIngredientEditPage() {
           Ubah nama, satuan default, atau status aktif. Stok tersimpan terpisah di menu stok bahan.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientForm
         mode="edit"

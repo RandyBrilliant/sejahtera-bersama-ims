@@ -24,10 +24,10 @@ import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { OrderStatus } from '@/types/purchase'
 
-function fmtQty(v: string | number) {
+function fmtKg(v: string | number) {
   const n = typeof v === 'string' ? Number(v) : v
   if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('id-ID', { maximumFractionDigits: 3 })
+  return `${n.toLocaleString('id-ID', { maximumFractionDigits: 3 })} KG`
 }
 
 function formatTrend(
@@ -493,8 +493,7 @@ export function AdminDashboardHome() {
                         {inv.ingredient_name}
                       </div>
                       <div className="text-error-app text-[13px] font-medium tabular-nums">
-                        {fmtQty(inv.remaining_stock)} / min{' '}
-                        {fmtQty(inv.minimum_stock)} {inv.ingredient_unit}
+                        {fmtKg(inv.remaining_stock)} (min. {fmtKg(inv.minimum_stock)})
                       </div>
                     </div>
                     <Link

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import EntryKind, OperationalCashEntry, OperationalCategory
+from .models import EntryKind, OperationalCashEntry, OperationalCategory, PaymentMethod
 
 
 def _user_mini(u):
@@ -54,6 +54,7 @@ class OperationalCashEntrySerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "direction",
+            "payment_method",
             "category",
             "category_name",
             "amount_idr",
@@ -114,6 +115,11 @@ class OperationalCashEntrySerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def validate_payment_method(self, value: str):
+        if value not in PaymentMethod.values:
+            raise serializers.ValidationError("Metode pembayaran tidak valid.")
+        return value
 
     def validate_description(self, value: str):
         cleaned = (value or "").strip()

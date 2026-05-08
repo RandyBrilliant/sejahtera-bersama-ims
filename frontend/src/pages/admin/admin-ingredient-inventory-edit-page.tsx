@@ -1,7 +1,6 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { IngredientInventoryForm } from '@/components/admin/inventory/ingredient-inventory-form'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 
 export function AdminIngredientInventoryEditPage() {
   const navigate = useNavigate()
@@ -29,8 +28,6 @@ export function AdminIngredientInventoryEditPage() {
           Sesuaikan stok sisa atau minimum. Untuk penyesuaian bercatatan gunakan mutasi bahan.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientInventoryForm
         inventoryId={id}

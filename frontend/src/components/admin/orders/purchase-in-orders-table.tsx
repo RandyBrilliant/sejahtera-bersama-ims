@@ -42,6 +42,7 @@ import {
   usePurchaseInOrdersQuery,
   useVerifyPurchaseInOrderMutation,
 } from '@/hooks/use-purchase-query'
+import { useAuth } from '@/hooks/use-auth'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
@@ -67,6 +68,8 @@ function fmtShort(iso: string) {
 
 export function PurchaseInOrdersTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canManagePurchase = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP' || user?.role === 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<PurchaseInOrdersListParams>({
     page: 1,
     page_size: 20,
@@ -160,7 +163,8 @@ export function PurchaseInOrdersTable() {
                 </a>
               </Button>
             ) : null}
-            {(row.original.status === 'PAYMENT_PROOF_UPLOADED' ||
+            {canManagePurchase &&
+            (row.original.status === 'PAYMENT_PROOF_UPLOADED' ||
               (row.original.status === 'AWAITING_PAYMENT' && !!row.original.payment_proof)) ? (
               <Button
                 type="button"
@@ -172,7 +176,7 @@ export function PurchaseInOrdersTable() {
                 Sukses
               </Button>
             ) : null}
-            {row.original.status !== 'VERIFIED' && row.original.status !== 'CANCELLED' ? (
+            {canManagePurchase && row.original.status !== 'VERIFIED' && row.original.status !== 'CANCELLED' ? (
               <Button
                 type="button"
                 variant="outline"
@@ -198,7 +202,7 @@ export function PurchaseInOrdersTable() {
         ),
       },
     ],
-    [navigate]
+    [canManagePurchase, navigate]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -230,14 +234,16 @@ export function PurchaseInOrdersTable() {
             Cari
           </Button>
         </div>
-        <Button
-          type="button"
-          onClick={() => navigate('/admin/pesanan/pembelian/baru')}
-          className="shrink-0 gap-2"
-        >
-          <Plus className="size-4" />
-          Order pembelian
-        </Button>
+        {canManagePurchase ? (
+          <Button
+            type="button"
+            onClick={() => navigate('/admin/pesanan/pembelian/baru')}
+            className="shrink-0 gap-2"
+          >
+            <Plus className="size-4" />
+            Order pembelian
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -23,9 +23,9 @@ export interface User {
 export const ROLE_DASHBOARD_ROUTE: Record<UserRole, string> = {
   ADMIN: '/admin/dashboard',
   LEADERSHIP: '/admin/dashboard',
-  WAREHOUSE_STAFF: '/warehouse/dashboard',
-  SALES_STAFF: '/sales/dashboard',
-  FINANCE_STAFF: '/finance/dashboard',
+  WAREHOUSE_STAFF: '/admin/dashboard',
+  SALES_STAFF: '/admin/dashboard',
+  FINANCE_STAFF: '/admin/dashboard',
 }
 
 export function getDashboardRouteForRole(role: UserRole): string {

@@ -4,7 +4,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ADMIN_QUICK_ACTIONS } from '@/config/admin-quick-actions-config'
+import { quickActionsForRole } from '@/config/admin-quick-actions-config'
+import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 
@@ -21,6 +22,9 @@ export function AdminQuickActionsDropdown({
   sideOffset?: number
   onNavigate?: () => void
 }) {
+  const { user } = useAuth()
+  const items = user ? quickActionsForRole(user.role) : []
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -37,7 +41,7 @@ export function AdminQuickActionsDropdown({
           </p>
         </div>
         <div className="max-h-[min(70vh,28rem)] overflow-y-auto py-1">
-          {ADMIN_QUICK_ACTIONS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon
             return (
               <DropdownMenuItem key={item.id} asChild className="cursor-pointer p-0 focus:bg-transparent">
@@ -62,9 +66,12 @@ export function AdminQuickActionsDropdown({
 }
 
 export function QuickActionsCardGrid({ className }: { className?: string }) {
+  const { user } = useAuth()
+  const items = user ? quickActionsForRole(user.role) : []
+
   return (
     <div className={cn('grid gap-2 sm:grid-cols-2 lg:grid-cols-4', className)}>
-      {ADMIN_QUICK_ACTIONS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon
         return (
           <Link

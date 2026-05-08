@@ -8,6 +8,7 @@ from rest_framework.views import exception_handler
 class ApiCode:
     SUCCESS = "success"
     VALIDATION_ERROR = "validation_error"
+    BAD_REQUEST = "bad_request"
     NOT_FOUND = "not_found"
     PERMISSION_DENIED = "permission_denied"
     METHOD_NOT_ALLOWED = "method_not_allowed"

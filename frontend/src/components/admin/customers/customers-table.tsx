@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { useCustomersQuery } from '@/hooks/use-purchase-query'
+import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +54,12 @@ function statusFromFilter(v: string): boolean | undefined {
 
 export function CustomersTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
+  const canEditCustomers =
+    user?.role === 'ADMIN' ||
+    user?.role === 'LEADERSHIP' ||
+    user?.role === 'SALES_STAFF'
   const [params, setParams] = useState<CustomersListParams>({
     page: 1,
     page_size: 20,
@@ -122,31 +129,35 @@ export function CustomersTable() {
         header: '',
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="size-8 px-0"
-              aria-label={`Edit ${row.original.name}`}
-              onClick={() => navigate(`/admin/pelanggan/${row.original.id}/edit`)}
-            >
-              <Pencil className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive size-8 px-0"
-              aria-label={`Hapus ${row.original.name}`}
-              onClick={() => setDeleteTarget(row.original)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {canEditCustomers ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="size-8 px-0"
+                aria-label={`Edit ${row.original.name}`}
+                onClick={() => navigate(`/admin/pelanggan/${row.original.id}/edit`)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive size-8 px-0"
+                aria-label={`Hapus ${row.original.name}`}
+                onClick={() => setDeleteTarget(row.original)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [navigate]
+    [canDelete, canEditCustomers, navigate]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table row API */
@@ -176,14 +187,16 @@ export function CustomersTable() {
             Cari
           </Button>
         </div>
-        <Button
-          type="button"
-          className="ambient-shadow shrink-0 gap-2"
-          onClick={() => navigate('/admin/pelanggan/baru')}
-        >
-          <Plus className="size-4" />
-          Pelanggan baru
-        </Button>
+        {canEditCustomers ? (
+          <Button
+            type="button"
+            className="ambient-shadow shrink-0 gap-2"
+            onClick={() => navigate('/admin/pelanggan/baru')}
+          >
+            <Plus className="size-4" />
+            Pelanggan baru
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -328,11 +341,13 @@ export function CustomersTable() {
         </div>
       </div>
 
-      <CustomerDeleteModal
-        open={deleteTarget != null}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
-        customer={deleteTarget}
-      />
+      {canDelete ? (
+        <CustomerDeleteModal
+          open={deleteTarget != null}
+          onOpenChange={(o) => !o && setDeleteTarget(null)}
+          customer={deleteTarget}
+        />
+      ) : null}
     </div>
   )
 }

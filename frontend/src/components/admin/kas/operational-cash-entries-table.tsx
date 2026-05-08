@@ -8,7 +8,7 @@ import {
 import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-import { ENTRY_KIND_LABEL } from '@/constants/expenses'
+import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { OperationalCashEntryDeleteModal } from '@/components/admin/kas/operational-cash-entry-delete-modal'
 import { useOperationalCashEntriesQuery } from '@/hooks/use-expenses-query'
 import { formatIdr } from '@/lib/format-idr'
@@ -35,6 +35,7 @@ import type {
   EntryKind,
   OperationalCashEntry,
   OperationalCashEntryListParams,
+  PaymentMethod,
 } from '@/types/expenses'
 
 const PAGE_SIZES = [10, 20, 50] as const
@@ -52,6 +53,12 @@ const DIR_FILTER: { value: string; label: string }[] = [
   { value: 'EXPENSE', label: ENTRY_KIND_LABEL.EXPENSE },
 ]
 
+const PAYMENT_FILTER: { value: string; label: string }[] = [
+  { value: 'all', label: 'Semua metode' },
+  { value: 'CASH', label: PAYMENT_METHOD_LABEL.CASH },
+  { value: 'TRANSFER', label: PAYMENT_METHOD_LABEL.TRANSFER },
+]
+
 function truncate(s: string, n: number) {
   if (s.length <= n) return s
   return `${s.slice(0, n)}…`
@@ -66,6 +73,7 @@ export function OperationalCashEntriesTable() {
   })
   const [searchInput, setSearchInput] = useState('')
   const [dirFilter, setDirFilter] = useState<string>('all')
+  const [paymentFilter, setPaymentFilter] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<OperationalCashEntry | null>(null)
@@ -77,12 +85,17 @@ export function OperationalCashEntriesTable() {
     } else {
       delete p.direction
     }
+    if (paymentFilter !== 'all') {
+      p.payment_method = paymentFilter as PaymentMethod
+    } else {
+      delete p.payment_method
+    }
     if (fromDate.trim()) p.occurred_on_from = fromDate.trim()
     else delete p.occurred_on_from
     if (toDate.trim()) p.occurred_on_to = toDate.trim()
     else delete p.occurred_on_to
     return p
-  }, [params, dirFilter, fromDate, toDate])
+  }, [params, dirFilter, paymentFilter, fromDate, toDate])
 
   const { data, isLoading, isError, error, isFetching } =
     useOperationalCashEntriesQuery(listParams)
@@ -115,6 +128,13 @@ export function OperationalCashEntriesTable() {
         header: 'Jenis',
         cell: ({ row }) => (
           <Badge variant="outline">{ENTRY_KIND_LABEL[row.original.direction]}</Badge>
+        ),
+      },
+      {
+        accessorKey: 'payment_method',
+        header: 'Metode',
+        cell: ({ row }) => (
+          <Badge variant="secondary">{PAYMENT_METHOD_LABEL[row.original.payment_method]}</Badge>
         ),
       },
       {
@@ -220,6 +240,24 @@ export function OperationalCashEntriesTable() {
           </SelectTrigger>
           <SelectContent>
             {DIR_FILTER.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={paymentFilter}
+          onValueChange={(v) => {
+            setPaymentFilter(v)
+            setParams((p) => ({ ...p, page: 1 }))
+          }}
+        >
+          <SelectTrigger className="border-outline-variant w-[170px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAYMENT_FILTER.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>

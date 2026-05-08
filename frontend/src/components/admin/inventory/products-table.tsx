@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useProductsQuery } from '@/hooks/use-inventory-query'
+import { useAuth } from '@/hooks/use-auth'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { Product, ProductsListParams } from '@/types/inventory'
@@ -45,6 +46,8 @@ const ORDERING_OPTIONS: { value: string; label: string }[] = [
 
 export function ProductsTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canManage = user?.role !== 'SALES_STAFF' && user?.role !== 'FINANCE_STAFF'
   const [params, setParams] = useState<ProductsListParams>({
     page: 1,
     page_size: 20,
@@ -124,32 +127,36 @@ export function ProductsTable() {
           const p = row.original
           return (
             <div className="flex justify-end gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="size-8 px-0"
-                onClick={() => navigate(`/admin/inventaris/${p.id}/edit`)}
-                aria-label={`Edit ${p.variant_name}`}
-              >
-                <Pencil className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive size-8 px-0"
-                onClick={() => setDeleteTarget(p)}
-                aria-label={`Hapus ${p.variant_name}`}
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              {canManage ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="size-8 px-0"
+                    onClick={() => navigate(`/admin/inventaris/${p.id}/edit`)}
+                    aria-label={`Edit ${p.variant_name}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive size-8 px-0"
+                    onClick={() => setDeleteTarget(p)}
+                    aria-label={`Hapus ${p.variant_name}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </>
+              ) : null}
             </div>
           )
         },
       },
     ],
-    [navigate]
+    [canManage, navigate]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table */
@@ -163,13 +170,15 @@ export function ProductsTable() {
 
   return (
     <div className="space-y-4">
-      <ProductDeleteModal
-        open={!!deleteTarget}
-        onOpenChange={(o) => {
-          if (!o) setDeleteTarget(null)
-        }}
-        product={deleteTarget}
-      />
+      {canManage ? (
+        <ProductDeleteModal
+          open={!!deleteTarget}
+          onOpenChange={(o) => {
+            if (!o) setDeleteTarget(null)
+          }}
+          product={deleteTarget}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">
@@ -187,14 +196,16 @@ export function ProductsTable() {
             Cari
           </Button>
         </div>
-        <Button
-          type="button"
-          onClick={() => navigate('/admin/inventaris/baru')}
-          className="shrink-0 gap-2"
-        >
-          <Plus className="size-4" />
-          Tambah produk
-        </Button>
+        {canManage ? (
+          <Button
+            type="button"
+            onClick={() => navigate('/admin/inventaris/baru')}
+            className="shrink-0 gap-2"
+          >
+            <Plus className="size-4" />
+            Tambah produk
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

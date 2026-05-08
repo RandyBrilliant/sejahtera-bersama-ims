@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { RouteFallback } from '@/components/route-fallback'
 import { AuthProvider } from '@/contexts/auth-context'
+import { InAppRoleRoute } from '@/components/auth/in-app-role-route'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { AppAlert } from '@/components/ui/app-alert'
 
@@ -158,6 +159,46 @@ const AdminSettingsPage = lazy(() =>
     default: m.AdminSettingsPage,
   }))
 )
+const AdminAttendanceTabletPage = lazy(() =>
+  import('@/pages/admin/admin-attendance-tablet-page').then((m) => ({
+    default: m.AdminAttendanceTabletPage,
+  }))
+)
+const AdminAttendanceSettingsPage = lazy(() =>
+  import('@/pages/admin/admin-attendance-settings-page').then((m) => ({
+    default: m.AdminAttendanceSettingsPage,
+  }))
+)
+const AdminAttendanceReportPage = lazy(() =>
+  import('@/pages/admin/admin-attendance-report-page').then((m) => ({
+    default: m.AdminAttendanceReportPage,
+  }))
+)
+const AdminPayrollPeriodsPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-periods-page').then((m) => ({
+    default: m.AdminPayrollPeriodsPage,
+  }))
+)
+const AdminPayrollCompensationPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-compensation-page').then((m) => ({
+    default: m.AdminPayrollCompensationPage,
+  }))
+)
+const AdminPayrollPeriodDetailPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-period-detail-page').then((m) => ({
+    default: m.AdminPayrollPeriodDetailPage,
+  }))
+)
+const AdminMyAttendancePage = lazy(() =>
+  import('@/pages/admin/admin-my-attendance-page').then((m) => ({
+    default: m.AdminMyAttendancePage,
+  }))
+)
+const AdminMyPayrollPage = lazy(() =>
+  import('@/pages/admin/admin-my-payroll-page').then((m) => ({
+    default: m.AdminMyPayrollPage,
+  }))
+)
 const AdminOrdersLayout = lazy(() =>
   import('@/pages/admin/admin-orders-layout').then((m) => ({
     default: m.AdminOrdersLayout,
@@ -203,22 +244,6 @@ const AdminSalesOrderDetailPage = lazy(() =>
     default: m.AdminSalesOrderDetailPage,
   }))
 )
-const WarehouseDashboardPage = lazy(() =>
-  import('@/pages/warehouse-dashboard-page').then((m) => ({
-    default: m.WarehouseDashboardPage,
-  }))
-)
-const SalesDashboardPage = lazy(() =>
-  import('@/pages/sales-dashboard-page').then((m) => ({
-    default: m.SalesDashboardPage,
-  }))
-)
-const FinanceDashboardPage = lazy(() =>
-  import('@/pages/finance-dashboard-page').then((m) => ({
-    default: m.FinanceDashboardPage,
-  }))
-)
-
 export default function App() {
   return (
     <AuthProvider>
@@ -229,7 +254,15 @@ export default function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'LEADERSHIP']}>
+                <ProtectedRoute
+                  allowedRoles={[
+                    'ADMIN',
+                    'LEADERSHIP',
+                    'WAREHOUSE_STAFF',
+                    'SALES_STAFF',
+                    'FINANCE_STAFF',
+                  ]}
+                >
                   <AdminAppShell />
                 </ProtectedRoute>
               }
@@ -237,73 +270,141 @@ export default function App() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminHomePage />} />
               <Route path="profil" element={<AdminProfilePage />} />
-              <Route path="staf/baru" element={<AdminStaffNewPage />} />
-              <Route path="staf/:id/edit" element={<AdminStaffEditPage />} />
-              <Route path="staf" element={<AdminStaffPage />} />
-              <Route path="pelanggan/baru" element={<AdminCustomerNewPage />} />
-              <Route path="pelanggan/:id/edit" element={<AdminCustomerEditPage />} />
-              <Route path="pelanggan" element={<AdminCustomersPage />} />
-              <Route path="kas" element={<AdminKasLayout />}>
-                <Route index element={<Navigate to="entri" replace />} />
-                <Route path="kategori/baru" element={<AdminKasCategoryNewPage />} />
-                <Route path="kategori/:id/edit" element={<AdminKasCategoryEditPage />} />
-                <Route path="kategori" element={<AdminKasCategoriesPage />} />
-                <Route path="entri/baru" element={<AdminKasEntryNewPage />} />
-                <Route path="entri/:id/edit" element={<AdminKasEntryEditPage />} />
-                <Route path="entri" element={<AdminKasEntriesPage />} />
+              <Route
+                element={
+                  <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF']} />
+                }
+              >
+                <Route path="gudang/bahan-baku/baru" element={<AdminIngredientNewPage />} />
+                <Route
+                  path="gudang/bahan-baku/:ingredientId/edit"
+                  element={<AdminIngredientEditPage />}
+                />
+                <Route path="gudang/bahan-baku" element={<AdminIngredientsPage />} />
+                <Route
+                  path="gudang/stok-bahan/:inventoryId/edit"
+                  element={<AdminIngredientInventoryEditPage />}
+                />
+                <Route path="gudang/stok-bahan" element={<AdminIngredientInventoryPage />} />
+                <Route path="gudang/mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
+                <Route path="gudang/mutasi-bahan" element={<AdminIngredientMovementsPage />} />
+                <Route path="gudang/mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
+                <Route path="gudang/mutasi-produk" element={<AdminProductMovementsPage />} />
+                <Route path="gudang" element={<AdminWarehousePage />} />
               </Route>
-              <Route path="inventaris/baru" element={<AdminInventoryNewPage />} />
+
               <Route
-                path="inventaris/kemasan/:packagingId/edit"
-                element={<AdminInventoryPackagingEditPage />}
-              />
+                element={
+                  <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF']} />
+                }
+              >
+                <Route path="pelanggan/baru" element={<AdminCustomerNewPage />} />
+                <Route path="pelanggan/:id/edit" element={<AdminCustomerEditPage />} />
+              </Route>
+              <Route path="pelanggan" element={<AdminCustomersPage />} />
+              <Route path="saya/presensi" element={<AdminMyAttendancePage />} />
+              <Route path="saya/gaji" element={<AdminMyPayrollPage />} />
               <Route
-                path="inventaris/:productId/kemasan/baru"
-                element={<AdminInventoryPackagingNewPage />}
-              />
-              <Route path="inventaris/:productId/edit" element={<AdminInventoryEditPage />} />
-              <Route path="inventaris" element={<AdminInventoryPage />} />
-              <Route path="gudang/bahan-baku/baru" element={<AdminIngredientNewPage />} />
+                element={
+                  <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF']} />
+                }
+              >
+                <Route path="absensi/laporan" element={<AdminAttendanceReportPage />} />
+                <Route path="gaji/kompensasi" element={<AdminPayrollCompensationPage />} />
+                <Route path="gaji/:periodId" element={<AdminPayrollPeriodDetailPage />} />
+                <Route path="gaji" element={<AdminPayrollPeriodsPage />} />
+              </Route>
               <Route
-                path="gudang/bahan-baku/:ingredientId/edit"
-                element={<AdminIngredientEditPage />}
-              />
-              <Route path="gudang/bahan-baku" element={<AdminIngredientsPage />} />
-              <Route
-                path="gudang/stok-bahan/:inventoryId/edit"
-                element={<AdminIngredientInventoryEditPage />}
-              />
-              <Route path="gudang/stok-bahan" element={<AdminIngredientInventoryPage />} />
-              <Route path="gudang/mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
-              <Route path="gudang/mutasi-bahan" element={<AdminIngredientMovementsPage />} />
-              <Route path="gudang/mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
-              <Route path="gudang/mutasi-produk" element={<AdminProductMovementsPage />} />
-              <Route path="gudang" element={<AdminWarehousePage />} />
+                element={
+                  <InAppRoleRoute
+                    allowedRoles={[
+                      'ADMIN',
+                      'LEADERSHIP',
+                      'WAREHOUSE_STAFF',
+                      'SALES_STAFF',
+                    ]}
+                  />
+                }
+              >
+                <Route path="inventaris" element={<AdminInventoryPage />} />
+              </Route>
               <Route path="pesanan" element={<AdminOrdersLayout />}>
                 <Route index element={<Navigate to="penjualan" replace />} />
-                <Route path="pembelian/baru" element={<AdminPurchaseOrderNewPage />} />
                 <Route
-                  path="pembelian/:orderId/edit"
-                  element={<AdminPurchaseOrderEditPage />}
-                />
+                  element={
+                    <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF']} />
+                  }
+                >
+                  <Route path="pembelian/baru" element={<AdminPurchaseOrderNewPage />} />
+                  <Route path="pembelian/:orderId/edit" element={<AdminPurchaseOrderEditPage />} />
+                </Route>
                 <Route
-                  path="pembelian/:orderId"
-                  element={<AdminPurchaseOrderDetailPage />}
-                />
-                <Route path="pembelian" element={<AdminPurchaseOrdersListPage />} />
-                <Route path="penjualan/baru" element={<AdminSalesOrderNewPage />} />
-                <Route path="penjualan/:orderId/edit" element={<AdminSalesOrderEditPage />} />
+                  element={
+                    <InAppRoleRoute
+                      allowedRoles={[
+                        'ADMIN',
+                        'LEADERSHIP',
+                        'WAREHOUSE_STAFF',
+                        'FINANCE_STAFF',
+                      ]}
+                    />
+                  }
+                >
+                  <Route path="pembelian/:orderId" element={<AdminPurchaseOrderDetailPage />} />
+                  <Route path="pembelian" element={<AdminPurchaseOrdersListPage />} />
+                </Route>
+                <Route
+                  element={
+                    <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF']} />
+                  }
+                >
+                  <Route path="penjualan/baru" element={<AdminSalesOrderNewPage />} />
+                  <Route path="penjualan/:orderId/edit" element={<AdminSalesOrderEditPage />} />
+                </Route>
                 <Route path="penjualan/:orderId" element={<AdminSalesOrderDetailPage />} />
                 <Route path="penjualan" element={<AdminSalesOrdersListPage />} />
               </Route>
-              <Route path="analitik" element={<AdminAnalyticsPage />} />
-              <Route path="pengaturan" element={<AdminSettingsPage />} />
+
+              <Route
+                element={
+                  <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF']} />
+                }
+              >
+                <Route path="kas" element={<AdminKasLayout />}>
+                  <Route index element={<Navigate to="entri" replace />} />
+                  <Route path="kategori/baru" element={<AdminKasCategoryNewPage />} />
+                  <Route path="kategori/:id/edit" element={<AdminKasCategoryEditPage />} />
+                  <Route path="kategori" element={<AdminKasCategoriesPage />} />
+                  <Route path="entri/baru" element={<AdminKasEntryNewPage />} />
+                  <Route path="entri/:id/edit" element={<AdminKasEntryEditPage />} />
+                  <Route path="entri" element={<AdminKasEntriesPage />} />
+                </Route>
+                <Route path="analitik" element={<AdminAnalyticsPage />} />
+              </Route>
+              <Route element={<InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />}>
+                <Route path="absensi/tablet" element={<AdminAttendanceTabletPage />} />
+                <Route path="absensi/pengaturan" element={<AdminAttendanceSettingsPage />} />
+                <Route path="staf/baru" element={<AdminStaffNewPage />} />
+                <Route path="staf/:id/edit" element={<AdminStaffEditPage />} />
+                <Route path="staf" element={<AdminStaffPage />} />
+                <Route path="inventaris/baru" element={<AdminInventoryNewPage />} />
+                <Route
+                  path="inventaris/kemasan/:packagingId/edit"
+                  element={<AdminInventoryPackagingEditPage />}
+                />
+                <Route
+                  path="inventaris/:productId/kemasan/baru"
+                  element={<AdminInventoryPackagingNewPage />}
+                />
+                <Route path="inventaris/:productId/edit" element={<AdminInventoryEditPage />} />
+                <Route path="pengaturan" element={<AdminSettingsPage />} />
+              </Route>
             </Route>
             <Route
               path="/warehouse/dashboard"
               element={
                 <ProtectedRoute allowedRoles={['WAREHOUSE_STAFF']}>
-                  <WarehouseDashboardPage />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               }
             />
@@ -311,7 +412,7 @@ export default function App() {
               path="/sales/dashboard"
               element={
                 <ProtectedRoute allowedRoles={['SALES_STAFF']}>
-                  <SalesDashboardPage />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               }
             />
@@ -319,7 +420,7 @@ export default function App() {
               path="/finance/dashboard"
               element={
                 <ProtectedRoute allowedRoles={['FINANCE_STAFF']}>
-                  <FinanceDashboardPage />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               }
             />

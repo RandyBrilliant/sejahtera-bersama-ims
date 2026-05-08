@@ -46,6 +46,7 @@ export function AdminSalesOrderDetailPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const isOwner = user?.role === 'LEADERSHIP'
+  const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
 
   const { data: order, isLoading, isError, refetch } = useSalesOrderQuery(validId ? id : null)
   const uploadMut = useUploadSalesPaymentProofMutation(id)
@@ -167,7 +168,7 @@ export function AdminSalesOrderDetailPage() {
           <p className="text-on-surface-variant mt-1 text-sm">{order.customer_name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canEdit ? (
+          {canEdit && !isFinanceReadOnly ? (
             <Button type="button" variant="outline" asChild>
               <Link to={`/admin/pesanan/penjualan/${id}/edit`}>Ubah order</Link>
             </Button>
@@ -182,7 +183,7 @@ export function AdminSalesOrderDetailPage() {
               {pdfMut.isPending ? 'PDF…' : 'Unduh invoice PDF'}
             </Button>
           ) : null}
-          {canDeleteOrder(order.status) ? (
+          {!isFinanceReadOnly && canDeleteOrder(order.status) ? (
             <Button
               type="button"
               variant="default"
@@ -272,7 +273,7 @@ export function AdminSalesOrderDetailPage() {
       />
 
       <div className="flex flex-wrap gap-2">
-        {showUpload ? (
+        {!isFinanceReadOnly && showUpload ? (
           <Button
             type="button"
             variant="outline"
@@ -282,7 +283,9 @@ export function AdminSalesOrderDetailPage() {
             {uploadMut.isPending ? 'Mengunggah…' : 'Unggah bukti pembayaran'}
           </Button>
         ) : null}
-        {order.status !== 'VERIFIED' && order.status !== 'CANCELLED' ? (
+        {!isFinanceReadOnly &&
+        order.status !== 'VERIFIED' &&
+        order.status !== 'CANCELLED' ? (
           <Button
             type="button"
             variant="outline"

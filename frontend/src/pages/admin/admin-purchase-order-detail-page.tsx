@@ -50,6 +50,7 @@ export function AdminPurchaseOrderDetailPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const isOwner = user?.role === 'LEADERSHIP'
+  const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
 
   const { data: order, isLoading, isError, refetch } = usePurchaseInOrderQuery(validId ? id : null)
   const uploadMut = useUploadPurchasePaymentProofMutation(id)
@@ -150,12 +151,12 @@ export function AdminPurchaseOrderDetailPage() {
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canEdit ? (
+          {canEdit && !isFinanceReadOnly ? (
             <Button type="button" variant="outline" asChild>
               <Link to={`/admin/pesanan/pembelian/${id}/edit`}>Ubah order</Link>
             </Button>
           ) : null}
-          {canDeleteOrder(order.status) ? (
+          {!isFinanceReadOnly && canDeleteOrder(order.status) ? (
             <Button
               type="button"
               variant="default"
@@ -236,7 +237,7 @@ export function AdminPurchaseOrderDetailPage() {
       />
 
       <div className="flex flex-wrap gap-2">
-        {showUpload ? (
+        {!isFinanceReadOnly && showUpload ? (
           <Button
             type="button"
             variant="outline"
@@ -246,7 +247,9 @@ export function AdminPurchaseOrderDetailPage() {
             {uploadMut.isPending ? 'Mengunggah…' : 'Unggah bukti pembayaran'}
           </Button>
         ) : null}
-        {order.status !== 'VERIFIED' && order.status !== 'CANCELLED' ? (
+        {!isFinanceReadOnly &&
+        order.status !== 'VERIFIED' &&
+        order.status !== 'CANCELLED' ? (
           <Button
             type="button"
             variant="outline"

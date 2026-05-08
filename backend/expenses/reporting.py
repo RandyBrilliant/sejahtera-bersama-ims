@@ -105,6 +105,7 @@ def entries_for_json(qs, limit=500):
                 "id": e.id,
                 "occurred_on": e.occurred_on.isoformat(),
                 "direction": e.direction,
+                "payment_method": e.payment_method,
                 "category_id": e.category_id,
                 "category_name": e.category.name,
                 "amount_idr": e.amount_idr,

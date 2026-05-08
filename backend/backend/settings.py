@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     "purchase.apps.PurchaseConfig",
     "expenses.apps.ExpensesConfig",
     "main.apps.MainConfig",
+    "attendance.apps.AttendanceConfig",
+    "payroll.apps.PayrollConfig",
 ]
 
 AUTH_USER_MODEL = "account.CustomUser"

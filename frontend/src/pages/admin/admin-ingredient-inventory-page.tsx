@@ -1,4 +1,3 @@
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { IngredientSummaryStats } from '@/components/admin/inventory/ingredient-summary-stats'
 import { IngredientInventoryTable } from '@/components/admin/inventory/ingredient-inventory-table'
 
@@ -14,8 +13,6 @@ export function AdminIngredientInventoryPage() {
           riwayat masuk/keluar.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientSummaryStats />
 

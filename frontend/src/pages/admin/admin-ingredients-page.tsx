@@ -1,4 +1,3 @@
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { IngredientSummaryStats } from '@/components/admin/inventory/ingredient-summary-stats'
 import { IngredientsTable } from '@/components/admin/inventory/ingredients-table'
 
@@ -14,8 +13,6 @@ export function AdminIngredientsPage() {
           halaman stok bahan.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientSummaryStats />
 

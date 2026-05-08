@@ -1,6 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
 
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { ProductStockMovementForm } from '@/components/admin/inventory/product-stock-movement-form'
 
 export function AdminProductMovementNewPage() {
@@ -23,8 +22,6 @@ export function AdminProductMovementNewPage() {
           masuk (IN).
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <ProductStockMovementForm
         onCancel={() => navigate('/admin/gudang/mutasi-produk')}

@@ -1,7 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 
 import { IngredientForm } from '@/components/admin/inventory/ingredient-form'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 
 export function AdminIngredientNewPage() {
   const navigate = useNavigate()
@@ -23,8 +22,6 @@ export function AdminIngredientNewPage() {
           mutasi.
         </p>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientForm
         mode="create"

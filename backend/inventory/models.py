@@ -248,7 +248,7 @@ class IngredientStockMovement(AuditModel):
         _("quantity"),
         max_digits=12,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
     note = models.TextField(_("note"), blank=True)
     movement_at = models.DateTimeField(_("movement at"), db_index=True)
@@ -372,7 +372,7 @@ class ProductionIngredientUsage(models.Model):
         _("quantity used"),
         max_digits=12,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
 
     class Meta:
@@ -408,7 +408,7 @@ class ProductionPackagingOutput(models.Model):
         _("quantity produced"),
         max_digits=12,
         decimal_places=3,
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
     bonus_quantity = models.DecimalField(
         _("bonus quantity"),

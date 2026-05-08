@@ -38,6 +38,7 @@ function buildEntryQuery(params: OperationalCashEntryListParams): string {
   if (params.search) search.set('search', params.search)
   if (params.ordering) search.set('ordering', params.ordering)
   if (params.direction) search.set('direction', params.direction)
+  if (params.payment_method) search.set('payment_method', params.payment_method)
   if (params.category != null) search.set('category', String(params.category))
   if (params.occurred_on_from) search.set('occurred_on_from', params.occurred_on_from)
   if (params.occurred_on_to) search.set('occurred_on_to', params.occurred_on_to)

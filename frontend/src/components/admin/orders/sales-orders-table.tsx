@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
+import { useAuth } from '@/hooks/use-auth'
 import { useSalesOrdersQuery } from '@/hooks/use-purchase-query'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
@@ -53,6 +54,8 @@ function fmtShort(iso: string) {
 
 export function SalesOrdersTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canCreateSalesOrder = user?.role !== 'FINANCE_STAFF'
   const [params, setParams] = useState<SalesOrdersListParams>({
     page: 1,
     page_size: 20,
@@ -163,14 +166,16 @@ export function SalesOrdersTable() {
             Cari
           </Button>
         </div>
-        <Button
-          type="button"
-          onClick={() => navigate('/admin/pesanan/penjualan/baru')}
-          className="shrink-0 gap-2"
-        >
-          <Plus className="size-4" />
-          Order penjualan
-        </Button>
+        {canCreateSalesOrder ? (
+          <Button
+            type="button"
+            onClick={() => navigate('/admin/pesanan/penjualan/baru')}
+            className="shrink-0 gap-2"
+          >
+            <Plus className="size-4" />
+            Order penjualan
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

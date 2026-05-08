@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 
 import { IngredientStockMovementsTable } from '@/components/admin/inventory/ingredient-stock-movements-table'
-import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { Button } from '@/components/ui/button'
 
 export function AdminIngredientMovementsPage() {
@@ -25,8 +24,6 @@ export function AdminIngredientMovementsPage() {
           </Link>
         </Button>
       </div>
-
-      <WarehouseSubnav />
 
       <IngredientStockMovementsTable />
     </div>

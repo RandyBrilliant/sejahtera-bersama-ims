@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useIngredientsQuery } from '@/hooks/use-inventory-query'
+import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import type { Ingredient, IngredientsListParams } from '@/types/inventory'
 
@@ -43,6 +44,8 @@ const ORDERING: { value: string; label: string }[] = [
 
 export function IngredientsTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canDelete = user?.role !== 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<IngredientsListParams>({
     page: 1,
     page_size: 20,
@@ -106,22 +109,24 @@ export function IngredientsTable() {
               >
                 <Pencil className="size-4" />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive size-8 px-0"
-                onClick={() => setDeleteTarget(ing)}
-                aria-label={`Hapus ${ing.name}`}
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              {canDelete ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive size-8 px-0"
+                  onClick={() => setDeleteTarget(ing)}
+                  aria-label={`Hapus ${ing.name}`}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              ) : null}
             </div>
           )
         },
       },
     ],
-    [navigate]
+    [canDelete, navigate]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -135,13 +140,15 @@ export function IngredientsTable() {
 
   return (
     <div className="space-y-4">
-      <IngredientDeleteModal
-        open={!!deleteTarget}
-        onOpenChange={(o) => {
-          if (!o) setDeleteTarget(null)
-        }}
-        ingredient={deleteTarget}
-      />
+      {canDelete ? (
+        <IngredientDeleteModal
+          open={!!deleteTarget}
+          onOpenChange={(o) => {
+            if (!o) setDeleteTarget(null)
+          }}
+          ingredient={deleteTarget}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">

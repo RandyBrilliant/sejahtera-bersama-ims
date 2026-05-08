@@ -27,6 +27,8 @@ urlpatterns = [
     path("api/inventory/", include("inventory.urls")),
     path("api/purchase/", include("purchase.urls")),
     path("api/expenses/", include("expenses.urls")),
+    path("api/attendance/", include("attendance.urls")),
+    path("api/payroll/", include("payroll.urls")),
 ]
 
 if settings.DEBUG and settings.MEDIA_ROOT:
