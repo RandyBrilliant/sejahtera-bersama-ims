@@ -2,10 +2,12 @@ import { NavLink } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
 
-const tabs = [
+type TabItem = { to: string; label: string; end?: boolean }
+
+const tabs: TabItem[] = [
   { to: '/admin/gaji', label: 'Periode gaji', end: true },
   { to: '/admin/gaji/kompensasi', label: 'Gaji pokok karyawan' },
-] as const
+]
 
 export function PayrollSubnav() {
   return (

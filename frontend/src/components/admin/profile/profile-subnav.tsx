@@ -2,11 +2,13 @@ import { NavLink } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
 
-const tabs = [
+type TabItem = { to: string; label: string; end?: boolean }
+
+const tabs: TabItem[] = [
   { to: '/admin/profil', label: 'Akun', end: true },
   { to: '/admin/profil/presensi', label: 'Presensi saya' },
   { to: '/admin/profil/slip-gaji', label: 'Slip gaji saya' },
-] as const
+]
 
 export function ProfileSubnav() {
   return (
