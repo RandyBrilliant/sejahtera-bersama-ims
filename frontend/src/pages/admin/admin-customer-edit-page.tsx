@@ -1,14 +1,22 @@
+import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
 
+import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { CustomerForm } from '@/components/admin/customers/customer-form'
 import { CustomerMetadataAside } from '@/components/admin/customers/customer-metadata-aside'
 import { useCustomerQuery } from '@/hooks/use-purchase-query'
+import { useAuth } from '@/hooks/use-auth'
+import { Button } from '@/components/ui/button'
 
 export function AdminCustomerEditPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { id: idParam } = useParams<{ id: string }>()
+  const [isDeleteOpen, setDeleteOpen] = useState(false)
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
 
   const { data: customer, isLoading, isError } = useCustomerQuery(validId ? id : null)
 
@@ -50,6 +58,17 @@ export function AdminCustomerEditPage() {
           Perbarui kontak atau status aktif. Pelanggan nonaktif disembunyikan dari dropdown pesanan
           baru.
         </p>
+        {canDelete ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="text-destructive border-destructive/30 hover:bg-destructive/5 mt-4 gap-2"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="size-4" />
+            Hapus pelanggan
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -61,6 +80,15 @@ export function AdminCustomerEditPage() {
         />
         <CustomerMetadataAside customer={customer} />
       </div>
+
+      {canDelete ? (
+        <CustomerDeleteModal
+          open={isDeleteOpen}
+          onOpenChange={setDeleteOpen}
+          onDeleted={() => navigate('/admin/pelanggan')}
+          customer={customer}
+        />
+      ) : null}
     </div>
   )
 }

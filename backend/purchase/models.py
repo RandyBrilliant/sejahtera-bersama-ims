@@ -36,6 +36,14 @@ class Customer(AuditModel):
     phone = models.CharField(_("phone"), max_length=50, blank=True, db_index=True)
     address = models.TextField(_("address"))
     notes = models.TextField(_("notes"), blank=True)
+    wilayah = models.ForeignKey(
+        "Wilayah",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customers",
+        verbose_name=_("region"),
+    )
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
     class Meta:
@@ -44,11 +52,31 @@ class Customer(AuditModel):
         ordering = ["name"]
         indexes = [
             models.Index(fields=["is_active", "name"]),
+            models.Index(fields=["wilayah", "name"]),
             models.Index(fields=["created_at"]),
         ]
 
     def __str__(self) -> str:
         return self.name
+
+
+class Wilayah(AuditModel):
+    """Master region/area for customer segmentation and filtering."""
+
+    name = models.CharField(_("region name"), max_length=100, unique=True, db_index=True)
+    is_active = models.BooleanField(_("active"), default=True, db_index=True)
+
+    class Meta:
+        verbose_name = _("region")
+        verbose_name_plural = _("regions")
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["is_active", "name"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
 
 
 class CustomerProductPrice(AuditModel):

@@ -25,6 +25,10 @@ export function CustomerMetadataAside({ customer }: { customer: Customer }) {
             </dd>
           </div>
           <div>
+            <dt className="text-on-surface-variant text-xs font-medium uppercase">Wilayah</dt>
+            <dd className="text-on-surface mt-0.5">{customer.wilayah_name || '—'}</dd>
+          </div>
+          <div>
             <dt className="text-on-surface-variant text-xs font-medium uppercase">Alamat</dt>
             <dd className="text-on-surface mt-0.5 min-w-0 break-words">
               {customer.address || '—'}

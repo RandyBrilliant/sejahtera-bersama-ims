@@ -21,6 +21,18 @@ export type Customer = {
   phone: string
   address: string
   notes: string
+  wilayah: number | null
+  wilayah_name: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  created_by: AuditUserMini | null
+  updated_by: AuditUserMini | null
+}
+
+export type Wilayah = {
+  id: number
+  name: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -124,6 +136,7 @@ export type CustomersListParams = {
   search?: string
   ordering?: string
   is_active?: boolean
+  wilayah?: number
 }
 
 export type CustomerCreateInput = {
@@ -131,6 +144,7 @@ export type CustomerCreateInput = {
   phone?: string
   address: string
   notes?: string
+  wilayah?: number | null
   is_active?: boolean
 }
 

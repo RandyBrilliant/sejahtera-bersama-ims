@@ -8,8 +8,8 @@ export function AdminCustomersPage() {
           Pelanggan
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Master data pelanggan untuk pesanan penjualan. Ubah status nonaktif jika tidak lagi
-          dipakai — penghapusan hanya jika tidak ada referensi pesanan.
+          Master data pelanggan untuk pesanan penjualan, termasuk segmentasi wilayah. Ubah status
+          nonaktif jika tidak lagi dipakai — penghapusan hanya jika tidak ada referensi pesanan.
         </p>
       </div>
 

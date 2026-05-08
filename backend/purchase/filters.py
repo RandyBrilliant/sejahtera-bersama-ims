@@ -8,6 +8,7 @@ class CustomerFilter(filters.FilterSet):
         model = Customer
         fields = {
             "is_active": ["exact"],
+            "wilayah": ["exact"],
             "name": ["icontains"],
             "phone": ["icontains"],
             "address": ["icontains"],

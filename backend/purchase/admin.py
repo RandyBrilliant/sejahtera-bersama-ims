@@ -7,6 +7,7 @@ from .models import (
     PurchaseInOrder,
     SalesOrder,
     SalesOrderLine,
+    Wilayah,
 )
 
 
@@ -38,8 +39,8 @@ class SalesOrderAdmin(admin.ModelAdmin):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "phone", "is_active", "created_at")
-    list_filter = ("is_active",)
+    list_display = ("id", "name", "wilayah", "phone", "is_active", "created_at")
+    list_filter = ("is_active", "wilayah")
     search_fields = ("name", "phone", "address")
 
 
@@ -48,3 +49,10 @@ class CustomerProductPriceAdmin(admin.ModelAdmin):
     list_display = ("id", "customer", "product_packaging", "selling_price_idr", "is_active", "updated_at")
     list_filter = ("is_active",)
     search_fields = ("customer__name", "note")
+
+
+@admin.register(Wilayah)
+class WilayahAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)

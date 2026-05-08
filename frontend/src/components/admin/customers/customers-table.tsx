@@ -9,7 +9,8 @@ import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-
 import { useNavigate } from 'react-router-dom'
 
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
-import { useCustomersQuery } from '@/hooks/use-purchase-query'
+import { WilayahManagerModal } from '@/components/admin/customers/wilayah-manager-modal'
+import { useCustomersQuery, useWilayahQuery } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -67,14 +68,18 @@ export function CustomersTable() {
   })
   const [searchInput, setSearchInput] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [wilayahFilter, setWilayahFilter] = useState('__all')
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
+  const [wilayahModalOpen, setWilayahModalOpen] = useState(false)
+  const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
 
   const listParams = useMemo(
     () => ({
       ...params,
       is_active: statusFromFilter(statusFilter),
+      wilayah: wilayahFilter === '__all' ? undefined : Number(wilayahFilter),
     }),
-    [params, statusFilter]
+    [params, statusFilter, wilayahFilter]
   )
 
   const { data, isLoading, isError, error, isFetching } = useCustomersQuery(listParams)
@@ -106,6 +111,11 @@ export function CustomersTable() {
         accessorKey: 'phone',
         header: 'Telepon',
         cell: ({ row }) => row.original.phone || '—',
+      },
+      {
+        id: 'wilayah_name',
+        header: 'Wilayah',
+        cell: ({ row }) => row.original.wilayah_name || '—',
       },
       {
         accessorKey: 'address',
@@ -179,7 +189,7 @@ export function CustomersTable() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-              placeholder="Cari nama, telepon, alamat…"
+              placeholder="Cari nama, wilayah, telepon, alamat…"
               className="border-outline-variant pl-10"
             />
           </div>
@@ -219,6 +229,25 @@ export function CustomersTable() {
           </SelectContent>
         </Select>
         <Select
+          value={wilayahFilter}
+          onValueChange={(v) => {
+            setWilayahFilter(v)
+            setParams((p) => ({ ...p, page: 1 }))
+          }}
+        >
+          <SelectTrigger className="border-outline-variant w-[200px]">
+            <SelectValue placeholder="Semua wilayah" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">Semua wilayah</SelectItem>
+            {(wilayahQuery.data?.results ?? []).map((w) => (
+              <SelectItem key={w.id} value={String(w.id)}>
+                {w.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
           value={params.ordering ?? 'name'}
           onValueChange={(ordering) =>
             setParams((p) => ({ ...p, page: 1, ordering }))
@@ -237,6 +266,11 @@ export function CustomersTable() {
         </Select>
         {isFetching ? (
           <span className="text-on-surface-variant text-xs">Memperbarui…</span>
+        ) : null}
+        {canEditCustomers ? (
+          <Button type="button" variant="outline" onClick={() => setWilayahModalOpen(true)}>
+            Kelola wilayah
+          </Button>
         ) : null}
       </div>
 
@@ -347,6 +381,9 @@ export function CustomersTable() {
           onOpenChange={(o) => !o && setDeleteTarget(null)}
           customer={deleteTarget}
         />
+      ) : null}
+      {canEditCustomers ? (
+        <WilayahManagerModal open={wilayahModalOpen} onOpenChange={setWilayahModalOpen} />
       ) : null}
     </div>
   )

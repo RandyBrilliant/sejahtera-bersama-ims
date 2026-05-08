@@ -203,15 +203,6 @@ export function AdminProfilePage() {
 
   return (
     <div className="space-y-6 lg:space-y-8">
-      <div>
-        <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Profil
-        </h1>
-        <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Kelola informasi akun Anda dan ubah kata sandi. Username dan peran dikelola oleh administrator.
-        </p>
-      </div>
-
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-start lg:gap-10">
         <div className="space-y-8">
           <ProfileEditForm

@@ -11,9 +11,11 @@ import {
   createCustomer,
   createPurchaseInOrder,
   createSalesOrder,
+  createWilayah,
   deleteCustomer,
   deletePurchaseInOrder,
   deleteSalesOrder,
+  deleteWilayah,
   downloadSalesInvoicePdf,
   fetchCustomer,
   fetchCustomers,
@@ -21,11 +23,13 @@ import {
   fetchPurchaseInOrders,
   fetchSalesOrder,
   fetchSalesOrders,
+  fetchWilayah,
   updateCustomer,
   updatePurchaseInOrder,
   updateSalesOrder,
   uploadPurchaseInPaymentProof,
   uploadSalesPaymentProof,
+  updateWilayah,
   verifyPurchaseInOrder,
   verifySalesOrder,
 } from '@/api/purchase'
@@ -46,6 +50,9 @@ export const purchaseKeys = {
   customerList: (params: CustomersListParams) =>
     [...purchaseKeys.customers(), 'list', params] as const,
   customerDetail: (id: number) => [...purchaseKeys.customers(), 'detail', id] as const,
+  wilayah: () => [...purchaseKeys.all, 'wilayah'] as const,
+  wilayahList: (params: { page?: number; page_size?: number; search?: string; ordering?: string }) =>
+    [...purchaseKeys.wilayah(), 'list', params] as const,
   purchaseIn: () => [...purchaseKeys.all, 'purchase-in'] as const,
   purchaseInList: (params: PurchaseInOrdersListParams) =>
     [...purchaseKeys.purchaseIn(), 'list', params] as const,
@@ -86,6 +93,52 @@ export function useCreateCustomerMutation() {
   return useMutation({
     mutationFn: createCustomer,
     onSuccess: () => invalidateCustomerQueries(qc),
+  })
+}
+
+function invalidateWilayahQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: purchaseKeys.wilayah() })
+}
+
+export function useWilayahQuery(params: { page?: number; page_size?: number; search?: string; ordering?: string }) {
+  return useQuery({
+    queryKey: purchaseKeys.wilayahList(params),
+    queryFn: () => fetchWilayah(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreateWilayahMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: createWilayah,
+    onSuccess: () => {
+      invalidateWilayahQueries(qc)
+      invalidateCustomerQueries(qc)
+    },
+  })
+}
+
+export function useDeleteWilayahMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: deleteWilayah,
+    onSuccess: () => {
+      invalidateWilayahQueries(qc)
+      invalidateCustomerQueries(qc)
+    },
+  })
+}
+
+export function useUpdateWilayahMutation(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Partial<{ name: string; is_active: boolean }>) =>
+      updateWilayah(id, input),
+    onSuccess: () => {
+      invalidateWilayahQueries(qc)
+      invalidateCustomerQueries(qc)
+    },
   })
 }
 

@@ -5,6 +5,7 @@ import type {
   CustomerCreateInput,
   CustomerUpdateInput,
   CustomersListParams,
+  Wilayah,
   Paginated,
   PurchaseInOrder,
   PurchaseInOrderCreateInput,
@@ -50,8 +51,35 @@ function buildCustomersQuery(params: CustomersListParams): string {
   if (params.search) search.set('search', params.search)
   if (params.ordering) search.set('ordering', params.ordering)
   if (params.is_active !== undefined) search.set('is_active', String(params.is_active))
+  if (params.wilayah != null) search.set('wilayah', String(params.wilayah))
   const qs = search.toString()
   return qs ? `?${qs}` : ''
+}
+
+export async function fetchWilayah(
+  params: { page?: number; page_size?: number; search?: string; ordering?: string } = {}
+): Promise<Paginated<Wilayah>> {
+  const search = new URLSearchParams()
+  if (params.page != null) search.set('page', String(params.page))
+  if (params.page_size != null) search.set('page_size', String(params.page_size))
+  if (params.search) search.set('search', params.search)
+  if (params.ordering) search.set('ordering', params.ordering)
+  const qs = search.toString()
+  const { data } = await api.get<Paginated<Wilayah>>(`/api/purchase/wilayah/${qs ? `?${qs}` : ''}`)
+  return data
+}
+
+export async function createWilayah(body: { name: string; is_active?: boolean }): Promise<Wilayah> {
+  const { data } = await api.post<Wilayah>('/api/purchase/wilayah/', body)
+  return data
+}
+
+export async function updateWilayah(
+  id: number,
+  body: Partial<{ name: string; is_active: boolean }>
+): Promise<Wilayah> {
+  const { data } = await api.patch<Wilayah>(`/api/purchase/wilayah/${id}/`, body)
+  return data
 }
 
 export async function fetchCustomers(
@@ -83,6 +111,10 @@ export async function updateCustomer(
 
 export async function deleteCustomer(id: number): Promise<void> {
   await api.delete(`/api/purchase/customers/${id}/`)
+}
+
+export async function deleteWilayah(id: number): Promise<void> {
+  await api.delete(`/api/purchase/wilayah/${id}/`)
 }
 
 export async function fetchPurchaseInOrders(

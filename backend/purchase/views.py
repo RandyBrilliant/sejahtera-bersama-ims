@@ -48,12 +48,14 @@ from .models import (
     PurchaseInOrder,
     SalesOrder,
     SalesOrderLine,
+    Wilayah,
 )
 from .serializers import (
     CustomerProductPriceSerializer,
     CustomerSerializer,
     PurchaseInOrderSerializer,
     SalesOrderSerializer,
+    WilayahSerializer,
 )
 
 
@@ -63,12 +65,31 @@ class CustomerViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = CustomerFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["name", "phone", "address", "notes"]
+    search_fields = ["name", "phone", "address", "notes", "wilayah__name"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
 
     def get_queryset(self):
-        return Customer.objects.select_related("created_by", "updated_by")
+        return Customer.objects.select_related("wilayah", "created_by", "updated_by")
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+
+class WilayahViewSet(viewsets.ModelViewSet):
+    serializer_class = WilayahSerializer
+    permission_classes = [CustomerAccess]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ["name"]
+    ordering_fields = ["name", "created_at", "updated_at"]
+    ordering = ["name"]
+
+    def get_queryset(self):
+        return Wilayah.objects.select_related("created_by", "updated_by")
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, updated_by=self.request.user)

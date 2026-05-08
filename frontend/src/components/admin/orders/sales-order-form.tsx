@@ -35,6 +35,7 @@ import {
   useCustomersQuery,
   useSalesOrderQuery,
   useUpdateSalesOrderMutation,
+  useWilayahQuery,
 } from '@/hooks/use-purchase-query'
 import { canEditOrderLines } from '@/constants/order-status'
 import type { SalesOrder, SalesOrderLineInput } from '@/types/purchase'
@@ -97,6 +98,7 @@ type InnerProps = {
 
 function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: InnerProps) {
   const customersQuery = useCustomersQuery({ ...listParams, is_active: true })
+  const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
   const packagingQuery = useProductPackagingListQuery(listParams)
 
   const customers = useMemo(() => customersQuery.data?.results ?? [], [customersQuery.data?.results])
@@ -121,6 +123,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const [newCustomerPhone, setNewCustomerPhone] = useState('')
   const [newCustomerAddress, setNewCustomerAddress] = useState('')
   const [newCustomerNotes, setNewCustomerNotes] = useState('')
+  const [newCustomerWilayahId, setNewCustomerWilayahId] = useState('__none')
 
   const createCustomerMut = useCreateCustomerMutation()
   const createMut = useCreateSalesOrderMutation()
@@ -132,6 +135,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     return customers.filter((c) => {
       return (
         c.name.toLowerCase().includes(q) ||
+        (c.wilayah_name ?? '').toLowerCase().includes(q) ||
         c.phone.toLowerCase().includes(q) ||
         c.address.toLowerCase().includes(q)
       )
@@ -172,6 +176,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
         name,
         phone: newCustomerPhone.trim() || undefined,
         address,
+        wilayah: newCustomerWilayahId === '__none' ? null : Number(newCustomerWilayahId),
         notes: newCustomerNotes.trim() || undefined,
         is_active: true,
       })
@@ -183,6 +188,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
       setNewCustomerPhone('')
       setNewCustomerAddress('')
       setNewCustomerNotes('')
+      setNewCustomerWilayahId('__none')
       void customersQuery.refetch()
       alert.success('Berhasil', 'Pelanggan baru ditambahkan.')
     } catch (err) {
@@ -316,7 +322,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                           >
                             <div className="font-medium">{c.name}</div>
                             <div className="text-on-surface-variant truncate text-xs">
-                              {c.phone || 'Tanpa telepon'} · {c.address || 'Tanpa alamat'}
+                              {[c.wilayah_name, c.phone || 'Tanpa telepon', c.address || 'Tanpa alamat']
+                                .filter(Boolean)
+                                .join(' · ')}
                             </div>
                           </button>
                         )
@@ -546,6 +554,26 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                 onChange={setNewCustomerPhone}
                 disabled={createCustomerMut.isPending}
               />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="quick-customer-wilayah">Wilayah</Label>
+              <Select
+                value={newCustomerWilayahId}
+                onValueChange={setNewCustomerWilayahId}
+                disabled={createCustomerMut.isPending || wilayahQuery.isLoading}
+              >
+                <SelectTrigger id="quick-customer-wilayah">
+                  <SelectValue placeholder="Pilih wilayah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Tanpa wilayah</SelectItem>
+                  {(wilayahQuery.data?.results ?? []).map((w) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="quick-customer-address">

@@ -21,6 +21,9 @@ const AdminHomePage = lazy(() =>
 const AdminProfilePage = lazy(() =>
   import('@/pages/admin/admin-profile-page').then((m) => ({ default: m.AdminProfilePage }))
 )
+const AdminProfileLayout = lazy(() =>
+  import('@/pages/admin/admin-profile-layout').then((m) => ({ default: m.AdminProfileLayout }))
+)
 const AdminStaffPage = lazy(() =>
   import('@/pages/admin/admin-staff-page').then((m) => ({ default: m.AdminStaffPage }))
 )
@@ -174,9 +177,24 @@ const AdminAttendanceReportPage = lazy(() =>
     default: m.AdminAttendanceReportPage,
   }))
 )
+const AdminAttendanceLayout = lazy(() =>
+  import('@/pages/admin/admin-attendance-layout').then((m) => ({
+    default: m.AdminAttendanceLayout,
+  }))
+)
+const AdminAttendanceIndexRedirect = lazy(() =>
+  import('@/pages/admin/admin-attendance-layout').then((m) => ({
+    default: m.AdminAttendanceIndexRedirect,
+  }))
+)
 const AdminPayrollPeriodsPage = lazy(() =>
   import('@/pages/admin/admin-payroll-periods-page').then((m) => ({
     default: m.AdminPayrollPeriodsPage,
+  }))
+)
+const AdminPayrollLayout = lazy(() =>
+  import('@/pages/admin/admin-payroll-layout').then((m) => ({
+    default: m.AdminPayrollLayout,
   }))
 )
 const AdminPayrollCompensationPage = lazy(() =>
@@ -269,7 +287,11 @@ export default function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminHomePage />} />
-              <Route path="profil" element={<AdminProfilePage />} />
+              <Route path="profil" element={<AdminProfileLayout />}>
+                <Route index element={<AdminProfilePage />} />
+                <Route path="presensi" element={<AdminMyAttendancePage />} />
+                <Route path="slip-gaji" element={<AdminMyPayrollPage />} />
+              </Route>
               <Route
                 element={
                   <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF']} />
@@ -302,17 +324,32 @@ export default function App() {
                 <Route path="pelanggan/:id/edit" element={<AdminCustomerEditPage />} />
               </Route>
               <Route path="pelanggan" element={<AdminCustomersPage />} />
-              <Route path="saya/presensi" element={<AdminMyAttendancePage />} />
-              <Route path="saya/gaji" element={<AdminMyPayrollPage />} />
+              <Route path="saya/presensi" element={<Navigate to="/admin/profil/presensi" replace />} />
+              <Route path="saya/gaji" element={<Navigate to="/admin/profil/slip-gaji" replace />} />
+              <Route path="absensi" element={<AdminAttendanceLayout />}>
+                <Route index element={<AdminAttendanceIndexRedirect />} />
+                <Route element={<InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />}>
+                  <Route path="tablet" element={<AdminAttendanceTabletPage />} />
+                  <Route path="pengaturan" element={<AdminAttendanceSettingsPage />} />
+                </Route>
+                <Route
+                  element={
+                    <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF']} />
+                  }
+                >
+                  <Route path="laporan" element={<AdminAttendanceReportPage />} />
+                </Route>
+              </Route>
               <Route
                 element={
                   <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF']} />
                 }
               >
-                <Route path="absensi/laporan" element={<AdminAttendanceReportPage />} />
-                <Route path="gaji/kompensasi" element={<AdminPayrollCompensationPage />} />
-                <Route path="gaji/:periodId" element={<AdminPayrollPeriodDetailPage />} />
-                <Route path="gaji" element={<AdminPayrollPeriodsPage />} />
+                <Route path="gaji" element={<AdminPayrollLayout />}>
+                  <Route index element={<AdminPayrollPeriodsPage />} />
+                  <Route path="kompensasi" element={<AdminPayrollCompensationPage />} />
+                  <Route path=":periodId" element={<AdminPayrollPeriodDetailPage />} />
+                </Route>
               </Route>
               <Route
                 element={
@@ -382,8 +419,6 @@ export default function App() {
                 <Route path="analitik" element={<AdminAnalyticsPage />} />
               </Route>
               <Route element={<InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />}>
-                <Route path="absensi/tablet" element={<AdminAttendanceTabletPage />} />
-                <Route path="absensi/pengaturan" element={<AdminAttendanceSettingsPage />} />
                 <Route path="staf/baru" element={<AdminStaffNewPage />} />
                 <Route path="staf/:id/edit" element={<AdminStaffEditPage />} />
                 <Route path="staf" element={<AdminStaffPage />} />

@@ -15,6 +15,7 @@ from .models import (
     PurchaseInOrder,
     SalesOrder,
     SalesOrderLine,
+    Wilayah,
 )
 from .utils import next_order_code, recompute_order_totals
 
@@ -33,6 +34,8 @@ class CustomerSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
     updated_by = serializers.SerializerMethodField()
 
+    wilayah_name = serializers.CharField(source="wilayah.name", read_only=True)
+
     class Meta:
         model = Customer
         fields = [
@@ -41,6 +44,8 @@ class CustomerSerializer(serializers.ModelSerializer):
             "phone",
             "address",
             "notes",
+            "wilayah",
+            "wilayah_name",
             "is_active",
             "created_at",
             "updated_at",
@@ -66,6 +71,36 @@ class CustomerSerializer(serializers.ModelSerializer):
         if not cleaned:
             raise serializers.ValidationError("Alamat wajib diisi.")
         return cleaned
+
+
+class WilayahSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+    updated_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Wilayah
+        fields = [
+            "id",
+            "name",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def get_created_by(self, obj):
+        return _user_mini(obj.created_by)
+
+    def get_updated_by(self, obj):
+        return _user_mini(obj.updated_by)
+
+    def validate_name(self, value: str):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Nama wilayah wajib diisi.")
+        return cleaned.upper()
 
 
 class CustomerProductPriceSerializer(serializers.ModelSerializer):

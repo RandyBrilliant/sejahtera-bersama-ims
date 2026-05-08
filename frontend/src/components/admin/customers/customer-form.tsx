@@ -3,6 +3,7 @@ import { useState } from 'react'
 import {
   useCreateCustomerMutation,
   useUpdateCustomerMutation,
+  useWilayahQuery,
 } from '@/hooks/use-purchase-query'
 import { alert } from '@/lib/alert'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
@@ -12,6 +13,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RegionalPhoneInput } from '@/components/ui/regional-phone-input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { Customer } from '@/types/purchase'
 
 type Props = {
@@ -35,10 +43,12 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
   const [phone, setPhone] = useState(initial?.phone ?? '')
   const [address, setAddress] = useState(initial?.address ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [wilayahId, setWilayahId] = useState<string>(initial?.wilayah != null ? String(initial.wilayah) : '__none')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
   const createMutation = useCreateCustomerMutation()
   const updateMutation = useUpdateCustomerMutation(initial?.id ?? 0)
+  const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,6 +69,7 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
       phone: p || undefined,
       address: a,
       notes: notes.trim() || undefined,
+      wilayah: wilayahId === '__none' ? null : Number(wilayahId),
       is_active: isActive,
     }
 
@@ -116,6 +127,22 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
                 onChange={setPhone}
                 disabled={submitting}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label>Wilayah</Label>
+              <Select value={wilayahId} onValueChange={setWilayahId} disabled={submitting || wilayahQuery.isLoading}>
+                <SelectTrigger className="border-outline-variant">
+                  <SelectValue placeholder="Pilih wilayah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Tanpa wilayah</SelectItem>
+                  {(wilayahQuery.data?.results ?? []).map((w) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2 md:col-span-2">
               <Label htmlFor="cust-address">

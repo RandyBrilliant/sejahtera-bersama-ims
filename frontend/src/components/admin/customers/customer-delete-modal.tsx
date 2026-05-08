@@ -17,9 +17,10 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   customer: Customer | null
+  onDeleted?: () => void
 }
 
-export function CustomerDeleteModal({ open, onOpenChange, customer }: Props) {
+export function CustomerDeleteModal({ open, onOpenChange, customer, onDeleted }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const mutation = useDeleteCustomerMutation()
 
@@ -34,6 +35,7 @@ export function CustomerDeleteModal({ open, onOpenChange, customer }: Props) {
     try {
       await mutation.mutateAsync(customer.id)
       handleOpenChange(false)
+      onDeleted?.()
     } catch (err) {
       setErrorMessage(parsePurchaseMutationError(err))
     }

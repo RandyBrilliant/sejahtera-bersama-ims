@@ -7,12 +7,14 @@ from .views import (
     PurchaseInOrderViewSet,
     SalesOrderViewSet,
     SalesRevenueReportView,
+    WilayahViewSet,
 )
 
 app_name = "purchase"
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customers")
+router.register(r"wilayah", WilayahViewSet, basename="wilayah")
 router.register(r"customer-product-prices", CustomerProductPriceViewSet, basename="customer-product-prices")
 router.register(r"purchase-in-orders", PurchaseInOrderViewSet, basename="purchase-in-orders")
 router.register(r"sales-orders", SalesOrderViewSet, basename="sales-orders")

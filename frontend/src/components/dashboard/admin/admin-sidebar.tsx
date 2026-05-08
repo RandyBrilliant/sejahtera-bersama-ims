@@ -3,19 +3,14 @@ import { useState } from 'react'
 import {
   Banknote,
   BarChart3,
-  ClipboardList,
-  Clock,
-  Coins,
   Contact,
   CircleDollarSign,
   LayoutDashboard,
   LogOut,
   Package,
   QrCode,
-  ScrollText,
   Settings,
   ShoppingCart,
-  Timer,
   Truck,
   User,
   Users,
@@ -41,13 +36,8 @@ const navItems: NavItem[] = [
   { to: '/admin/pesanan', label: 'Pesanan', icon: ShoppingCart },
   { to: '/admin/gudang', label: 'Gudang', icon: Warehouse },
   { to: '/admin/analitik', label: 'Analitik', icon: BarChart3 },
-  { to: '/admin/absensi/tablet', label: 'Presensi (tablet)', icon: QrCode },
-  { to: '/admin/absensi/pengaturan', label: 'Aturan presensi', icon: Timer },
-  { to: '/admin/absensi/laporan', label: 'Laporan presensi', icon: ClipboardList },
+  { to: '/admin/absensi', label: 'Presensi', icon: QrCode },
   { to: '/admin/gaji', label: 'Payroll', icon: CircleDollarSign },
-  { to: '/admin/gaji/kompensasi', label: 'Gaji pokok pegawai', icon: Coins },
-  { to: '/admin/saya/presensi', label: 'Presensi saya', icon: Clock },
-  { to: '/admin/saya/gaji', label: 'Slip gaji saya', icon: ScrollText },
 ]
 
 const warehouseNavItems: NavItem[] = [
@@ -56,8 +46,6 @@ const warehouseNavItems: NavItem[] = [
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan', icon: Package },
   { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan', icon: ShoppingCart },
   { to: '/admin/gudang/mutasi-produk', label: 'Mutasi produk', icon: BarChart3 },
-  { to: '/admin/saya/presensi', label: 'Presensi saya', icon: Clock },
-  { to: '/admin/saya/gaji', label: 'Slip gaji saya', icon: ScrollText },
 ]
 
 const salesNavItems: NavItem[] = [
@@ -65,22 +53,17 @@ const salesNavItems: NavItem[] = [
   { to: '/admin/inventaris', label: 'Inventaris (lihat)', icon: Package },
   { to: '/admin/pelanggan', label: 'Pelanggan', icon: Contact },
   { to: '/admin/pesanan/penjualan', label: 'Pesanan penjualan', icon: ShoppingCart },
-  { to: '/admin/saya/presensi', label: 'Presensi saya', icon: Clock },
-  { to: '/admin/saya/gaji', label: 'Slip gaji saya', icon: ScrollText },
 ]
 
 const financeNavItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor keuangan', icon: LayoutDashboard, end: true },
   { to: '/admin/kas', label: 'Kas operasional', icon: Wallet },
   { to: '/admin/analitik', label: 'Analitik', icon: BarChart3 },
-  { to: '/admin/absensi/laporan', label: 'Laporan presensi', icon: ClipboardList },
+  { to: '/admin/absensi', label: 'Presensi', icon: QrCode },
   { to: '/admin/gaji', label: 'Payroll', icon: Banknote },
-  { to: '/admin/gaji/kompensasi', label: 'Gaji pokok pegawai', icon: Coins },
   { to: '/admin/pelanggan', label: 'Pelanggan', icon: Contact },
   { to: '/admin/pesanan/penjualan', label: 'Pesanan penjualan', icon: ShoppingCart },
   { to: '/admin/pesanan/pembelian', label: 'Pesanan pembelian', icon: Truck },
-  { to: '/admin/saya/presensi', label: 'Presensi saya', icon: Clock },
-  { to: '/admin/saya/gaji', label: 'Slip gaji saya', icon: ScrollText },
 ]
 
 type AdminSidebarProps = {
