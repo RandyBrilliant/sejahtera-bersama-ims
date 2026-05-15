@@ -476,22 +476,24 @@ export function AdminAttendanceTabletPage() {
             </div>
           ) : null}
           <div
-            id={regionId}
             className={cn(
-              'border-outline-variant bg-surface-container-lowest ambient-shadow relative mx-auto min-h-[280px] w-full overflow-hidden rounded-xl border',
-              !scannerReady && 'flex items-center justify-center p-8'
+              'border-outline-variant bg-surface-container-lowest ambient-shadow relative mx-auto min-h-[280px] w-full overflow-hidden rounded-xl border'
             )}
           >
+            {/* Library owns #regionId; React children there would be wiped on reconcile. */}
+            <div id={regionId} className="min-h-[280px] w-full" />
             {!scannerReady ? (
-              <p className="text-on-surface-variant pointer-events-none max-w-sm text-center text-sm leading-relaxed">
-                {cameraEnvIssue === 'insecure' || cameraEnvIssue === 'unsupported'
-                  ? 'Pratinjau kamera tidak tersedia di lingkungan ini. Gunakan HTTPS atau input manual.'
-                  : cameraEnvIssue === 'denied'
-                    ? 'Izin kamera ditolak untuk situs ini. Ubah di pengaturan browser lalu muat ulang, atau gunakan input manual.'
-                    : cameraEnvIssue === 'policy'
-                      ? 'Kamera tidak diizinkan oleh Permissions-Policy pada situs ini. Perbaiki header server lalu deploy ulang, atau gunakan input manual.'
-                      : 'Menyiapkan kamera…'}
-              </p>
+              <div className="bg-surface-container-lowest/92 pointer-events-none absolute inset-0 flex items-center justify-center p-8 backdrop-blur-[1px]">
+                <p className="text-on-surface-variant max-w-sm text-center text-sm leading-relaxed">
+                  {cameraEnvIssue === 'insecure' || cameraEnvIssue === 'unsupported'
+                    ? 'Pratinjau kamera tidak tersedia di lingkungan ini. Gunakan HTTPS atau input manual.'
+                    : cameraEnvIssue === 'denied'
+                      ? 'Izin kamera ditolak untuk situs ini. Ubah di pengaturan browser lalu muat ulang, atau gunakan input manual.'
+                      : cameraEnvIssue === 'policy'
+                        ? 'Kamera tidak diizinkan oleh Permissions-Policy pada situs ini. Perbaiki header server lalu deploy ulang, atau gunakan input manual.'
+                        : 'Menyiapkan kamera…'}
+                </p>
+              </div>
             ) : null}
           </div>
           <Button
