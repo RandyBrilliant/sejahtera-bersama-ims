@@ -35,6 +35,22 @@ function intentLabel(intent: AttendanceIntent) {
 const CAMERA_ERR_INSECURE = '__CAMERA_INSECURE_CONTEXT__'
 const CAMERA_ERR_NO_API = '__CAMERA_API_UNSUPPORTED__'
 const CAMERA_ERR_PERMISSION_DENIED = '__CAMERA_PERMISSION_DENIED__'
+const CAMERA_ERR_POLICY_BLOCKED = '__CAMERA_PERMISSIONS_POLICY_BLOCKED__'
+
+function assertCameraAllowedByDocumentPolicyOrThrow() {
+  type DocWithPermissionsPolicy = Document & {
+    permissionsPolicy?: { allowsFeature: (feature: string) => boolean }
+  }
+  const pp = (document as DocWithPermissionsPolicy).permissionsPolicy
+  if (!pp) return
+  try {
+    if (!pp.allowsFeature('camera')) {
+      throw new Error(CAMERA_ERR_POLICY_BLOCKED)
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === CAMERA_ERR_POLICY_BLOCKED) throw e
+  }
+}
 
 function assertCameraEnvironmentOrThrow() {
   if (typeof window === 'undefined') return
@@ -69,6 +85,13 @@ function formatCameraFailure(err: unknown): { title: string; detail: string } {
         title,
         detail:
           'Izin kamera untuk situs ini sudah ditolak permanen, jadi dialog izin tidak muncul. Buka pengaturan situs (ikon gembok / “i” di bilah alamat) → Izin → Kamera → Izinkan, lalu muat ulang halaman.',
+      }
+    }
+    if (err.message === CAMERA_ERR_POLICY_BLOCKED) {
+      return {
+        title,
+        detail:
+          'Kamera diblokir oleh header HTTP Permissions-Policy untuk situs ini (bukan pengaturan izin di HP). Pastikan deployment memakai `camera=(self)` atau menghapus `camera=()` dari header. Setelah diperbaiki, deploy ulang dan hard-refresh.',
       }
     }
   }
@@ -118,6 +141,17 @@ function formatCameraFailure(err: unknown): { title: string; detail: string } {
   if (lower.includes('notfound') || lower.includes('devicesnotfound')) {
     return { title, detail: 'Tidak ada kamera yang terdeteksi di perangkat ini.' }
   }
+  if (
+    lower.includes('permissions policy') ||
+    lower.includes('permissions-policy') ||
+    lower.includes('not allowed in this document')
+  ) {
+    return {
+      title,
+      detail:
+        'Kamera diblokir oleh Permissions-Policy pada respons server (sering `camera=()`). Ubah menjadi `camera=(self)` di konfigurasi hosting (misalnya Vercel headers), deploy ulang, lalu muat ulang halaman.',
+    }
+  }
   if (lower.includes('notreadable') || lower.includes('trackstarterror') || lower.includes('could not start')) {
     return {
       title,
@@ -142,6 +176,10 @@ function isNoCameraApiError(err: unknown): boolean {
 
 function isPermissionDeniedError(err: unknown): boolean {
   return err instanceof Error && err.message === CAMERA_ERR_PERMISSION_DENIED
+}
+
+function isPolicyBlockedError(err: unknown): boolean {
+  return err instanceof Error && err.message === CAMERA_ERR_POLICY_BLOCKED
 }
 
 async function assertCameraPermissionNotDeniedOrThrow() {
@@ -211,7 +249,7 @@ export function AdminAttendanceTabletPage() {
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [manual, setManual] = useState('')
-  const [cameraEnvIssue, setCameraEnvIssue] = useState<'insecure' | 'unsupported' | 'denied' | null>(null)
+  const [cameraEnvIssue, setCameraEnvIssue] = useState<'insecure' | 'unsupported' | 'denied' | 'policy' | null>(null)
 
   async function stopScanner() {
     const qr = scannerRef.current
@@ -239,6 +277,7 @@ export function AdminAttendanceTabletPage() {
 
     try {
       assertCameraEnvironmentOrThrow()
+      assertCameraAllowedByDocumentPolicyOrThrow()
       await assertCameraPermissionNotDeniedOrThrow()
 
       qr = new Html5Qrcode(regionId, {
@@ -309,6 +348,7 @@ export function AdminAttendanceTabletPage() {
       if (isInsecureCameraError(err)) setCameraEnvIssue('insecure')
       else if (isNoCameraApiError(err)) setCameraEnvIssue('unsupported')
       else if (isPermissionDeniedError(err)) setCameraEnvIssue('denied')
+      else if (isPolicyBlockedError(err)) setCameraEnvIssue('policy')
       else setCameraEnvIssue(null)
       throw err
     }
@@ -405,6 +445,16 @@ export function AdminAttendanceTabletPage() {
               </p>
             </div>
           ) : null}
+          {cameraEnvIssue === 'policy' ? (
+            <div className="border-outline-variant rounded-xl border border-violet-500/35 bg-violet-500/10 px-4 py-3 text-sm text-violet-950 dark:text-violet-50">
+              <p className="font-semibold">Kamera diblokir oleh kebijakan situs (Permissions-Policy)</p>
+              <p className="text-on-surface-variant mt-1 leading-relaxed">
+                Header respons halaman memakai pembatasan seperti <span className="font-mono">camera=()</span>.
+                Untuk presensi tablet, gunakan <span className="font-mono">camera=(self)</span> di konfigurasi
+                hosting (misalnya Vercel), deploy ulang, lalu hard-refresh.
+              </p>
+            </div>
+          ) : null}
           {cameraEnvIssue === 'insecure' ? (
             <div className="border-outline-variant rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-50">
               <p className="font-semibold">Kamera tidak bisa dipakai lewat HTTP biasa</p>
@@ -438,7 +488,9 @@ export function AdminAttendanceTabletPage() {
                   ? 'Pratinjau kamera tidak tersedia di lingkungan ini. Gunakan HTTPS atau input manual.'
                   : cameraEnvIssue === 'denied'
                     ? 'Izin kamera ditolak untuk situs ini. Ubah di pengaturan browser lalu muat ulang, atau gunakan input manual.'
-                    : 'Menyiapkan kamera…'}
+                    : cameraEnvIssue === 'policy'
+                      ? 'Kamera tidak diizinkan oleh Permissions-Policy pada situs ini. Perbaiki header server lalu deploy ulang, atau gunakan input manual.'
+                      : 'Menyiapkan kamera…'}
               </p>
             ) : null}
           </div>
