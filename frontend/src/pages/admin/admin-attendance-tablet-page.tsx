@@ -32,12 +32,54 @@ function intentLabel(intent: AttendanceIntent) {
   return 'Sudah lengkap'
 }
 
+/** Prefer rear/wide lens when labels are available; avoids facingMode hangs on some tablets. */
+async function pickCameraIdForQrScan(): Promise<string | undefined> {
+  try {
+    const devices = await Html5Qrcode.getCameras()
+    if (!devices?.length) return undefined
+    const preferBack = (label: string) =>
+      /back|rear|belakang|environment|wide|ultra|world/i.test(label)
+    const preferFront = (label: string) => /front|user|depan|selfie|facetime/i.test(label)
+    const withLabel = devices.filter((d) => d.label?.trim())
+    const back = withLabel.find((d) => preferBack(d.label))
+    if (back) return back.id
+    const nonFront = withLabel.find((d) => !preferFront(d.label))
+    if (nonFront) return nonFront.id
+    if (devices.length === 1) return devices[0].id
+    return devices[devices.length - 1]?.id
+  } catch {
+    return undefined
+  }
+}
+
+type CameraStartConfig = string | { facingMode: string }
+
+async function resolveCameraStartConfig(): Promise<CameraStartConfig> {
+  const id = await pickCameraIdForQrScan()
+  if (id) return id
+  return { facingMode: 'environment' }
+}
+
+async function safeReleaseScanner(qr: Html5Qrcode) {
+  try {
+    await qr.stop()
+  } catch {
+    /* not running yet or already stopped */
+  }
+  try {
+    await qr.clear()
+  } catch {
+    /* noop */
+  }
+}
+
 export function AdminAttendanceTabletPage() {
   const reactId = useId()
   const regionId = `attendance-scan-${reactId.replace(/:/g, '')}`
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const busyRef = useRef(false)
   const activeRef = useRef(true)
+  const sessionEpochRef = useRef(0)
 
   const [scannerReady, setScannerReady] = useState(false)
   const [scanRaw, setScanRaw] = useState<string | null>(null)
@@ -67,43 +109,73 @@ export function AdminAttendanceTabletPage() {
     await stopScanner()
     if (!activeRef.current) return
 
-    const qr = new Html5Qrcode(regionId, false)
-    scannerRef.current = qr
+    const epoch = sessionEpochRef.current
+    const qr = new Html5Qrcode(regionId, {
+      verbose: false,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: false },
+    })
     const config = { fps: 8, qrbox: { width: 280, height: 280 } as const }
 
-    await qr.start(
-      { facingMode: 'environment' },
-      config,
-      (decodedText) => {
-        void (async () => {
-          if (busyRef.current || !activeRef.current) return
-          busyRef.current = true
-          const trimmed = decodedText.trim()
-          if (!trimmed) {
-            busyRef.current = false
-            return
-          }
-          setLoadingPreview(true)
-          try {
-            const p = await previewAttendanceScan(trimmed)
-            if (!activeRef.current) return
-            setScanRaw(trimmed)
-            setPreview(p)
-            await stopScanner()
-          } catch (e) {
-            if (!activeRef.current) return
-            alert.error('Gagal membaca kartu', axiosDetail(e) ?? String((e as Error)?.message ?? e))
-          } finally {
-            setLoadingPreview(false)
-            busyRef.current = false
-          }
-        })()
-      },
-      () => {
-        /* frame errors ignored */
+    const tryStart = async (camera: CameraStartConfig) => {
+      await qr.start(
+        camera,
+        config,
+        (decodedText) => {
+          void (async () => {
+            if (busyRef.current || !activeRef.current) return
+            busyRef.current = true
+            const trimmed = decodedText.trim()
+            if (!trimmed) {
+              busyRef.current = false
+              return
+            }
+            setLoadingPreview(true)
+            try {
+              const p = await previewAttendanceScan(trimmed)
+              if (!activeRef.current) return
+              setScanRaw(trimmed)
+              setPreview(p)
+              await stopScanner()
+            } catch (e) {
+              if (!activeRef.current) return
+              alert.error('Gagal membaca kartu', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+            } finally {
+              setLoadingPreview(false)
+              busyRef.current = false
+            }
+          })()
+        },
+        () => {
+          /* frame errors ignored */
+        }
+      )
+    }
+
+    try {
+      let camera = await resolveCameraStartConfig()
+      if (!activeRef.current || sessionEpochRef.current !== epoch) {
+        await safeReleaseScanner(qr)
+        return
       }
-    )
-    if (activeRef.current) setScannerReady(true)
+      try {
+        await tryStart(camera)
+      } catch {
+        if (typeof camera === 'string') throw new Error('camera_start_failed')
+        await safeReleaseScanner(qr)
+        camera = { facingMode: 'user' }
+        await tryStart(camera)
+      }
+      if (!activeRef.current || sessionEpochRef.current !== epoch) {
+        await safeReleaseScanner(qr)
+        return
+      }
+      scannerRef.current = qr
+      setScannerReady(true)
+    } catch {
+      await safeReleaseScanner(qr)
+      if (!activeRef.current || sessionEpochRef.current !== epoch) return
+      throw new Error('camera_start_failed')
+    }
   }
 
   useEffect(() => {
@@ -118,6 +190,7 @@ export function AdminAttendanceTabletPage() {
     })
 
     return () => {
+      sessionEpochRef.current += 1
       activeRef.current = false
       void stopScanner()
     }
@@ -192,12 +265,14 @@ export function AdminAttendanceTabletPage() {
           <div
             id={regionId}
             className={cn(
-              'border-outline-variant bg-surface-container-lowest ambient-shadow mx-auto w-full overflow-hidden rounded-xl border',
-              !scannerReady && 'flex min-h-[280px] items-center justify-center p-8'
+              'border-outline-variant bg-surface-container-lowest ambient-shadow relative mx-auto min-h-[280px] w-full overflow-hidden rounded-xl border',
+              !scannerReady && 'flex items-center justify-center p-8'
             )}
           >
             {!scannerReady ? (
-              <p className="text-on-surface-variant text-center text-sm">Menyiapkan kamera…</p>
+              <p className="text-on-surface-variant pointer-events-none text-center text-sm">
+                Menyiapkan kamera…
+              </p>
             ) : null}
           </div>
           <Button
