@@ -163,13 +163,7 @@ if [ -d "$APP_DIR/nginx/ssl" ]; then
     echo "  ✓ SSL certificates removed (can be regenerated)"
 fi
 
-    # Reset docker-compose.prod.yml to HTTP-only config
-if [ -f "$APP_DIR/docker-compose.prod.yml" ]; then
-    echo "  → Resetting nginx config to HTTP-only..."
-    sed -i "s|$SSL_CONF:/etc/nginx/conf.d/default.conf:ro|$HTTP_CONF:/etc/nginx/conf.d/default.conf:ro|g" "$APP_DIR/docker-compose.prod.yml"
-    sed -i 's|      - ./nginx/ssl:/etc/nginx/ssl:ro||g' "$APP_DIR/docker-compose.prod.yml"
-    echo "  ✓ Docker Compose reset to HTTP-only configuration"
-fi
+echo "  → SSL disabled (docker-compose.prod.ssl.yml is skipped when certs are absent)"
 
 # Remove db.sqlite3 if exists
 if [ -f "$APP_DIR/db.sqlite3" ]; then

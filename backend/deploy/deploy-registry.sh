@@ -50,13 +50,11 @@ fi
 
 if [ "${SKIP_PULL_CODE:-false}" != "true" ]; then
     REPO_ROOT="$(resolve_repo_root)"
-    if [ -d "$REPO_ROOT/.git" ]; then
-        BEFORE_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
-        git -C "$REPO_ROOT" pull origin "${DEPLOY_BRANCH}" || true
-        AFTER_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
-        if [ -z "${CHANGED_FILES:-}" ]; then
-            CHANGED_FILES="$(git -C "$REPO_ROOT" diff --name-only "$BEFORE_HEAD" "$AFTER_HEAD" 2>/dev/null || true)"
-        fi
+    BEFORE_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+    sync_repo_for_deploy "$REPO_ROOT" "${DEPLOY_BRANCH}"
+    AFTER_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+    if [ -z "${CHANGED_FILES:-}" ]; then
+        CHANGED_FILES="$(git -C "$REPO_ROOT" diff --name-only "$BEFORE_HEAD" "$AFTER_HEAD" 2>/dev/null || true)"
     fi
 fi
 

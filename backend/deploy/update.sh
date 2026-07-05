@@ -19,9 +19,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${APP_DIR:-$PROJECT_DIR}"
 
-# Compose: use block storage override when present (so one script works for both setups)
-COMPOSE_OPTS="-f docker-compose.prod.yml"
-[ -f "$APP_DIR/docker-compose.prod.block.yml" ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.prod.block.yml"
+# Compose: block storage + SSL overrides are added automatically when present.
+source "$SCRIPT_DIR/lib/common.sh"
+PROJECT_ROOT="$APP_DIR"
+export PROJECT_ROOT
+COMPOSE_OPTS="$(compose_opts_string)"
 
 echo -e "${BLUE}=========================================="
 echo "Sejahtera Bersama IMS - Update"

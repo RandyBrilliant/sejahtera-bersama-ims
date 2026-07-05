@@ -158,6 +158,15 @@ jobs:
           fi
           echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
           BEFORE_HEAD="\$(git -C "\$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+          git -C "\$REPO_ROOT" config core.fileMode false
+          COMPOSE_PATH="docker-compose.prod.yml"
+          if [ -f "\$REPO_ROOT/backend/docker-compose.prod.yml" ]; then
+            COMPOSE_PATH="backend/docker-compose.prod.yml"
+          fi
+          if ! git -C "\$REPO_ROOT" diff --quiet -- "\$COMPOSE_PATH" 2>/dev/null; then
+            echo "Discarding local edits to \$COMPOSE_PATH (SSL uses docker-compose.prod.ssl.yml)"
+            git -C "\$REPO_ROOT" checkout -- "\$COMPOSE_PATH"
+          fi
           git -C "\$REPO_ROOT" pull origin main
           AFTER_HEAD="\$(git -C "\$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
           CHANGED_FILES="\$(git -C "\$REPO_ROOT" diff --name-only "\$BEFORE_HEAD" "\$AFTER_HEAD" 2>/dev/null || true)"

@@ -16,6 +16,7 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-ims-api}"
 APP_PORT_DEFAULT="${APP_PORT_DEFAULT:-8000}"
 WORKER_SERVICES="${WORKER_SERVICES:-celery celery-beat}"
+DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
 
 # Set by require_project_root
 PROJECT_ROOT=""
@@ -71,7 +72,52 @@ compose_args() {
     if [ -f "$PROJECT_ROOT/docker-compose.prod.block.yml" ]; then
         args+=(-f "$PROJECT_ROOT/docker-compose.prod.block.yml")
     fi
+    if ssl_certs_present; then
+        args+=(-f "$PROJECT_ROOT/docker-compose.prod.ssl.yml")
+    fi
     printf '%s\n' "${args[@]}"
+}
+
+ssl_certs_present() {
+    local ssl_dir="$PROJECT_ROOT/nginx/ssl/${DOMAIN}"
+    [ -f "$ssl_dir/fullchain.pem" ] && [ -f "$ssl_dir/privkey.pem" ]
+}
+
+compose_opts_string() {
+    compose_args | tr '\n' ' '
+}
+
+restore_tracked_compose_files() {
+    local repo_root="$1"
+    local compose_path="docker-compose.prod.yml"
+
+    if [ ! -d "$repo_root/.git" ]; then
+        return 0
+    fi
+
+    git -C "$repo_root" config core.fileMode false
+
+    if [ -f "$repo_root/backend/docker-compose.prod.yml" ]; then
+        compose_path="backend/docker-compose.prod.yml"
+    fi
+
+    if ! git -C "$repo_root" diff --quiet -- "$compose_path" 2>/dev/null; then
+        print_warning "Discarding local edits to $compose_path (SSL uses docker-compose.prod.ssl.yml)"
+        git -C "$repo_root" checkout -- "$compose_path"
+    fi
+}
+
+sync_repo_for_deploy() {
+    local repo_root="$1"
+    local branch="${2:-$DEPLOY_BRANCH}"
+
+    if [ ! -d "$repo_root/.git" ]; then
+        print_warning "Not a git repository — skipping git pull"
+        return 0
+    fi
+
+    restore_tracked_compose_files "$repo_root"
+    git -C "$repo_root" pull origin "$branch"
 }
 
 compose() {

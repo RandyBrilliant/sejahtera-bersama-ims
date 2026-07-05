@@ -19,6 +19,9 @@ APP_DIR="${APP_DIR:-$PROJECT_DIR}"
 
 COMPOSE_OPTS="-f docker-compose.prod.yml"
 [ -f "$APP_DIR/docker-compose.prod.block.yml" ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.prod.block.yml"
+source "$SCRIPT_DIR/lib/common.sh"
+PROJECT_ROOT="$APP_DIR"
+export PROJECT_ROOT
 
 echo -e "${BLUE}=========================================="
 echo "SSL Certificate Setup"
@@ -118,18 +121,11 @@ chmod 644 "$APP_DIR/nginx/ssl/$DOMAIN/chain.pem"
 chmod 600 "$APP_DIR/nginx/ssl/$DOMAIN/privkey.pem"
 echo -e "${GREEN}✓ Certificates copied${NC}"
 
-# Update docker-compose.prod.yml to use SSL config
+# Enable SSL via compose override (do not edit docker-compose.prod.yml)
 echo ""
-echo -e "${BLUE}Updating Docker Compose configuration for SSL...${NC}"
-cd "$APP_DIR"
-
-# Replace active nginx config mount and ensure ssl volume is mounted
-sed -i "s|$HTTP_CONF:/etc/nginx/conf.d/default.conf:ro|$SSL_CONF:/etc/nginx/conf.d/default.conf:ro|g" docker-compose.prod.yml
-if ! grep -q "./nginx/ssl:/etc/nginx/ssl:ro" docker-compose.prod.yml; then
-    sed -i '/conf.d\/default.conf:ro/a\      - ./nginx/ssl:/etc/nginx/ssl:ro' docker-compose.prod.yml
-fi
-
-echo -e "${GREEN}✓ Configuration updated${NC}"
+echo -e "${BLUE}Enabling SSL via docker-compose.prod.ssl.yml...${NC}"
+COMPOSE_OPTS="$(compose_opts_string)"
+echo -e "${GREEN}✓ SSL compose override active${NC}"
 
 # Restart nginx with SSL
 echo ""

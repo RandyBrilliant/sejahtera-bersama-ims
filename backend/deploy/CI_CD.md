@@ -123,6 +123,18 @@ Image rollback does **not** undo database migrations. Always commit Django migra
 
 ## Troubleshooting
 
+**`git pull` fails: local changes to `docker-compose.prod.yml`**
+
+Older bootstrap scripts edited that file for SSL. Reset it and use the SSL override instead:
+
+```bash
+cd /path/to/sejahtera-bersama-ims
+git checkout -- backend/docker-compose.prod.yml
+git pull origin main
+```
+
+SSL is enabled via `docker-compose.prod.ssl.yml` when certs exist under `nginx/ssl/` — never edit the base compose file on the VPS.
+
 **`git pull` fails on VPS during deploy**
 
 ```bash

@@ -1,0 +1,9 @@
+# SSL override — included automatically when Let's Encrypt certs exist under nginx/ssl/<domain>/.
+# Do NOT edit docker-compose.prod.yml for SSL on the VPS; that file must stay identical to git.
+# Used by deploy scripts when nginx/ssl/api.sejahterabersama.my.id/fullchain.pem is present.
+
+services:
+  nginx:
+    volumes:
+      - ./nginx/api.sejahterabersama.my.id.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro

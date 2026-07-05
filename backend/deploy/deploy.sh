@@ -42,9 +42,11 @@ cd "$APP_DIR" || {
     exit 1
 }
 
-# Compose: use block storage override when present (one script for both setups)
-COMPOSE_OPTS="-f docker-compose.prod.yml"
-[ -f "$APP_DIR/docker-compose.prod.block.yml" ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.prod.block.yml"
+# Compose: block storage + SSL overrides are added automatically when present.
+source "$SCRIPT_DIR/lib/common.sh"
+PROJECT_ROOT="$APP_DIR"
+export PROJECT_ROOT
+COMPOSE_OPTS="$(compose_opts_string)"
 
 echo -e "${BLUE}[1/7] Creating necessary directories...${NC}"
 mkdir -p logs
@@ -79,29 +81,20 @@ echo -e "${GREEN}✓ Application built${NC}"
 
 echo ""
 echo -e "${BLUE}[4/7] Checking SSL certificates and configuring Nginx...${NC}"
-# Verify nginx config files exist
 if [ ! -f "$APP_DIR/$HTTP_CONF" ]; then
     echo -e "${RED}Error: HTTP-only nginx config not found!${NC}"
     exit 1
 fi
 
-# Check if SSL certificates exist
-if [ -f "$APP_DIR/$SSL_DIR/fullchain.pem" ] && \
-   [ -f "$APP_DIR/$SSL_DIR/privkey.pem" ] && \
-   [ -f "$APP_DIR/$SSL_DIR/chain.pem" ]; then
-    echo "  ✓ SSL certificates found, using SSL configuration"
-    # Verify SSL config file exists
+if ssl_certs_present; then
     if [ ! -f "$APP_DIR/$SSL_CONF" ]; then
         echo -e "${RED}Error: SSL nginx config not found!${NC}"
         exit 1
     fi
-    sed -i "s|$HTTP_CONF:/etc/nginx/conf.d/default.conf:ro|$SSL_CONF:/etc/nginx/conf.d/default.conf:ro|g" docker-compose.prod.yml
-    if ! grep -q "./nginx/ssl:/etc/nginx/ssl:ro" docker-compose.prod.yml; then
-        sed -i '/conf.d\/default.conf:ro/a\      - ./nginx/ssl:/etc/nginx/ssl:ro' docker-compose.prod.yml
-    fi
+    echo "  ✓ SSL certificates found — using docker-compose.prod.ssl.yml override"
+    COMPOSE_OPTS="$(compose_opts_string)"
 else
     echo "  ⚠ SSL certificates not found, using HTTP-only configuration"
-    sed -i "s|$SSL_CONF:/etc/nginx/conf.d/default.conf:ro|$HTTP_CONF:/etc/nginx/conf.d/default.conf:ro|g" docker-compose.prod.yml
 fi
 echo -e "${GREEN}✓ Nginx configuration ready${NC}"
 
