@@ -39,7 +39,9 @@ SECRET_KEY = _env(
     "django-insecure-rq39(xe))ga3c!s3vk5z_+!n+e5@4f!zbogaa-yj)3s++m=_(l",
 )
 DEBUG = _env_bool("DEBUG", True)
-ALLOWED_HOSTS = _env_csv("ALLOWED_HOSTS")
+# Loopback hosts are always allowed for Docker healthchecks and deploy probes (not publicly routed).
+_LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "[::1]")
+ALLOWED_HOSTS = list(dict.fromkeys((*_env_csv("ALLOWED_HOSTS"), *_LOOPBACK_HOSTS)))
 
 # Reverse-proxy / HTTPS settings
 SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", False)

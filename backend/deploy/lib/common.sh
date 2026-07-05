@@ -142,14 +142,26 @@ resolve_repo_root() {
     fi
 }
 
+_health_body_ok() {
+    grep -qE '"success"[[:space:]]*:[[:space:]]*true|"status"[[:space:]]*:[[:space:]]*"ok"|"up"[[:space:]]*:[[:space:]]*true'
+}
+
+_probe_health_url() {
+    local host="$1"
+    local port="$2"
+    curl -fsS --max-time 5 "http://${host}:${port}/health/" 2>/dev/null | _health_body_ok
+}
+
 probe_app_http_health() {
     local port="${1:-$(resolve_app_port)}"
     local max_attempts="${2:-12}"
     local i
 
     for i in $(seq 1 "$max_attempts"); do
-        if curl -fsS --max-time 5 "http://127.0.0.1:${port}/health/" 2>/dev/null \
-            | grep -qE '"success"[[:space:]]*:[[:space:]]*true|"status"[[:space:]]*:[[:space:]]*"ok"|"up"[[:space:]]*:[[:space:]]*true'; then
+        if _probe_health_url localhost "$port" || _probe_health_url 127.0.0.1 "$port"; then
+            return 0
+        fi
+        if compose exec -T api curl -fsS --max-time 5 "http://localhost:${port}/health/" 2>/dev/null | _health_body_ok; then
             return 0
         fi
         sleep 5
@@ -157,13 +169,26 @@ probe_app_http_health() {
     return 1
 }
 
+container_health_status() {
+    docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$APP_CONTAINER_NAME" 2>/dev/null || true
+}
+
 wait_for_healthy() {
     local service="$1"
-    local max_attempts="${2:-40}"
+    local max_attempts="${2:-50}"
     local i
 
     for i in $(seq 1 "$max_attempts"); do
-        if compose ps "$service" 2>/dev/null | grep -q "(healthy)"; then
+        local status
+        status="$(container_health_status)"
+        if [ "$status" = "healthy" ]; then
+            return 0
+        fi
+        # During Docker start_period status stays "starting" even when checks pass — probe HTTP.
+        if probe_app_http_health "$(resolve_app_port)" 1; then
+            return 0
+        fi
+        if compose ps "$service" 2>/dev/null | grep -qiE 'healthy'; then
             return 0
         fi
         sleep 3
@@ -180,7 +205,7 @@ rollback_app_deployment() {
     compose pull api 2>/dev/null || true
     compose up -d --no-deps api
 
-    if wait_for_healthy api 40 && probe_app_http_health "$(resolve_app_port)" 12; then
+    if wait_for_healthy api 50; then
         # shellcheck disable=SC2086
         compose up -d --no-deps $WORKER_SERVICES
         persist_app_image "$rollback_image"

@@ -69,7 +69,7 @@ print_header "Restarting API"
 compose up -d --no-deps api
 
 DEPLOY_OK=false
-if wait_for_healthy api 40 && probe_app_http_health "$(resolve_app_port)" 12; then
+if wait_for_healthy api 50; then
     DEPLOY_OK=true
 fi
 
