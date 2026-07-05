@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Update script: pull code, rebuild, restart, collectstatic.
+# Update script (emergency fallback — rebuilds images on the VPS).
+# Prefer CI/CD: push to main and let GitHub Actions deploy via GHCR.
 # Migrations run in the API entrypoint (do not run migrate here — avoids racing a second migrator).
 # Uses block storage override automatically if docker-compose.prod.block.yml exists.
 

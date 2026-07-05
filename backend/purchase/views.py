@@ -1,7 +1,7 @@
+from collections import defaultdict
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from collections import defaultdict
 from django.db import transaction
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Cast, Coalesce
@@ -29,7 +29,6 @@ from inventory.models import (
     IngredientInventory,
     IngredientStockMovement,
     Product,
-    ProductPackaging,
     ProductStockMovement,
     StockMovementType,
 )

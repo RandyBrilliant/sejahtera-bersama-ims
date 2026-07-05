@@ -6,9 +6,9 @@ from .models import (
     IngredientInventory,
     IngredientStockMovement,
     Product,
+    ProductionBatch,
     ProductPackaging,
     ProductStockMovement,
-    ProductionBatch,
 )
 
 

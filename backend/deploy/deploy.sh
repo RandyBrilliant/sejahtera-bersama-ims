@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Main Deployment Script
-# Deploys the Sejahtera Bersama IMS backend to production
+# Main Deployment Script (bootstrap only — first-time production setup)
+# Routine deploys: push to main → GitHub Actions → GHCR → deploy/deploy-registry.sh
+# Emergency rebuild on VPS: ./deploy/update.sh
 # Server: Ubuntu 22.04 LTS or 24.04 LTS recommended. Optimized for 1 vCPU, 2GB RAM.
 
 set -e

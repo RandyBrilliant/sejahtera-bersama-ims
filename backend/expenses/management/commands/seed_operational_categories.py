@@ -3,7 +3,6 @@ from django.utils.text import slugify
 
 from expenses.models import EntryKind, OperationalCategory
 
-
 DEFAULT_INCOME = [
     ("Penjualan produk", "Pemasukan dari penjualan barang jadi."),
     ("Penjualan lain-lain", "Pemasukan operasional lain."),

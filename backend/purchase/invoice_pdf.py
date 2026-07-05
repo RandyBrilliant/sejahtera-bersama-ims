@@ -40,7 +40,6 @@ def build_sales_order_invoice_pdf(order) -> BytesIO:
         fontSize=16,
         spaceAfter=6,
     )
-    normal = styles["Normal"]
     small = ParagraphStyle("Small", parent=styles["Normal"], fontSize=9, textColor=colors.grey)
 
     story = []

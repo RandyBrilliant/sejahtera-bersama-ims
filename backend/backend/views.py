@@ -2,9 +2,9 @@
 Minimal views for backend (e.g. health check for Docker/load balancer).
 """
 from django.conf import settings
-from django.http import JsonResponse
-from django.db import connection
 from django.core.cache import cache
+from django.db import connection
+from django.http import JsonResponse
 
 
 def health(request):
@@ -13,7 +13,7 @@ def health(request):
     Checks: app, DB (read), optional Redis cache.
     Returns 200 with status and optional details; 503 if DB or required cache fails.
     """
-    result = {"status": "ok"}
+    result = {"status": "ok", "success": True}
     checks = {}
     failed = False
 

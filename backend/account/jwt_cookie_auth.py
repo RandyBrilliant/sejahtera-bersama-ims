@@ -5,7 +5,6 @@ Cookie names and options come from settings.SIMPLE_JWT (AUTH_COOKIE_*).
 """
 from django.conf import settings as django_settings
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.settings import api_settings as jwt_api_settings
 
 
 def _cookie_settings():

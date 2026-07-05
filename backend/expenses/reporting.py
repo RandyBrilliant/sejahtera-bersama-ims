@@ -2,7 +2,7 @@
 
 from django.db import models
 from django.db.models import Count, Sum, Value
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models.functions import Coalesce
 
 from .models import EntryKind, OperationalCashEntry
 

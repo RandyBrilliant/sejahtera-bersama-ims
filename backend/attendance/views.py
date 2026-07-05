@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import ApiCode, error_response, success_response
-
 from attendance.models import AttendanceDailyCheckIn, StaffAttendanceBadge
 from attendance.permissions import (
     AttendanceReportAccess,

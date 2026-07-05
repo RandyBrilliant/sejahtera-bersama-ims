@@ -201,6 +201,18 @@
   box-shadow: 0 4px 12px rgb(31 16 142 / 0.08);
 }
 
+/* html5-qrcode attendance tablet: single preview, no stacked duplicates on init */
+[id^='attendance-scan-'] video {
+  display: block;
+  width: 100%;
+  max-height: min(70vh, 520px);
+  object-fit: cover;
+}
+
+[id^='attendance-scan-'] video:not(:first-of-type) {
+  display: none !important;
+}
+
 [data-rich-colors='true'][data-sonner-toast][data-type='success'] {
   background: hsl(150, 40%, 98%) !important;
   border-color: hsl(150, 30%, 92%) !important;

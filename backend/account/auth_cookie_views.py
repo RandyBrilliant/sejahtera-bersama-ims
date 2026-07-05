@@ -19,9 +19,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
 from .models import UserRole
-from .user_payload import build_user_payload
 from .permissions import has_role
 from .throttles import AuthRateThrottle
+from .user_payload import build_user_payload
 
 User = get_user_model()
 

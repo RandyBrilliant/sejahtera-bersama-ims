@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 
 from account.api_responses import ApiCode, error_response, success_response
 from account.models import UserRole
-
 from payroll.models import EmployeeCompensation, PayrollEntry, PayrollPeriod
 from payroll.permissions import PayrollFinalizeAccess, PayrollManageAccess
 from payroll.serializers import (

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from django.utils import timezone
-from zoneinfo import ZoneInfo
 
 from attendance.models import AttendanceSettings
 

@@ -7,10 +7,10 @@ from .views import (
     IngredientStockMovementViewSet,
     IngredientViewSet,
     InventorySummaryView,
+    ProductionBatchViewSet,
     ProductPackagingViewSet,
     ProductStockMovementViewSet,
     ProductViewSet,
-    ProductionBatchViewSet,
     RangeInventoryRecapView,
 )
 

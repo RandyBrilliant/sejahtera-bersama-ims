@@ -235,6 +235,11 @@ async function safeReleaseScanner(qr: Html5Qrcode) {
   }
 }
 
+function clearScannerRegion(regionId: string) {
+  const el = document.getElementById(regionId)
+  if (el) el.innerHTML = ''
+}
+
 export function AdminAttendanceTabletPage() {
   const reactId = useId()
   const regionId = `attendance-scan-${reactId.replace(/:/g, '')}`
@@ -242,6 +247,7 @@ export function AdminAttendanceTabletPage() {
   const busyRef = useRef(false)
   const activeRef = useRef(true)
   const sessionEpochRef = useRef(0)
+  const startLockRef = useRef<Promise<void> | null>(null)
 
   const [scannerReady, setScannerReady] = useState(false)
   const [scanRaw, setScanRaw] = useState<string | null>(null)
@@ -254,7 +260,10 @@ export function AdminAttendanceTabletPage() {
   async function stopScanner() {
     const qr = scannerRef.current
     scannerRef.current = null
-    if (!qr) return
+    if (!qr) {
+      clearScannerRegion(regionId)
+      return
+    }
     try {
       await qr.stop()
     } catch {
@@ -265,92 +274,121 @@ export function AdminAttendanceTabletPage() {
     } catch {
       /* noop */
     }
+    clearScannerRegion(regionId)
     setScannerReady(false)
   }
 
   async function startScanner() {
-    await stopScanner()
-    if (!activeRef.current) return
+    if (startLockRef.current) {
+      await startLockRef.current.catch(() => undefined)
+    }
 
-    const epoch = sessionEpochRef.current
-    let qr: Html5Qrcode | null = null
+    const run = (async () => {
+      await stopScanner()
+      if (!activeRef.current) return
 
-    try {
-      assertCameraEnvironmentOrThrow()
-      assertCameraAllowedByDocumentPolicyOrThrow()
-      await assertCameraPermissionNotDeniedOrThrow()
+      const epoch = sessionEpochRef.current
+      let qr: Html5Qrcode | null = null
 
-      qr = new Html5Qrcode(regionId, {
-        verbose: false,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: false },
-      })
-      const config = { fps: 8, qrbox: { width: 280, height: 280 } as const }
-
-      const tryStart = async (camera: CameraStartConfig) => {
-        await qr!.start(
-          camera,
-          config,
-          (decodedText) => {
-            void (async () => {
-              if (busyRef.current || !activeRef.current) return
-              busyRef.current = true
-              const trimmed = decodedText.trim()
-              if (!trimmed) {
-                busyRef.current = false
-                return
-              }
-              setLoadingPreview(true)
-              try {
-                const p = await previewAttendanceScan(trimmed)
-                if (!activeRef.current) return
-                setScanRaw(trimmed)
-                setPreview(p)
-                await stopScanner()
-              } catch (e) {
-                if (!activeRef.current) return
-                alert.error('Gagal membaca kartu', axiosDetail(e) ?? String((e as Error)?.message ?? e))
-              } finally {
-                setLoadingPreview(false)
-                busyRef.current = false
-              }
-            })()
-          },
-          () => {
-            /* frame errors ignored */
-          }
-        )
-      }
-
-      let camera = await resolveCameraStartConfig()
-      if (!activeRef.current || sessionEpochRef.current !== epoch) {
-        await safeReleaseScanner(qr)
-        return
-      }
       try {
-        await tryStart(camera)
-      } catch (firstErr) {
-        if (typeof camera === 'string') throw firstErr
-        await safeReleaseScanner(qr)
-        camera = { facingMode: 'user' }
-        await tryStart(camera)
+        assertCameraEnvironmentOrThrow()
+        assertCameraAllowedByDocumentPolicyOrThrow()
+        await assertCameraPermissionNotDeniedOrThrow()
+
+        clearScannerRegion(regionId)
+        qr = new Html5Qrcode(regionId, {
+          verbose: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: false },
+        })
+        // Assign before start() so StrictMode unmount can stop in-flight init.
+        scannerRef.current = qr
+        const config = { fps: 8, qrbox: { width: 280, height: 280 } as const }
+
+        const tryStart = async (camera: CameraStartConfig) => {
+          await qr!.start(
+            camera,
+            config,
+            (decodedText) => {
+              void (async () => {
+                if (busyRef.current || !activeRef.current) return
+                busyRef.current = true
+                const trimmed = decodedText.trim()
+                if (!trimmed) {
+                  busyRef.current = false
+                  return
+                }
+                setLoadingPreview(true)
+                try {
+                  const p = await previewAttendanceScan(trimmed)
+                  if (!activeRef.current) return
+                  setScanRaw(trimmed)
+                  setPreview(p)
+                  await stopScanner()
+                } catch (e) {
+                  if (!activeRef.current) return
+                  alert.error('Gagal membaca kartu', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+                } finally {
+                  setLoadingPreview(false)
+                  busyRef.current = false
+                }
+              })()
+            },
+            () => {
+              /* frame errors ignored */
+            }
+          )
+        }
+
+        let camera = await resolveCameraStartConfig()
+        if (!activeRef.current || sessionEpochRef.current !== epoch) {
+          await safeReleaseScanner(qr)
+          scannerRef.current = null
+          clearScannerRegion(regionId)
+          return
+        }
+        try {
+          await tryStart(camera)
+        } catch (firstErr) {
+          if (typeof camera === 'string') throw firstErr
+          await safeReleaseScanner(qr)
+          clearScannerRegion(regionId)
+          qr = new Html5Qrcode(regionId, {
+            verbose: false,
+            experimentalFeatures: { useBarCodeDetectorIfSupported: false },
+          })
+          scannerRef.current = qr
+          camera = { facingMode: 'user' }
+          await tryStart(camera)
+        }
+        if (!activeRef.current || sessionEpochRef.current !== epoch) {
+          await safeReleaseScanner(qr)
+          scannerRef.current = null
+          clearScannerRegion(regionId)
+          return
+        }
+        setCameraEnvIssue(null)
+        setScannerReady(true)
+      } catch (err) {
+        if (qr) {
+          await safeReleaseScanner(qr)
+          scannerRef.current = null
+          clearScannerRegion(regionId)
+        }
+        if (!activeRef.current || sessionEpochRef.current !== epoch) return
+        if (isInsecureCameraError(err)) setCameraEnvIssue('insecure')
+        else if (isNoCameraApiError(err)) setCameraEnvIssue('unsupported')
+        else if (isPermissionDeniedError(err)) setCameraEnvIssue('denied')
+        else if (isPolicyBlockedError(err)) setCameraEnvIssue('policy')
+        else setCameraEnvIssue(null)
+        throw err
       }
-      if (!activeRef.current || sessionEpochRef.current !== epoch) {
-        await safeReleaseScanner(qr)
-        return
-      }
-      scannerRef.current = qr
-      qr = null
-      setCameraEnvIssue(null)
-      setScannerReady(true)
-    } catch (err) {
-      if (qr) await safeReleaseScanner(qr)
-      if (!activeRef.current || sessionEpochRef.current !== epoch) return
-      if (isInsecureCameraError(err)) setCameraEnvIssue('insecure')
-      else if (isNoCameraApiError(err)) setCameraEnvIssue('unsupported')
-      else if (isPermissionDeniedError(err)) setCameraEnvIssue('denied')
-      else if (isPolicyBlockedError(err)) setCameraEnvIssue('policy')
-      else setCameraEnvIssue(null)
-      throw err
+    })()
+
+    startLockRef.current = run
+    try {
+      await run
+    } finally {
+      if (startLockRef.current === run) startLockRef.current = null
     }
   }
 

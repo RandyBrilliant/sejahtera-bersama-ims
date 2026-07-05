@@ -10,9 +10,9 @@ from rest_framework.views import APIView
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
 from .filters import UserListFilterSet
-from .serializers import EmployeeProfileSerializer, UserSerializer
 from .models import EmployeeProfile, UserRole
 from .permissions import IsAdminOrOwner, user_is_owner
+from .serializers import EmployeeProfileSerializer, UserSerializer
 from .user_payload import build_user_payload
 
 User = get_user_model()

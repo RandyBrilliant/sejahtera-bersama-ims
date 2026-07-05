@@ -2,7 +2,7 @@
 Pagination classes for account API.
 Page size cap to avoid heavy list responses at scale.
 """
-from rest_framework.pagination import PageNumberPagination, CursorPagination
+from rest_framework.pagination import CursorPagination, PageNumberPagination
 
 
 class StandardResultsSetPagination(PageNumberPagination):
