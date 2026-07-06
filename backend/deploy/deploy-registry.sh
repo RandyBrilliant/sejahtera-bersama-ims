@@ -19,6 +19,9 @@ if [ -z "${APP_IMAGE:-}" ]; then
     exit 1
 fi
 
+# Capture before load_env — .env may contain a stale APP_IMAGE from the last deploy.
+TARGET_APP_IMAGE="$APP_IMAGE"
+
 if [ ! -f "$PROJECT_ROOT/$ENV_FILE" ]; then
     print_error "$ENV_FILE missing — run ./deploy/deploy.sh for first-time bootstrap"
     exit 1
@@ -26,8 +29,6 @@ fi
 
 validate_env
 load_env
-
-TARGET_APP_IMAGE="$APP_IMAGE"
 
 PREVIOUS_APP_IMAGE="$(read_running_app_image)"
 if [ -z "$PREVIOUS_APP_IMAGE" ]; then
