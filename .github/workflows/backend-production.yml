@@ -176,12 +176,21 @@ jobs:
           EOF
 
       - name: Verify deployment health
+        env:
+          EXPECTED_IMAGE: ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ github.sha }}
         run: |
           SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes"
           ssh $SSH_OPTS -p "${{ secrets.DO_SSH_PORT }}" "${{ secrets.DO_USERNAME }}@${{ secrets.DO_HOST }}" \
-            "PROJECT_PATH='${{ secrets.DO_PROJECT_PATH }}' bash -s" << 'EOF'
+            "PROJECT_PATH='${{ secrets.DO_PROJECT_PATH }}' EXPECTED_IMAGE='$EXPECTED_IMAGE' bash -s" << 'EOF'
           set -euo pipefail
           cd "$PROJECT_PATH"
+          RUNNING_IMAGE="$(docker inspect ims-api --format '{{.Config.Image}}' 2>/dev/null || true)"
+          echo "Running image: ${RUNNING_IMAGE:-unknown}"
+          echo "Expected image:  $EXPECTED_IMAGE"
+          if [ -z "$RUNNING_IMAGE" ] || [ "$RUNNING_IMAGE" != "$EXPECTED_IMAGE" ]; then
+            echo "Deployed image does not match the commit image — deploy did not apply."
+            exit 1
+          fi
           PORT="$(grep -E '^PORT=' .env 2>/dev/null | head -n1 | cut -d= -f2 | tr -d '\r' || true)"
           PORT="${PORT:-8000}"
           for i in $(seq 1 6); do

@@ -64,7 +64,14 @@ compose pull api
 
 echo ""
 print_header "Restarting API"
-compose up -d --no-deps api
+compose up -d --no-deps --no-build --force-recreate api
+
+RUNNING_IMAGE="$(read_running_app_image)"
+echo "Running API image: ${RUNNING_IMAGE:-unknown}"
+if [ -n "$RUNNING_IMAGE" ] && [ "$RUNNING_IMAGE" != "$TARGET_APP_IMAGE" ]; then
+    print_error "Container image mismatch — expected $TARGET_APP_IMAGE"
+    exit 1
+fi
 
 DEPLOY_OK=false
 if wait_for_healthy api 50; then
