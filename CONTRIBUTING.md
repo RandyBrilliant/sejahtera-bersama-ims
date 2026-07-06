@@ -31,7 +31,7 @@ pre-commit run --all-files
 | **ruff** / **ruff-format** | Python in `backend/` |
 | **frontend-eslint** | `npm run lint` in `frontend/` when `frontend/src/` changes |
 
-CI also runs `pip-audit` (backend) and `npm audit` (frontend) — fix high-severity issues when practical.
+CI runs `pip-audit` on the backend. Fix high-severity issues when practical.
 
 ## Backend
 

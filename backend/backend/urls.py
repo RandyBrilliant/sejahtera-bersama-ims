@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from account.media_access import ProtectedMediaServeView
+
 from .views import health
 
 urlpatterns = [

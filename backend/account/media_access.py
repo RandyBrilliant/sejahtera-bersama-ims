@@ -11,11 +11,11 @@ from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseForbidden
 from django.utils.encoding import force_bytes
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from account.jwt_cookie_auth import JWTCookieAuthentication
-from account.permissions import has_role, is_authenticated, user_is_owner
 from account.models import UserRole
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from account.permissions import has_role, is_authenticated, user_is_owner
 
 MEDIA_SIGNATURE_TTL_SECONDS = int(getattr(settings, "MEDIA_SIGNATURE_TTL_SECONDS", 3600))
 MEDIA_SIGNATURE_PARAM = "sig"
