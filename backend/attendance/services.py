@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import math
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from attendance.models import AttendanceDailyCheckIn, StaffAttendanceBadge
-from attendance.utils_lateness import compute_lateness_for_check_in
+from attendance.models import AttendanceDailyCheckIn, AttendanceSettings, StaffAttendanceBadge
+from attendance.utils_lateness import compute_lateness_for_check_in, get_attendance_settings
 from attendance.utils_zone import jakarta_today_date
 
 User = get_user_model()
@@ -20,6 +21,41 @@ class AttendanceError(Exception):
     def __init__(self, detail: str) -> None:
         self.detail = detail
         super().__init__(detail)
+
+
+def _fmt_local_time(dt: datetime) -> str:
+    ck = dt
+    if timezone.is_naive(ck):
+        ck = timezone.make_aware(ck, timezone=timezone.utc)
+    return ck.astimezone().strftime("%H:%M")
+
+
+def checkout_availability(
+    checked_in_at: datetime,
+    *,
+    settings: AttendanceSettings | None = None,
+    now: datetime | None = None,
+) -> tuple[bool, str | None, datetime | None]:
+    """Return (can_check_out, blocked_reason, available_at)."""
+    settings = settings or get_attendance_settings()
+    now = now or timezone.now()
+    min_delta = timedelta(hours=int(settings.minimum_hours_before_checkout))
+    available_at = checked_in_at + min_delta
+    if now >= available_at:
+        return True, None, available_at
+    remaining_mins = max(1, math.ceil((available_at - now).total_seconds() / 60))
+    reason = (
+        f"Sudah absen masuk pukul {_fmt_local_time(checked_in_at)}. "
+        f"Pulang dapat dilakukan minimal {settings.minimum_hours_before_checkout} jam "
+        f"setelah masuk (~{remaining_mins} menit lagi)."
+    )
+    return False, reason, available_at
+
+
+def work_hours_between(checked_in_at: datetime, checked_out_at: datetime | None) -> float | None:
+    if checked_out_at is None:
+        return None
+    return (checked_out_at - checked_in_at).total_seconds() / 3600
 
 
 def resolve_employee_from_badge_token(token: uuid.UUID) -> StaffAttendanceBadge:
@@ -50,9 +86,16 @@ def build_tablet_preview(badge: StaffAttendanceBadge, today_work_date_jakarta) -
     ).first()
 
     suggested_intent = "check_in"
+    can_check_out = False
+    checkout_blocked_reason = None
+    checkout_available_at = None
+
     if checked is not None:
         if checked.checked_out_at is None:
             suggested_intent = "check_out"
+            can_check_out, checkout_blocked_reason, checkout_available_at = checkout_availability(
+                checked.checked_in_at
+            )
         else:
             suggested_intent = "done"
 
@@ -71,6 +114,9 @@ def build_tablet_preview(badge: StaffAttendanceBadge, today_work_date_jakarta) -
         if checked and checked.checked_out_at
         else None,
         "suggested_intent": suggested_intent,
+        "can_check_out": can_check_out,
+        "checkout_blocked_reason": checkout_blocked_reason,
+        "checkout_available_at": checkout_available_at.isoformat() if checkout_available_at else None,
     }
 
 
@@ -98,7 +144,10 @@ def confirm_check_in(badge_token: uuid.UUID, verifier_id: int) -> tuple[Attendan
         return row, True
     except IntegrityError:
         existing = AttendanceDailyCheckIn.objects.get(employee_id=emp.id, work_date=wd)
-        return existing, False
+        raise AttendanceError(
+            f"{emp.full_name} sudah tercatat masuk hari ini pukul "
+            f"{_fmt_local_time(existing.checked_in_at)}."
+        ) from None
 
 
 @transaction.atomic
@@ -118,9 +167,16 @@ def confirm_check_out(badge_token: uuid.UUID, verifier_id: int) -> tuple[Attenda
         raise AttendanceError("Belum ada presensi masuk untuk hari ini.")
 
     if rec.checked_out_at is not None:
-        return rec, False
+        raise AttendanceError(
+            f"{emp.full_name} sudah tercatat pulang hari ini pukul "
+            f"{_fmt_local_time(rec.checked_out_at)}."
+        )
 
     now = timezone.now()
+    can_check_out, blocked_reason, _ = checkout_availability(rec.checked_in_at, now=now)
+    if not can_check_out:
+        raise AttendanceError(blocked_reason or "Belum dapat absen pulang.")
+
     rec.checked_out_at = now
     rec.verified_out_by_id = verifier_id
     rec.save(update_fields=["checked_out_at", "verified_out_by_id"])

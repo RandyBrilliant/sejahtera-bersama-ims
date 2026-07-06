@@ -1,9 +1,11 @@
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from payroll.models import EmployeeCompensation, PayrollEntry, PayrollPeriod
+from payroll.period_week import is_saturday, week_bounds_for_pay_saturday
 
 User = get_user_model()
 
@@ -33,8 +35,9 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
         model = PayrollPeriod
         fields = (
             "id",
-            "year",
-            "month",
+            "pay_date",
+            "period_start_date",
+            "period_end_date",
             "status",
             "finalized_at",
             "finalized_by",
@@ -44,6 +47,8 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "period_start_date",
+            "period_end_date",
             "status",
             "finalized_at",
             "finalized_by",
@@ -52,16 +57,31 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
         )
 
 
-class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PayrollPeriod
-        fields = ("year", "month", "notes")
+class PayrollPeriodCreateSerializer(serializers.Serializer):
+    pay_date = serializers.DateField()
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_pay_date(self, value: date) -> date:
+        if not is_saturday(value):
+            raise serializers.ValidationError("Tanggal pembayaran harus hari Sabtu.")
+        return value
 
     def validate(self, attrs):
-        y, m = int(attrs["year"]), int(attrs["month"])
-        if PayrollPeriod.objects.filter(year=y, month=m).exists():
-            raise serializers.ValidationError({"month": ["Periode ini sudah ada."]})
+        pay_date = attrs["pay_date"]
+        if PayrollPeriod.objects.filter(pay_date=pay_date).exists():
+            raise serializers.ValidationError({"pay_date": ["Periode gaji untuk Sabtu ini sudah ada."]})
         return attrs
+
+    def create(self, validated_data):
+        pay_date = validated_data["pay_date"]
+        period_start, period_end = week_bounds_for_pay_saturday(pay_date)
+        return PayrollPeriod.objects.create(
+            pay_date=pay_date,
+            period_start_date=period_start,
+            period_end_date=period_end,
+            notes=validated_data.get("notes", ""),
+            status=PayrollPeriod.Status.DRAFT,
+        )
 
 
 class PayrollEntrySerializer(serializers.ModelSerializer):
@@ -108,12 +128,13 @@ class PayrollEntryAdjustSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):  # type: ignore[override]
         if "deductions_idr" in validated_data:
-            instance.deductions_idr = validated_data["deductions_idr"]
+            old_deductions = instance.deductions_idr
+            new_deductions = validated_data["deductions_idr"]
+            instance.deductions_idr = new_deductions
+            instance.net_pay_idr = instance.net_pay_idr + old_deductions - new_deductions
+            if instance.net_pay_idr < Decimal("0"):
+                instance.net_pay_idr = Decimal("0")
         if "notes" in validated_data:
             instance.notes = validated_data["notes"]
-        net = instance.base_salary_snapshot_idr - instance.deductions_idr
-        if net < Decimal("0"):
-            net = Decimal("0")
-        instance.net_pay_idr = net
         instance.save(update_fields=["deductions_idr", "net_pay_idr", "notes", "updated_at"])
         return instance

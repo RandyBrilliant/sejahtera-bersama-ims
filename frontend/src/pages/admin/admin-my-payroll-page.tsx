@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import type { MyPayrollSlip } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
@@ -20,13 +21,6 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof d?.detail === 'string' ? d.detail : undefined
 }
 
-function monthLabel(m: number) {
-  try {
-    return new Date(2024, m - 1).toLocaleString('id-ID', { month: 'long' })
-  } catch {
-    return String(m)
-  }
-}
 
 export function AdminMyPayrollPage() {
   const [rows, setRows] = useState<MyPayrollSlip[]>([])
@@ -59,7 +53,8 @@ export function AdminMyPayrollPage() {
           Slip gaji saya
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Hanya slip dari periode yang sudah dikunci (finalized) akan muncul.
+          Gaji dibayar setiap Sabtu. Hanya slip dari periode yang sudah dikunci (finalized) akan
+          muncul.
         </p>
       </div>
 
@@ -86,8 +81,12 @@ export function AdminMyPayrollPage() {
               {rows.map((r) => (
                 <TableRow key={r.period_id}>
                   <TableCell>
-                    <div className="font-medium capitalize">
-                      {monthLabel(r.month)} {r.year}
+                    <div className="font-medium">
+                      {formatPayrollWeekLabel(
+                        r.pay_date,
+                        r.period_start_date,
+                        r.period_end_date
+                      )}
                     </div>
                     {r.finalized_at ? (
                       <div className="text-on-surface-variant text-xs tabular-nums">

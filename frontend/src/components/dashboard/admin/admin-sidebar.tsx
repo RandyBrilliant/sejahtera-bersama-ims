@@ -72,6 +72,15 @@ type AdminSidebarProps = {
   onNavigate?: () => void
 }
 
+const sidebarNavLinkClass = (isActive: boolean) =>
+  cn(
+    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+    'focus-visible:font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-variant/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container-lowest',
+    isActive
+      ? 'bg-surface-container-low font-semibold text-on-surface'
+      : 'text-on-surface-variant hover:bg-surface-container-low/60 hover:text-on-surface'
+  )
+
 export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const { user } = useAuth()
   const [logoutOpen, setLogoutOpen] = useState(false)
@@ -115,14 +124,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
               to={item.to}
               end={item.end}
               onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-4 py-3 font-semibold transition-all duration-200',
-                  isActive
-                    ? 'border-primary bg-surface-container-low text-primary border-l-4'
-                    : 'text-on-surface-variant hover:bg-surface-container-lowest hover:text-on-surface hover:pl-5 border-l-4 border-transparent'
-                )
-              }
+              className={({ isActive }) => sidebarNavLinkClass(isActive)}
             >
               <Icon className="size-5 shrink-0" />
               <span>{item.label}</span>
@@ -151,12 +153,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
             <NavLink
               to="/admin/pengaturan"
               onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'text-on-surface-variant hover:bg-surface-container-lowest flex items-center gap-2 rounded-lg px-4 py-2 transition-colors',
-                  isActive && 'bg-surface-container-low text-on-surface'
-                )
-              }
+              className={({ isActive }) => sidebarNavLinkClass(isActive)}
             >
               <Settings className="size-5" />
               <span>Pengaturan</span>
@@ -165,19 +162,17 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           <NavLink
             to="/admin/profil"
             onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                'text-on-surface-variant hover:bg-surface-container-lowest flex items-center gap-2 rounded-lg px-4 py-2 transition-colors',
-                isActive && 'bg-surface-container-low text-on-surface'
-              )
-            }
+            className={({ isActive }) => sidebarNavLinkClass(isActive)}
           >
             <User className="size-5" />
             <span>Profil</span>
           </NavLink>
           <button
             type="button"
-            className="text-on-surface-variant hover:bg-surface-container-lowest flex items-center gap-2 rounded-lg px-4 py-2 transition-colors"
+            className={cn(
+              sidebarNavLinkClass(false),
+              'w-full text-left'
+            )}
             onClick={() => setLogoutOpen(true)}
           >
             <LogOut className="size-5" />

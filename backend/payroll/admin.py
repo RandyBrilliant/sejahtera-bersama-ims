@@ -12,7 +12,7 @@ class EmployeeCompensationAdmin(admin.ModelAdmin):
 
 @admin.register(PayrollPeriod)
 class PayrollPeriodAdmin(admin.ModelAdmin):
-    list_display = ("year", "month", "status", "finalized_at")
+    list_display = ("pay_date", "period_start_date", "period_end_date", "status", "finalized_at")
 
 
 @admin.register(PayrollEntry)

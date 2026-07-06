@@ -29,6 +29,9 @@ export function AdminAttendanceSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [workStart, setWorkStart] = useState('')
   const [graceMinutes, setGraceMinutes] = useState('')
+  const [minHoursCheckout, setMinHoursCheckout] = useState('')
+  const [minWorkHoursFullDay, setMinWorkHoursFullDay] = useState('')
+  const [lateFineIdr, setLateFineIdr] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -38,6 +41,9 @@ export function AdminAttendanceSettingsPage() {
         if (cancelled) return
         setWorkStart(timeForInput(s.work_start_time))
         setGraceMinutes(String(s.grace_minutes ?? 0))
+        setMinHoursCheckout(String(s.minimum_hours_before_checkout ?? 1))
+        setMinWorkHoursFullDay(String(s.minimum_work_hours_full_day ?? 6))
+        setLateFineIdr(String(s.late_fine_idr ?? '20000'))
       } catch (e) {
         if (!cancelled) {
           alert.error('Presensi', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -54,8 +60,24 @@ export function AdminAttendanceSettingsPage() {
 
   async function handleSave() {
     const gm = Number(graceMinutes)
+    const minCheckout = Number(minHoursCheckout)
+    const minFullDay = Number(minWorkHoursFullDay)
+    const fine = Number(lateFineIdr.replace(/\./g, ''))
+
     if (!Number.isFinite(gm) || gm < 0 || !Number.isInteger(gm)) {
       alert.error('Validasi', 'Toleransi terlambat harus bilangan bulat ≥ 0.')
+      return
+    }
+    if (!Number.isFinite(minCheckout) || minCheckout < 1 || !Number.isInteger(minCheckout)) {
+      alert.error('Validasi', 'Jeda sebelum pulang minimal 1 jam (bilangan bulat).')
+      return
+    }
+    if (!Number.isFinite(minFullDay) || minFullDay < 1 || !Number.isInteger(minFullDay)) {
+      alert.error('Validasi', 'Jam kerja penuh minimal 1 jam (bilangan bulat).')
+      return
+    }
+    if (!Number.isFinite(fine) || fine < 0) {
+      alert.error('Validasi', 'Denda terlambat harus angka ≥ 0.')
       return
     }
     if (!/^\d{2}:\d{2}$/.test(workStart)) {
@@ -82,6 +104,9 @@ export function AdminAttendanceSettingsPage() {
       await patchAttendanceSettings({
         work_start_time: `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:00`,
         grace_minutes: gm,
+        minimum_hours_before_checkout: minCheckout,
+        minimum_work_hours_full_day: minFullDay,
+        late_fine_idr: String(fine),
       })
       alert.success('Disimpan', 'Pengaturan presensi diperbarui.')
     } catch (e) {
@@ -98,7 +123,8 @@ export function AdminAttendanceSettingsPage() {
           Pengaturan presensi
         </h1>
         <p className="text-on-surface-variant mt-2 text-sm leading-relaxed">
-          Jam kerja nominal dan toleransi untuk menandai ketidakhadiran tepat waktu (zona Jakarta di server).
+          Jam kerja, toleransi keterlambatan, aturan absen pulang, dan denda/potongan gaji harian
+          (zona Jakarta di server).
         </p>
       </div>
 
@@ -130,9 +156,51 @@ export function AdminAttendanceSettingsPage() {
               onChange={(e) => setGraceMinutes(e.target.value.replace(/\D/g, ''))}
               disabled={saving}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="min-checkout-hours" className="text-xs font-semibold uppercase">
+              Jeda sebelum absen pulang (jam)
+            </Label>
+            <Input
+              id="min-checkout-hours"
+              inputMode="numeric"
+              min={1}
+              value={minHoursCheckout}
+              onChange={(e) => setMinHoursCheckout(e.target.value.replace(/\D/g, ''))}
+              disabled={saving}
+            />
             <p className="text-on-surface-variant text-xs leading-relaxed">
-              Menit pertama setelah jam mulai yang masih dianggap tidak terlambat.
+              Mencegah double tap: staf baru bisa absen pulang setelah interval ini sejak masuk.
             </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="min-full-day-hours" className="text-xs font-semibold uppercase">
+              Jam kerja untuk gaji harian penuh
+            </Label>
+            <Input
+              id="min-full-day-hours"
+              inputMode="numeric"
+              min={1}
+              value={minWorkHoursFullDay}
+              onChange={(e) => setMinWorkHoursFullDay(e.target.value.replace(/\D/g, ''))}
+              disabled={saving}
+            />
+            <p className="text-on-surface-variant text-xs leading-relaxed">
+              Kurang dari ini (atau belum absen pulang): gaji harian dihitung setengah.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="late-fine" className="text-xs font-semibold uppercase">
+              Denda terlambat (IDR)
+            </Label>
+            <Input
+              id="late-fine"
+              inputMode="numeric"
+              min={0}
+              value={lateFineIdr}
+              onChange={(e) => setLateFineIdr(e.target.value.replace(/[^\d]/g, ''))}
+              disabled={saving}
+            />
           </div>
           <Button type="button" disabled={saving} onClick={() => void handleSave()}>
             {saving ? 'Menyimpan…' : 'Simpan'}

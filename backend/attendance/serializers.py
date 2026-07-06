@@ -17,5 +17,13 @@ class TabletConfirmSerializer(serializers.Serializer):
 class AttendanceSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttendanceSettings
-        fields = ("id", "work_start_time", "grace_minutes", "updated_at")
+        fields = (
+            "id",
+            "work_start_time",
+            "grace_minutes",
+            "minimum_hours_before_checkout",
+            "minimum_work_hours_full_day",
+            "late_fine_idr",
+            "updated_at",
+        )
         read_only_fields = ("id", "updated_at")

@@ -19,8 +19,9 @@ export type PayrollCompensationTableRow = {
 
 export type PayrollPeriod = {
   id: number
-  year: number
-  month: number
+  pay_date: string
+  period_start_date: string
+  period_end_date: string
   status: 'DRAFT' | 'FINALIZED'
   finalized_at: string | null
   finalized_by: number | null
@@ -45,8 +46,9 @@ export type PayrollEntryRow = {
 
 export type MyPayrollSlip = {
   period_id: number
-  year: number
-  month: number
+  pay_date: string
+  period_start_date: string
+  period_end_date: string
   base_salary_snapshot_idr: string
   days_present: number
   late_count: number

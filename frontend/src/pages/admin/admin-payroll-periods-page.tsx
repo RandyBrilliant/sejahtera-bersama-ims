@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   createPayrollPeriod,
@@ -9,9 +9,16 @@ import {
 } from '@/api/payroll'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import {
+  formatPayrollWeekLabel,
+  isSaturday,
+  parseIsoDateOnly,
+  toIsoDateOnly,
+  upcomingPaySaturday,
+} from '@/lib/payroll-week'
 import {
   Table,
   TableBody,
@@ -30,21 +37,25 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof d?.detail === 'string' ? d.detail : undefined
 }
 
-function monthLabel(m: number) {
-  try {
-    return new Date(2024, m - 1).toLocaleString('id-ID', { month: 'long' })
-  } catch {
-    return String(m)
-  }
-}
-
 export function AdminPayrollPeriodsPage() {
   const [rows, setRows] = useState<PayrollPeriod[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [yearStr, setYearStr] = useState(String(new Date().getFullYear()))
-  const [monthStr, setMonthStr] = useState(String(new Date().getMonth() + 1))
+  const [payDate, setPayDate] = useState(() => toIsoDateOnly(upcomingPaySaturday()))
   const [notes, setNotes] = useState('')
+
+  const weekPreview = useMemo(() => {
+    if (!payDate) return null
+    try {
+      const pay = parseIsoDateOnly(payDate)
+      if (!isSaturday(pay)) return null
+      const start = new Date(pay)
+      start.setDate(start.getDate() - 5)
+      return formatPayrollWeekLabel(payDate, toIsoDateOnly(start), payDate)
+    } catch {
+      return null
+    }
+  }, [payDate])
 
   async function reload() {
     setLoading(true)
@@ -63,17 +74,19 @@ export function AdminPayrollPeriodsPage() {
   }, [])
 
   async function handleCreate() {
-    const y = Number(yearStr)
-    const m = Number(monthStr)
-    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
-      alert.error('Validasi', 'Tahun dan bulan harus valid (bulan 1–12).')
+    if (!payDate) {
+      alert.error('Validasi', 'Pilih tanggal pembayaran (Sabtu).')
+      return
+    }
+    if (!isSaturday(parseIsoDateOnly(payDate))) {
+      alert.error('Validasi', 'Gaji dibayar setiap Sabtu — pilih tanggal yang jatuh pada hari Sabtu.')
       return
     }
     setCreating(true)
     try {
-      await createPayrollPeriod({ year: y, month: m, notes: notes.trim() || undefined })
+      await createPayrollPeriod({ pay_date: payDate, notes: notes.trim() || undefined })
       setNotes('')
-      alert.success('Periode', 'Periode draft dibuat.')
+      alert.success('Periode', 'Periode mingguan draft dibuat.')
       await reload()
     } catch (e) {
       alert.error('Gagal membuat periode', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -99,11 +112,12 @@ export function AdminPayrollPeriodsPage() {
     <div className="space-y-10">
       <div>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Payroll dan slip gaji
+          Payroll mingguan
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Kelola periode gaji bulanan: buat draft, bangkitkan entri dari presensi dan gaji pokok pegawai aktif,
-          sesuaikan potongan di periode draft, lalu kunci oleh admin/pemilik ketika slip siap dibagikan.
+          Gaji dibayar setiap <span className="text-on-surface font-medium">Sabtu</span> untuk minggu
+          kerja Senin–Sabtu. Buat draft periode, bangkitkan entri dari presensi dan gaji pokok, lalu
+          kunci ketika slip siap dibagikan.
         </p>
         <p className="mt-3 text-sm">
           <Link to="/admin/gaji/kompensasi" className="text-primary font-semibold underline">
@@ -116,27 +130,19 @@ export function AdminPayrollPeriodsPage() {
         <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">
           Periode baru (draft)
         </h2>
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="py-y">Tahun</Label>
-            <Input
-              id="py-y"
-              inputMode="numeric"
-              value={yearStr}
-              onChange={(e) => setYearStr(e.target.value.replace(/\D/g, '').slice(0, 5))}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="py-m">Bulan</Label>
-            <Input
-              id="py-m"
-              inputMode="numeric"
-              min={1}
-              max={12}
-              value={monthStr}
-              onChange={(e) => setMonthStr(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            />
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="pay-date">Tanggal pembayaran (Sabtu)</Label>
+          <DatePickerInput
+            id="pay-date"
+            value={payDate}
+            onChange={setPayDate}
+            disabled={creating}
+          />
+          {weekPreview ? (
+            <p className="text-on-surface-variant text-xs leading-relaxed">{weekPreview}</p>
+          ) : payDate ? (
+            <p className="text-destructive text-xs">Tanggal harus jatuh pada hari Sabtu.</p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="py-notes">Catatan (opsional)</Label>
@@ -170,7 +176,7 @@ export function AdminPayrollPeriodsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Periode</TableHead>
+                  <TableHead>Periode / bayar</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
@@ -183,7 +189,11 @@ export function AdminPayrollPeriodsPage() {
                         to={`/admin/gaji/${p.id}`}
                         className="text-primary hover:underline font-medium"
                       >
-                        {monthLabel(p.month)} {p.year}
+                        {formatPayrollWeekLabel(
+                          p.pay_date,
+                          p.period_start_date,
+                          p.period_end_date
+                        )}
                       </Link>
                     </TableCell>
                     <TableCell>

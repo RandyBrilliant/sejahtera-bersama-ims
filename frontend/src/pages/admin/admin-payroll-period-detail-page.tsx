@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
 import { isAxiosError } from 'axios'
@@ -33,14 +34,6 @@ function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
   const d = err.response?.data as { detail?: unknown } | undefined
   return typeof d?.detail === 'string' ? d.detail : undefined
-}
-
-function monthLabel(m: number) {
-  try {
-    return new Date(2024, m - 1).toLocaleString('id-ID', { month: 'long' })
-  } catch {
-    return String(m)
-  }
 }
 
 export function AdminPayrollPeriodDetailPage() {
@@ -121,7 +114,7 @@ export function AdminPayrollPeriodDetailPage() {
     const ok =
       typeof window !== 'undefined'
         ? window.confirm(
-            `Kunci periode ${monthLabel(period.month)} ${period.year}? Potongan tidak bisa diubah setelah dikunci.`
+            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date)}? Potongan tidak bisa diubah setelah dikunci.`
           )
         : false
     if (!ok) return
@@ -177,7 +170,11 @@ export function AdminPayrollPeriodDetailPage() {
         ) : period ? (
           <>
             <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-              Payroll {monthLabel(period.month)} {period.year}
+              {formatPayrollWeekLabel(
+                period.pay_date,
+                period.period_start_date,
+                period.period_end_date
+              )}
             </h1>
             <div className="text-on-surface-variant mt-2 flex flex-wrap items-center gap-2 text-sm">
               <Badge variant={period.status === 'FINALIZED' ? 'default' : 'secondary'}>

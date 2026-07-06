@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import time
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -11,6 +12,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 _DEFAULT_START = time(8, 0)
+_DEFAULT_LATE_FINE_IDR = Decimal("20000")
 
 
 class AttendanceSettings(models.Model):
@@ -29,6 +31,26 @@ class AttendanceSettings(models.Model):
         default=15,
         validators=[MinValueValidator(0)],
         help_text=_("Menit setelah jam mulai tanpa dihitung terlambat."),
+    )
+    minimum_hours_before_checkout = models.PositiveSmallIntegerField(
+        _("minimum hours before checkout"),
+        default=1,
+        validators=[MinValueValidator(1)],
+        help_text=_("Jam minimal antara absen masuk dan absen pulang (cegah double tap)."),
+    )
+    minimum_work_hours_full_day = models.PositiveSmallIntegerField(
+        _("minimum work hours for full day pay"),
+        default=6,
+        validators=[MinValueValidator(1)],
+        help_text=_("Jam kerja minimum agar gaji harian dihitung penuh."),
+    )
+    late_fine_idr = models.DecimalField(
+        _("late fine (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        default=_DEFAULT_LATE_FINE_IDR,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text=_("Potongan per hari terlambat."),
     )
     updated_at = models.DateTimeField(auto_now=True)
 

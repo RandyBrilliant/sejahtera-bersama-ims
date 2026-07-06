@@ -62,7 +62,16 @@ export async function fetchAttendanceSettings(): Promise<AttendanceSettings> {
 }
 
 export async function patchAttendanceSettings(
-  patch: Partial<Pick<AttendanceSettings, 'work_start_time' | 'grace_minutes'>>
+  patch: Partial<
+    Pick<
+      AttendanceSettings,
+      | 'work_start_time'
+      | 'grace_minutes'
+      | 'minimum_hours_before_checkout'
+      | 'minimum_work_hours_full_day'
+      | 'late_fine_idr'
+    >
+  >
 ): Promise<AttendanceSettings> {
   const { data } = await api.patch<Envelope<AttendanceSettings>>('/api/attendance/settings/', patch)
   return data.data

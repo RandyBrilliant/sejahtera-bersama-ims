@@ -10,7 +10,8 @@ export function AdminPayrollLayout() {
           Payroll
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Kelola periode penggajian bulanan, gaji pokok karyawan, dan finalisasi slip gaji.
+          Kelola periode penggajian mingguan (dibayar setiap Sabtu), gaji pokok karyawan, dan
+          finalisasi slip gaji.
         </p>
       </div>
 

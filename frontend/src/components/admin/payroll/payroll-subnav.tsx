@@ -5,7 +5,7 @@ import { pillSubnavItemClass, pillSubnavNavClass } from '@/lib/pill-subnav'
 type TabItem = { to: string; label: string; end?: boolean }
 
 const tabs: TabItem[] = [
-  { to: '/admin/gaji', label: 'Periode gaji', end: true },
+  { to: '/admin/gaji', label: 'Periode mingguan', end: true },
   { to: '/admin/gaji/kompensasi', label: 'Gaji pokok karyawan' },
 ]
 

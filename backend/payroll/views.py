@@ -118,14 +118,13 @@ class PayrollPeriodListCreateView(APIView):
     permission_classes = [PayrollManageAccess]
 
     def get(self, request):
-        qs = PayrollPeriod.objects.order_by("-year", "-month")
+        qs = PayrollPeriod.objects.order_by("-pay_date")
         return Response(success_response(data=PayrollPeriodSerializer(qs, many=True).data), status=200)
 
     def post(self, request):
         ser = PayrollPeriodCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        p = PayrollPeriod(**ser.validated_data, status=PayrollPeriod.Status.DRAFT)
-        p.save()
+        p = ser.save()
         return Response(
             success_response(data=PayrollPeriodSerializer(p).data, detail="Periode dibuat."),
             status=201,
@@ -234,22 +233,23 @@ class PayrollMeEntriesView(APIView):
         qs = PayrollEntry.objects.select_related("period").filter(
             employee_id=request.user.pk,
             period__status=PayrollPeriod.Status.FINALIZED,
-        ).order_by("-period__year", "-period__month")
+        ).order_by("-period__pay_date")
 
-        y_raw = request.query_params.get("year")
-        mo_raw = request.query_params.get("month")
-        if y_raw and y_raw.isdigit():
-            qs = qs.filter(period__year=int(y_raw))
-        if mo_raw and mo_raw.isdigit():
-            qs = qs.filter(period__month=int(mo_raw))
+        pay_from = request.query_params.get("pay_date_from")
+        pay_to = request.query_params.get("pay_date_to")
+        if pay_from:
+            qs = qs.filter(period__pay_date__gte=pay_from)
+        if pay_to:
+            qs = qs.filter(period__pay_date__lte=pay_to)
 
         rows = []
         for e in qs:
             rows.append(
                 {
                     "period_id": e.period_id,
-                    "year": e.period.year,
-                    "month": e.period.month,
+                    "pay_date": str(e.period.pay_date),
+                    "period_start_date": str(e.period.period_start_date),
+                    "period_end_date": str(e.period.period_end_date),
                     "base_salary_snapshot_idr": str(e.base_salary_snapshot_idr),
                     "days_present": e.days_present,
                     "late_count": e.late_count,

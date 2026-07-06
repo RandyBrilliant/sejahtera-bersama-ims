@@ -189,11 +189,7 @@ class AdminAttendanceConfirmView(APIView):
                             "verified_by_id": row.verified_by_id,
                             "timezone": settings.TIME_ZONE,
                         },
-                        detail=(
-                            "Presensi masuk dicatat."
-                            if created
-                            else "Pegawai sudah tercatat masuk untuk hari ini."
-                        ),
+                        detail="Presensi masuk dicatat.",
                     ),
                     status=200,
                 )
@@ -205,17 +201,14 @@ class AdminAttendanceConfirmView(APIView):
                         "created": created,
                         "employee_id": row.employee_id,
                         "work_date": str(row.work_date),
+                        "checked_in_at": row.checked_in_at.isoformat(),
                         "checked_out_at": row.checked_out_at.isoformat()
                         if row.checked_out_at
                         else None,
                         "verified_out_by_id": row.verified_out_by_id,
                         "timezone": settings.TIME_ZONE,
                     },
-                    detail=(
-                        "Presensi pulang dicatat."
-                        if created
-                        else "Pegawai sudah tercatat pulang untuk hari ini."
-                    ),
+                    detail="Presensi pulang dicatat.",
                 ),
                 status=200,
             )

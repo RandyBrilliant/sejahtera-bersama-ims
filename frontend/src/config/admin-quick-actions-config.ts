@@ -7,6 +7,7 @@ import {
   Clock,
   Coins,
   PackagePlus,
+  QrCode,
   Receipt,
   ScrollText,
   Timer,
@@ -104,6 +105,14 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
     allowedRoles: ['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF'],
   },
   {
+    id: 'attendance-scan',
+    label: 'Presensi tablet',
+    description: 'Pindai QR kartu staf',
+    to: '/admin/absensi/scan',
+    icon: QrCode,
+    allowedRoles: ['ADMIN', 'LEADERSHIP'],
+  },
+  {
     id: 'attendance-settings',
     label: 'Aturan presensi',
     description: 'Jam kerja & toleransi telat',
@@ -122,7 +131,7 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
   {
     id: 'payroll',
     label: 'Payroll',
-    description: 'Periode slip gaji pegawai',
+    description: 'Periode mingguan — bayar setiap Sabtu',
     to: '/admin/gaji',
     icon: CircleDollarSign,
     allowedRoles: ['ADMIN', 'LEADERSHIP', 'FINANCE_STAFF'],

@@ -34,14 +34,15 @@ class EmployeeCompensation(models.Model):
 
 
 class PayrollPeriod(models.Model):
-    """Satu periode gaji kalender."""
+    """Satu periode gaji mingguan — dibayar setiap Sabtu (Senin–Sabtu)."""
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", _("Draft")
         FINALIZED = "FINALIZED", _("Final")
 
-    year = models.PositiveSmallIntegerField(_("year"))
-    month = models.PositiveSmallIntegerField(_("month"), validators=[MinValueValidator(1), MaxValueValidator(12)])
+    pay_date = models.DateField(_("pay date (Saturday)"), db_index=True)
+    period_start_date = models.DateField(_("period start (Monday)"))
+    period_end_date = models.DateField(_("period end (Saturday)"))
     status = models.CharField(_("status"), max_length=16, choices=Status.choices, default=Status.DRAFT, db_index=True)
     finalized_at = models.DateTimeField(null=True, blank=True)
     finalized_by = models.ForeignKey(
@@ -60,12 +61,12 @@ class PayrollPeriod(models.Model):
         verbose_name = _("payroll period")
         verbose_name_plural = _("payroll periods")
         constraints = [
-            models.UniqueConstraint(fields=("year", "month"), name="uniq_payroll_year_month"),
+            models.UniqueConstraint(fields=("pay_date",), name="uniq_payroll_pay_date"),
         ]
-        ordering = ["-year", "-month"]
+        ordering = ["-pay_date"]
 
     def __str__(self) -> str:
-        return f"{self.year}-{self.month:02d} [{self.status}]"
+        return f"{self.pay_date.isoformat()} [{self.status}]"
 
 
 class PayrollEntry(models.Model):

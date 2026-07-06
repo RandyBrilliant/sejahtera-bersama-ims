@@ -21,6 +21,9 @@ export type AttendancePreviewResponse = {
   already_checked_out_today: boolean
   checked_out_at: string | null
   suggested_intent: AttendanceIntent
+  can_check_out: boolean
+  checkout_blocked_reason: string | null
+  checkout_available_at: string | null
   badge_token: string
 }
 
@@ -43,6 +46,9 @@ export type AttendanceSettings = {
   id: number
   work_start_time: string
   grace_minutes: number
+  minimum_hours_before_checkout: number
+  minimum_work_hours_full_day: number
+  late_fine_idr: string
   updated_at: string
 }
 

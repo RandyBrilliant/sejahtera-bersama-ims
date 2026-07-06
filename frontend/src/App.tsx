@@ -172,6 +172,11 @@ const AdminAttendanceTabletPage = lazy(() =>
     default: m.AdminAttendanceTabletPage,
   }))
 )
+const AdminAttendanceScanPage = lazy(() =>
+  import('@/pages/admin/admin-attendance-scan-page').then((m) => ({
+    default: m.AdminAttendanceScanPage,
+  }))
+)
 const AdminAttendanceSettingsPage = lazy(() =>
   import('@/pages/admin/admin-attendance-settings-page').then((m) => ({
     default: m.AdminAttendanceSettingsPage,
@@ -274,6 +279,14 @@ export default function App() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/admin/absensi/scan"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'LEADERSHIP']}>
+                  <AdminAttendanceScanPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/admin"
               element={

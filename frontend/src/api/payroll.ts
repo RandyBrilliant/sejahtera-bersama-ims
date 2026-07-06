@@ -55,8 +55,7 @@ export async function fetchPayrollPeriods(): Promise<PayrollPeriod[]> {
 }
 
 export async function createPayrollPeriod(payload: {
-  year: number
-  month: number
+  pay_date: string
   notes?: string
 }): Promise<PayrollPeriod> {
   const { data } = await api.post<Envelope<PayrollPeriod>>('/api/payroll/periods/', payload)
@@ -106,12 +105,15 @@ export async function patchPayrollEntry(
   return data.data
 }
 
-export async function fetchMyPayrollSlips(params?: { year?: number; month?: number }): Promise<{
+export async function fetchMyPayrollSlips(params?: {
+  pay_date_from?: string
+  pay_date_to?: string
+}): Promise<{
   results: MyPayrollSlip[]
 }> {
   const search = new URLSearchParams()
-  if (params?.year != null) search.set('year', String(params.year))
-  if (params?.month != null) search.set('month', String(params.month))
+  if (params?.pay_date_from) search.set('pay_date_from', params.pay_date_from)
+  if (params?.pay_date_to) search.set('pay_date_to', params.pay_date_to)
   const qs = search.toString()
   const path = qs ? `/api/payroll/me/entries/?${qs}` : '/api/payroll/me/entries/'
   const { data } = await api.get<Envelope<{ results: MyPayrollSlip[] }>>(path)
