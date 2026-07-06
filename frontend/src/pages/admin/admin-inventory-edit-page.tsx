@@ -1,12 +1,16 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { ProductForm } from '@/components/admin/inventory/product-form'
 import { ProductMetadataAside } from '@/components/admin/inventory/product-metadata-aside'
 import { ProductPackagingInlineTable } from '@/components/admin/inventory/product-packaging-inline-table'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useProductQuery } from '@/hooks/use-inventory-query'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/inventaris'
 
 export function AdminInventoryEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { productId: idParam } = useParams<{ productId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
@@ -14,7 +18,7 @@ export function AdminInventoryEditPage() {
   const { data: product, isLoading, isError } = useProductQuery(validId ? id : null)
 
   if (!validId) {
-    return <Navigate to="/admin/inventaris" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   if (isLoading) {
@@ -24,12 +28,9 @@ export function AdminInventoryEditPage() {
   if (isError || !product) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/inventaris"
-          className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Kembali ke daftar
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Produk tidak ditemukan.</p>
       </div>
     )
@@ -38,12 +39,7 @@ export function AdminInventoryEditPage() {
   return (
     <div className="space-y-10">
       <div>
-        <Link
-          to="/admin/inventaris"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Edit produk
         </h1>
@@ -58,8 +54,8 @@ export function AdminInventoryEditPage() {
           key={product.id}
           mode="edit"
           initialProduct={product}
-          onCancel={() => navigate('/admin/inventaris')}
-          onSaved={() => navigate('/admin/inventaris')}
+          onCancel={() => goBack(LIST_PATH)}
+          onSaved={() => goBack(LIST_PATH)}
         />
         <ProductMetadataAside product={product} />
       </div>

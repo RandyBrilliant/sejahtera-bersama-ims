@@ -1,26 +1,26 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { PurchaseOrderForm } from '@/components/admin/orders/purchase-order-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/pesanan/pembelian'
 
 export function AdminPurchaseOrderEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { orderId: idParam } = useParams<{ orderId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
+  const detailPath = `/admin/pesanan/pembelian/${id}`
 
   if (!validId) {
-    return <Navigate to="/admin/pesanan/pembelian" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to={`/admin/pesanan/pembelian/${id}`}
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke detail order
-        </Link>
+        <PageBackLink fallback={detailPath}>← Kembali ke detail order</PageBackLink>
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
           Ubah order pembelian
         </h2>
@@ -29,8 +29,8 @@ export function AdminPurchaseOrderEditPage() {
       <PurchaseOrderForm
         mode="edit"
         orderId={id}
-        onCancel={() => navigate(`/admin/pesanan/pembelian/${id}`)}
-        onSaved={(savedId) => navigate(`/admin/pesanan/pembelian/${savedId}`)}
+        onCancel={() => goBack(detailPath)}
+        onSaved={() => goBack(detailPath)}
       />
     </div>
   )

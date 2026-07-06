@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
@@ -359,12 +359,12 @@ function PurchaseOrderEditGate({
     return (
       <p className="text-destructive text-sm">
         Order dengan status ini tidak dapat diubah lewat formulir.{' '}
-        <Link
-          to={`/admin/pesanan/pembelian/${orderId}`}
-          className="text-primary font-medium underline underline-offset-2"
+        <PageBackLink
+          variant="inline"
+          fallback={`/admin/pesanan/pembelian/${orderId}`}
         >
           Kembali ke detail
-        </Link>
+        </PageBackLink>
       </p>
     )
   }

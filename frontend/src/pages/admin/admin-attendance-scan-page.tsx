@@ -1,6 +1,5 @@
 import { ArrowLeft, Camera } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 
 import {
@@ -10,10 +9,11 @@ import {
 import { confirmAttendanceScan, previewAttendanceScan } from '@/api/attendance'
 import { Button } from '@/components/ui/button'
 import { useAttendanceQrScanner } from '@/hooks/use-attendance-qr-scanner'
+import { useGoBack } from '@/hooks/use-go-back'
 import type { AttendancePreviewResponse } from '@/types/attendance'
 
 const SAME_QR_COOLDOWN_MS = 2500
-const NOTICE_AUTO_DISMISS_MS = 3000
+const NOTICE_AUTO_DISMISS_MS = 5000
 
 type NoticeState = {
   title: string
@@ -38,6 +38,7 @@ function showNotice(
 }
 
 export function AdminAttendanceScanPage() {
+  const goBack = useGoBack()
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [processing, setProcessing] = useState(false)
   const lastRawRef = useRef<string | null>(null)
@@ -167,12 +168,10 @@ export function AdminAttendanceScanPage() {
               variant="outline"
               size="sm"
               className="gap-2 border-white/25 bg-black/55 text-white hover:bg-black/75 hover:text-white"
-              asChild
+              onClick={() => goBack('/admin/dashboard')}
             >
-              <Link to="/admin/dashboard">
-                <ArrowLeft className="size-4" />
-                Kembali
-              </Link>
+              <ArrowLeft className="size-4" />
+              Kembali
             </Button>
             <Button
               type="button"

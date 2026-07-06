@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
 import {
@@ -27,8 +27,11 @@ import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
 import { isAxiosError } from 'axios'
+
+const LIST_PATH = '/admin/gaji'
 
 function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
@@ -159,12 +162,7 @@ export function AdminPayrollPeriodDetailPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/gaji"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar</PageBackLink>
         {loading && !period ? (
           <p className="text-on-surface-variant text-sm">Memuat…</p>
         ) : period ? (

@@ -1,7 +1,8 @@
 import { useRef } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/table'
 import { canDeleteOrder, canEditOrderLines } from '@/constants/order-status'
 import { useAuth } from '@/hooks/use-auth'
+import { useGoBack } from '@/hooks/use-go-back'
 import {
   useCancelPurchaseInOrderMutation,
   useDeletePurchaseInOrderMutation,
@@ -42,8 +44,10 @@ function fmtQty(raw: string | number) {
     .replace(/,$/, '')
 }
 
+const LIST_PATH = '/admin/pesanan/pembelian'
+
 export function AdminPurchaseOrderDetailPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { orderId: idParam } = useParams<{ orderId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
@@ -101,7 +105,7 @@ export function AdminPurchaseOrderDetailPage() {
     try {
       await deleteMut.mutateAsync(id)
       alert.success('Berhasil', 'Order dihapus.')
-      navigate('/admin/pesanan/pembelian')
+      goBack(LIST_PATH)
     } catch (err) {
       alert.error('Gagal menghapus', parsePurchaseMutationError(err))
     }
@@ -114,12 +118,9 @@ export function AdminPurchaseOrderDetailPage() {
   if (isError || !order) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/pesanan/pembelian"
-          className="text-on-surface-variant hover:text-primary text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Daftar pembelian
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Order tidak ditemukan.</p>
       </div>
     )
@@ -140,12 +141,7 @@ export function AdminPurchaseOrderDetailPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            to="/admin/pesanan/pembelian"
-            className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-          >
-            ← Daftar pembelian bahan
-          </Link>
+          <PageBackLink fallback={LIST_PATH}>← Daftar pembelian bahan</PageBackLink>
           <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
             {order.order_code}
           </h2>

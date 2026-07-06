@@ -1,26 +1,25 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { IngredientInventoryForm } from '@/components/admin/inventory/ingredient-inventory-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/gudang/stok-bahan'
 
 export function AdminIngredientInventoryEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { inventoryId: idParam } = useParams<{ inventoryId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
 
   if (!validId) {
-    return <Navigate to="/admin/gudang/stok-bahan" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/gudang/stok-bahan"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke stok bahan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke stok bahan</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Edit stok bahan
         </h1>
@@ -31,8 +30,8 @@ export function AdminIngredientInventoryEditPage() {
 
       <IngredientInventoryForm
         inventoryId={id}
-        onCancel={() => navigate('/admin/gudang/stok-bahan')}
-        onSaved={() => navigate('/admin/gudang/stok-bahan')}
+        onCancel={() => goBack(LIST_PATH)}
+        onSaved={() => goBack(LIST_PATH)}
       />
     </div>
   )

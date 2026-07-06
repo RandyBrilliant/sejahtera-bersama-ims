@@ -1,10 +1,14 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { OperationalCashEntryForm } from '@/components/admin/kas/operational-cash-entry-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useOperationalCashEntryQuery } from '@/hooks/use-expenses-query'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/kas/entri'
 
 export function AdminKasEntryEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { id: idParam } = useParams<{ id: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
@@ -12,7 +16,7 @@ export function AdminKasEntryEditPage() {
   const { data: entry, isLoading, isError } = useOperationalCashEntryQuery(validId ? id : null)
 
   if (!validId) {
-    return <Navigate to="/admin/kas/entri" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   if (isLoading) {
@@ -22,12 +26,9 @@ export function AdminKasEntryEditPage() {
   if (isError || !entry) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/kas/entri"
-          className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Kembali ke daftar
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Transaksi tidak ditemukan.</p>
       </div>
     )
@@ -35,18 +36,15 @@ export function AdminKasEntryEditPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/admin/kas/entri"
-        className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-      >
+      <PageBackLink fallback={LIST_PATH} className="mb-0">
         ← Kembali ke transaksi
-      </Link>
+      </PageBackLink>
       <OperationalCashEntryForm
         key={`${entry.id}-${entry.updated_at}`}
         mode="edit"
         initial={entry}
-        onCancel={() => navigate('/admin/kas/entri')}
-        onSaved={() => navigate('/admin/kas/entri')}
+        onCancel={() => goBack(LIST_PATH)}
+        onSaved={() => goBack(LIST_PATH)}
       />
     </div>
   )

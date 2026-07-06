@@ -1,10 +1,14 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { IngredientForm } from '@/components/admin/inventory/ingredient-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useIngredientQuery } from '@/hooks/use-inventory-query'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/gudang/bahan-baku'
 
 export function AdminIngredientEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { ingredientId: idParam } = useParams<{ ingredientId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
@@ -12,7 +16,7 @@ export function AdminIngredientEditPage() {
   const { data: ingredient, isLoading, isError } = useIngredientQuery(validId ? id : null)
 
   if (!validId) {
-    return <Navigate to="/admin/gudang/bahan-baku" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   if (isLoading) {
@@ -22,12 +26,9 @@ export function AdminIngredientEditPage() {
   if (isError || !ingredient) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/gudang/bahan-baku"
-          className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Kembali ke daftar
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Bahan tidak ditemukan.</p>
       </div>
     )
@@ -36,12 +37,7 @@ export function AdminIngredientEditPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/gudang/bahan-baku"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar bahan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar bahan</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Edit bahan baku
         </h1>
@@ -53,8 +49,8 @@ export function AdminIngredientEditPage() {
       <IngredientForm
         mode="edit"
         initial={ingredient}
-        onCancel={() => navigate('/admin/gudang/bahan-baku')}
-        onSaved={() => navigate('/admin/gudang/bahan-baku')}
+        onCancel={() => goBack(LIST_PATH)}
+        onSaved={() => goBack(LIST_PATH)}
       />
     </div>
   )

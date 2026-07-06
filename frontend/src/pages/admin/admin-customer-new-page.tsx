@@ -1,19 +1,16 @@
-import { Link, useNavigate } from 'react-router-dom'
-
 import { CustomerForm } from '@/components/admin/customers/customer-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/pelanggan'
 
 export function AdminCustomerNewPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
 
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/pelanggan"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar pelanggan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar pelanggan</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Tambah pelanggan
         </h1>
@@ -25,8 +22,8 @@ export function AdminCustomerNewPage() {
       <CustomerForm
         mode="create"
         initial={null}
-        onCancel={() => navigate('/admin/pelanggan')}
-        onSaved={() => navigate('/admin/pelanggan')}
+        onCancel={() => goBack(LIST_PATH)}
+        onSaved={() => goBack(LIST_PATH)}
       />
     </div>
   )

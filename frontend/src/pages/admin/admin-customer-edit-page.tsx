@@ -1,16 +1,20 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { CustomerForm } from '@/components/admin/customers/customer-form'
 import { CustomerMetadataAside } from '@/components/admin/customers/customer-metadata-aside'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useCustomerQuery } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
+import { useGoBack } from '@/hooks/use-go-back'
 import { Button } from '@/components/ui/button'
 
+const LIST_PATH = '/admin/pelanggan'
+
 export function AdminCustomerEditPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { user } = useAuth()
   const { id: idParam } = useParams<{ id: string }>()
   const [isDeleteOpen, setDeleteOpen] = useState(false)
@@ -21,7 +25,7 @@ export function AdminCustomerEditPage() {
   const { data: customer, isLoading, isError } = useCustomerQuery(validId ? id : null)
 
   if (!validId) {
-    return <Navigate to="/admin/pelanggan" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   if (isLoading) {
@@ -31,12 +35,9 @@ export function AdminCustomerEditPage() {
   if (isError || !customer) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/pelanggan"
-          className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Kembali ke daftar
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Pelanggan tidak ditemukan.</p>
       </div>
     )
@@ -45,12 +46,7 @@ export function AdminCustomerEditPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/pelanggan"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar pelanggan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar pelanggan</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Edit pelanggan
         </h1>
@@ -75,8 +71,8 @@ export function AdminCustomerEditPage() {
         <CustomerForm
           mode="edit"
           initial={customer}
-          onCancel={() => navigate('/admin/pelanggan')}
-          onSaved={() => navigate('/admin/pelanggan')}
+          onCancel={() => goBack(LIST_PATH)}
+          onSaved={() => goBack(LIST_PATH)}
         />
         <CustomerMetadataAside customer={customer} />
       </div>
@@ -85,7 +81,7 @@ export function AdminCustomerEditPage() {
         <CustomerDeleteModal
           open={isDeleteOpen}
           onOpenChange={setDeleteOpen}
-          onDeleted={() => navigate('/admin/pelanggan')}
+          onDeleted={() => goBack(LIST_PATH)}
           customer={customer}
         />
       ) : null}

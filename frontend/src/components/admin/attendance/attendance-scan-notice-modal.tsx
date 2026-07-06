@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 import {
   Dialog,
@@ -30,10 +30,63 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-const TITLE_CLASS: Record<AttendanceScanNoticeVariant, string> = {
-  success: 'text-primary',
-  warning: 'text-amber-600 dark:text-amber-400',
-  error: 'text-destructive',
+const STATUS_WORD_PATTERN: Record<AttendanceScanNoticeVariant, RegExp> = {
+  success: /\b(berhasil)\b/gi,
+  error: /\b(gagal|error)\b/gi,
+  warning: /\b(belum|lengkap)\b/gi,
+}
+
+const STATUS_PILL_CLASS: Record<AttendanceScanNoticeVariant, string> = {
+  success: 'bg-emerald-600 text-white',
+  error: 'bg-destructive text-white',
+  warning: 'bg-amber-500 text-white',
+}
+
+function StatusPill({
+  children,
+  variant,
+}: {
+  children: ReactNode
+  variant: AttendanceScanNoticeVariant
+}) {
+  return (
+    <span
+      className={cn(
+        'mx-0.5 inline-flex rounded-full px-2.5 py-0.5 text-sm font-semibold tracking-tight',
+        STATUS_PILL_CLASS[variant]
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+function renderTitleWithStatusPill(title: string, variant: AttendanceScanNoticeVariant) {
+  const pattern = STATUS_WORD_PATTERN[variant]
+  const match = title.match(pattern)
+
+  if (!match) {
+    if (variant === 'error') {
+      return (
+        <>
+          <StatusPill variant="error">Gagal</StatusPill> {title}
+        </>
+      )
+    }
+    return title
+  }
+
+  const keyword = match[0]
+  const idx = title.toLowerCase().indexOf(keyword.toLowerCase())
+  if (idx === -1) return title
+
+  return (
+    <>
+      {title.slice(0, idx)}
+      <StatusPill variant={variant}>{keyword}</StatusPill>
+      {title.slice(idx + keyword.length)}
+    </>
+  )
 }
 
 export function AttendanceScanNoticeModal({
@@ -43,7 +96,7 @@ export function AttendanceScanNoticeModal({
   message,
   preview = null,
   variant = 'warning',
-  autoDismissMs = 3000,
+  autoDismissMs = 5000,
 }: Props) {
   const roleLabel =
     preview?.role != null
@@ -65,7 +118,9 @@ export function AttendanceScanNoticeModal({
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className={cn(TITLE_CLASS[variant])}>{title}</DialogTitle>
+          <DialogTitle className="text-on-surface text-lg leading-snug">
+            {renderTitleWithStatusPill(title, variant)}
+          </DialogTitle>
           <DialogDescription className="text-on-surface-variant leading-relaxed">
             {message}
           </DialogDescription>

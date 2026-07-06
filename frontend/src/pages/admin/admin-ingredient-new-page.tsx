@@ -1,19 +1,16 @@
-import { Link, useNavigate } from 'react-router-dom'
-
 import { IngredientForm } from '@/components/admin/inventory/ingredient-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/gudang/bahan-baku'
 
 export function AdminIngredientNewPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
 
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/gudang/bahan-baku"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar bahan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar bahan</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Tambah bahan baku
         </h1>
@@ -26,8 +23,8 @@ export function AdminIngredientNewPage() {
       <IngredientForm
         mode="create"
         initial={null}
-        onCancel={() => navigate('/admin/gudang/bahan-baku')}
-        onSaved={() => navigate('/admin/gudang/bahan-baku')}
+        onCancel={() => goBack(LIST_PATH)}
+        onSaved={() => goBack(LIST_PATH)}
       />
     </div>
   )

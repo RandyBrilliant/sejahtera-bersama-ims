@@ -1,19 +1,16 @@
-import { Link, useNavigate } from 'react-router-dom'
-
 import { ProductForm } from '@/components/admin/inventory/product-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/inventaris'
 
 export function AdminInventoryNewPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
 
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          to="/admin/inventaris"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Tambah produk
         </h1>
@@ -27,8 +24,8 @@ export function AdminInventoryNewPage() {
           key="create"
           mode="create"
           initialProduct={null}
-          onCancel={() => navigate('/admin/inventaris')}
-          onSaved={() => navigate('/admin/inventaris')}
+          onCancel={() => goBack(LIST_PATH)}
+          onSaved={() => goBack(LIST_PATH)}
         />
         <aside className="border-outline-variant bg-surface-container-lowest ambient-shadow lg:sticky lg:top-20 rounded-xl border p-6">
           <h2 className="text-on-surface mb-3 text-sm font-semibold tracking-wide uppercase">

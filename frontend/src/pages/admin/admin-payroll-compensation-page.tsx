@@ -1,3 +1,4 @@
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -27,6 +28,8 @@ function axiosDetail(err: unknown): string | undefined {
   const d = err.response?.data as { detail?: unknown } | undefined
   return typeof d?.detail === 'string' ? d.detail : undefined
 }
+
+const LIST_PATH = '/admin/gaji'
 
 export function AdminPayrollCompensationPage() {
   const { user } = useAuth()
@@ -111,12 +114,7 @@ export function AdminPayrollCompensationPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/gaji"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke periode payroll
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke periode payroll</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Gaji pokok pegawai aktif
         </h1>

@@ -1,18 +1,22 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 import { StaffAttendanceBadgePanel } from '@/components/admin/staff/staff-attendance-badge-panel'
 import { StaffCompensationPanel } from '@/components/admin/staff/staff-compensation-panel'
 import { StaffUserDetailSubnav, type StaffDetailTab } from '@/components/admin/staff/staff-user-detail-subnav'
 import { StaffUserMetadataAside } from '@/components/admin/staff/staff-user-metadata-aside'
 import { StaffUserForm } from '@/components/admin/staff/staff-user-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
 import { useAuth } from '@/hooks/use-auth'
 import { useSystemUserQuery } from '@/hooks/use-system-users-query'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/staf'
 
 export function AdminStaffEditPage() {
+  const goBack = useGoBack()
   const { id: idParam } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { user: authUser } = useAuth()
   const actorRole = authUser?.role ?? 'ADMIN'
   const [activeTab, setActiveTab] = useState<StaffDetailTab>('profile')
@@ -23,7 +27,7 @@ export function AdminStaffEditPage() {
   const { data: user, isLoading, isError } = useSystemUserQuery(validId ? id : null)
 
   if (!validId) {
-    return <Navigate to="/admin/staf" replace />
+    return <Navigate to={LIST_PATH} replace />
   }
 
   if (isLoading) {
@@ -35,12 +39,9 @@ export function AdminStaffEditPage() {
   if (isError || !user) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/admin/staf"
-          className="text-on-surface-variant hover:text-primary inline-block text-sm font-medium"
-        >
+        <PageBackLink fallback={LIST_PATH} className="mb-0">
           ← Kembali ke daftar
-        </Link>
+        </PageBackLink>
         <p className="text-destructive text-sm">Pengguna tidak ditemukan.</p>
       </div>
     )
@@ -51,12 +52,7 @@ export function AdminStaffEditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          to="/admin/staf"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke daftar
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke daftar</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Detail pengguna
         </h1>
@@ -76,8 +72,8 @@ export function AdminStaffEditPage() {
             mode="edit"
             initialUser={user}
             actorRole={actorRole}
-            onCancel={() => navigate('/admin/staf')}
-            onSaved={() => navigate('/admin/staf')}
+            onCancel={() => goBack(LIST_PATH)}
+            onSaved={() => goBack(LIST_PATH)}
           />
           <StaffUserMetadataAside user={user} />
         </div>

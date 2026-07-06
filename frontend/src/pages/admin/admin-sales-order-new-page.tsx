@@ -1,19 +1,19 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import { SalesOrderForm } from '@/components/admin/orders/sales-order-form'
+import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useGoBack } from '@/hooks/use-go-back'
+
+const LIST_PATH = '/admin/pesanan/penjualan'
 
 export function AdminSalesOrderNewPage() {
   const navigate = useNavigate()
+  const goBack = useGoBack()
 
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          to="/admin/pesanan/penjualan"
-          className="text-on-surface-variant hover:text-primary mb-2 inline-block text-sm font-medium"
-        >
-          ← Kembali ke penjualan
-        </Link>
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke penjualan</PageBackLink>
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
           Order penjualan baru
         </h2>
@@ -21,7 +21,7 @@ export function AdminSalesOrderNewPage() {
 
       <SalesOrderForm
         mode="create"
-        onCancel={() => navigate('/admin/pesanan/penjualan')}
+        onCancel={() => goBack(LIST_PATH)}
         onSaved={(oid) => navigate(`/admin/pesanan/penjualan/${oid}`)}
       />
     </div>
