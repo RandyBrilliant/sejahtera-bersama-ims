@@ -47,7 +47,12 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False, trim_whitespace=False)
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+    )
     joined_date = serializers.DateField(write_only=True, required=False, allow_null=True)
     employee_profile = EmployeeProfileSerializer(read_only=True)
 
@@ -76,6 +81,13 @@ class UserSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if not attrs.get("full_name") and not (self.instance and self.instance.full_name):
             raise serializers.ValidationError({"full_name": [ApiMessage.PROFILE_FULL_NAME_REQUIRED]})
+
+        # Initial password defaults to username when omitted (staff reset it after first login).
+        if not self.instance and not attrs.get("password"):
+            username = attrs.get("username")
+            if username:
+                attrs["password"] = username
+
         return attrs
 
     def create(self, validated_data):

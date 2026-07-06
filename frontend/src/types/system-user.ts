@@ -41,6 +41,7 @@ export type UsersListParams = {
 
 export type SystemUserCreateInput = {
   username: string
+  password: string
   full_name: string
   role: UserRole
   phone_number?: string

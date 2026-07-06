@@ -89,8 +89,10 @@ export function StaffUserForm({
       }
 
       try {
+        const trimmedUsername = username.trim()
         await createMutation.mutateAsync({
-          username: username.trim(),
+          username: trimmedUsername,
+          password: trimmedUsername,
           full_name: fullName.trim(),
           role,
           phone_number: phone.trim() || undefined,
