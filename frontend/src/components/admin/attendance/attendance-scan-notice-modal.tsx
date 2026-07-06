@@ -1,21 +1,26 @@
+import { useEffect } from 'react'
+
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
+import { cn } from '@/lib/utils'
 import type { AttendancePreviewResponse } from '@/types/attendance'
+
+export type AttendanceScanNoticeVariant = 'success' | 'warning' | 'error'
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   message: string
-  preview: AttendancePreviewResponse | null
+  preview?: AttendancePreviewResponse | null
+  variant?: AttendanceScanNoticeVariant
+  autoDismissMs?: number
 }
 
 function fmtDt(iso: string | null | undefined) {
@@ -25,23 +30,42 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+const TITLE_CLASS: Record<AttendanceScanNoticeVariant, string> = {
+  success: 'text-primary',
+  warning: 'text-amber-600 dark:text-amber-400',
+  error: 'text-destructive',
+}
+
 export function AttendanceScanNoticeModal({
   open,
   onOpenChange,
   title,
   message,
-  preview,
+  preview = null,
+  variant = 'warning',
+  autoDismissMs = 3000,
 }: Props) {
   const roleLabel =
     preview?.role != null
       ? USER_ROLE_LABEL[preview.role as keyof typeof USER_ROLE_LABEL] ?? preview.role
       : null
 
+  useEffect(() => {
+    if (!open || autoDismissMs <= 0) return
+    const timer = window.setTimeout(() => onOpenChange(false), autoDismissMs)
+    return () => window.clearTimeout(timer)
+  }, [autoDismissMs, onOpenChange, open, title])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-outline-variant bg-card sm:max-w-md" showCloseButton>
+      <DialogContent
+        className="border-outline-variant bg-card sm:max-w-md"
+        showCloseButton={false}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className={cn(TITLE_CLASS[variant])}>{title}</DialogTitle>
           <DialogDescription className="text-on-surface-variant leading-relaxed">
             {message}
           </DialogDescription>
@@ -67,14 +91,14 @@ export function AttendanceScanNoticeModal({
                 </span>
               </p>
             ) : null}
+            {preview.is_late ? (
+              <p className="text-destructive pt-1 text-xs font-medium">
+                Terlambat
+                {preview.minutes_late != null ? ` (+${preview.minutes_late} menit)` : ''}
+              </p>
+            ) : null}
           </div>
         ) : null}
-
-        <DialogFooter>
-          <Button type="button" onClick={() => onOpenChange(false)}>
-            Tutup
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

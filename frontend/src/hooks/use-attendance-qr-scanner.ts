@@ -17,10 +17,11 @@ type CameraEnvIssue = 'insecure' | 'unsupported' | 'denied' | 'policy' | null
 
 type Options = {
   onScan: (raw: string) => void | Promise<void>
+  onCameraError?: (title: string, detail: string) => void
   enabled?: boolean
 }
 
-export function useAttendanceQrScanner({ onScan, enabled = true }: Options) {
+export function useAttendanceQrScanner({ onScan, onCameraError, enabled = true }: Options) {
   const reactId = useId()
   const regionId = `attendance-scan-${reactId.replace(/:/g, '')}`
 
@@ -30,6 +31,7 @@ export function useAttendanceQrScanner({ onScan, enabled = true }: Options) {
   const sessionEpochRef = useRef(0)
   const startLockRef = useRef<Promise<void> | null>(null)
   const onScanRef = useRef(onScan)
+  const onCameraErrorRef = useRef(onCameraError)
 
   const [scannerReady, setScannerReady] = useState(false)
   const [cameraEnvIssue, setCameraEnvIssue] = useState<CameraEnvIssue>(null)
@@ -37,6 +39,10 @@ export function useAttendanceQrScanner({ onScan, enabled = true }: Options) {
   useEffect(() => {
     onScanRef.current = onScan
   }, [onScan])
+
+  useEffect(() => {
+    onCameraErrorRef.current = onCameraError
+  }, [onCameraError])
 
   const stopScanner = useCallback(async () => {
     const qr = scannerRef.current
@@ -112,7 +118,11 @@ export function useAttendanceQrScanner({ onScan, enabled = true }: Options) {
 
   const handleCameraStartFailure = useCallback((err: unknown) => {
     const { title, detail } = formatCameraFailure(err)
-    alert.error(title, detail)
+    if (onCameraErrorRef.current) {
+      onCameraErrorRef.current(title, detail)
+    } else {
+      alert.error(title, detail)
+    }
     setScannerReady(false)
   }, [])
 
