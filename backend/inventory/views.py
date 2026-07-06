@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db import models, transaction
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models import Case, Count, DecimalField, ExpressionWrapper, F, IntegerField, Sum, Value, When
 from django.db.models.functions import Cast, Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -93,7 +93,7 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
-    ordering_fields = ["name", "variant_name", "remaining_mass_grams", "created_at", "updated_at"]
+    ordering_fields = ["name", "variant_name", "remaining_mass_grams", "is_active", "created_at", "updated_at"]
     ordering = ["variant_name"]
 
     def get_queryset(self):
@@ -124,6 +124,9 @@ class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         "net_mass_kg",
         "remaining_stock",
         "base_price_idr",
+        "list_price_idr",
+        "sku",
+        "is_active",
         "created_at",
         "updated_at",
     ]
@@ -141,7 +144,7 @@ class IngredientViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = IngredientFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name"]
-    ordering_fields = ["name", "created_at", "updated_at"]
+    ordering_fields = ["name", "default_unit", "is_active", "created_at", "updated_at"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -155,7 +158,14 @@ class IngredientInventoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = IngredientInventoryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["ingredient__name"]
-    ordering_fields = ["remaining_stock", "minimum_stock", "created_at", "updated_at"]
+    ordering_fields = [
+        "ingredient__name",
+        "remaining_stock",
+        "minimum_stock",
+        "is_below_minimum",
+        "created_at",
+        "updated_at",
+    ]
     ordering = ["ingredient__name"]
 
     def get_queryset(self):
@@ -163,6 +173,12 @@ class IngredientInventoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             "ingredient",
             "created_by",
             "updated_by",
+        ).annotate(
+            is_below_minimum=Case(
+                When(remaining_stock__lt=F("minimum_stock"), then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
         )
 
 
@@ -425,7 +441,14 @@ class IngredientStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = IngredientStockMovementFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["ingredient_inventory__ingredient__name", "note"]
-    ordering_fields = ["movement_at", "created_at", "quantity"]
+    ordering_fields = [
+        "movement_at",
+        "created_at",
+        "quantity",
+        "movement_type",
+        "note",
+        "ingredient_inventory__ingredient__name",
+    ]
     ordering = ["-movement_at"]
     http_method_names = ["get", "post", "head", "options"]
 
@@ -482,7 +505,17 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         "product_packaging__product__variant_name",
         "note",
     ]
-    ordering_fields = ["movement_at", "created_at", "mass_grams", "bonus_mass_grams"]
+    ordering_fields = [
+        "movement_at",
+        "created_at",
+        "mass_grams",
+        "bonus_mass_grams",
+        "total_mass_grams",
+        "movement_type",
+        "note",
+        "product__variant_name",
+        "product_packaging__label",
+    ]
     ordering = ["-movement_at"]
     http_method_names = ["get", "post", "head", "options"]
 
@@ -493,6 +526,11 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             "product_packaging__product",
             "created_by",
             "updated_by",
+        ).annotate(
+            total_mass_grams=ExpressionWrapper(
+                F("mass_grams") + F("bonus_mass_grams"),
+                output_field=DecimalField(max_digits=14, decimal_places=3),
+            )
         )
 
     @transaction.atomic

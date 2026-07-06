@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { WilayahManagerModal } from '@/components/admin/customers/wilayah-manager-modal'
 import { useCustomersQuery, useWilayahQuery } from '@/hooks/use-purchase-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,15 +32,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Customer, CustomersListParams } from '@/types/purchase'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_OPTIONS: { value: string; label: string }[] = [
-  { value: 'name', label: 'Nama A–Z' },
-  { value: '-name', label: 'Nama Z–A' },
-  { value: '-created_at', label: 'Terbaru dibuat' },
-  { value: 'created_at', label: 'Terlama dibuat' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 const STATUS_FILTER: { value: string; label: string }[] = [
   { value: 'all', label: 'Semua status' },
@@ -63,7 +58,7 @@ export function CustomersTable() {
     user?.role === 'SALES_STAFF'
   const [params, setParams] = useState<CustomersListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'name',
   })
   const [searchInput, setSearchInput] = useState('')
@@ -86,7 +81,7 @@ export function CustomersTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -98,33 +93,44 @@ export function CustomersTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'name',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<Customer>[]>(
     () => [
       {
         accessorKey: 'name',
-        header: 'Nama',
+        header: () => sortHeader('Nama', 'name'),
         cell: ({ row }) => (
           <span className="font-medium">{row.original.name}</span>
         ),
       },
       {
         accessorKey: 'phone',
-        header: 'Telepon',
+        header: () => sortHeader('Telepon', 'phone'),
         cell: ({ row }) => row.original.phone || '—',
       },
       {
         id: 'wilayah_name',
-        header: 'Wilayah',
+        header: () => sortHeader('Wilayah', 'wilayah__name'),
         cell: ({ row }) => row.original.wilayah_name || '—',
       },
       {
         accessorKey: 'address',
-        header: 'Alamat',
+        header: () => sortHeader('Alamat', 'address'),
         cell: ({ row }) => row.original.address || '—',
       },
       {
         id: 'status',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge className="bg-emerald-500/15 text-emerald-800 dark:text-emerald-300">
@@ -167,7 +173,7 @@ export function CustomersTable() {
         ),
       },
     ],
-    [canDelete, canEditCustomers, navigate]
+    [canDelete, canEditCustomers, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table row API */
@@ -243,23 +249,6 @@ export function CustomersTable() {
             {(wilayahQuery.data?.results ?? []).map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
                 {w.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={params.ordering ?? 'name'}
-          onValueChange={(ordering) =>
-            setParams((p) => ({ ...p, page: 1, ordering }))
-          }
-        >
-          <SelectTrigger className="border-outline-variant w-[200px]">
-            <SelectValue placeholder="Urutan" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
               </SelectItem>
             ))}
           </SelectContent>

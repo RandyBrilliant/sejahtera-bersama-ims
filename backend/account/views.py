@@ -60,12 +60,12 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = UserListFilterSet
     search_fields = ["username", "full_name", "phone_number"]
-    ordering_fields = ["username", "full_name", "created_at", "updated_at", "date_joined"]
+    ordering_fields = ["username", "full_name", "role", "phone_number", "is_active", "employee_profile__employee_code", "created_at", "updated_at", "date_joined"]
     ordering = ["username"]
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_queryset(self):
-        qs = User.objects.all()
+        qs = User.objects.select_related("employee_profile")
         return qs if user_is_owner(self.request.user) else qs.exclude(role=UserRole.LEADERSHIP)
 
     def _guard_owner_role_change(self, role):

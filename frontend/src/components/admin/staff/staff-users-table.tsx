@@ -17,6 +17,8 @@ import {
 import { useNavigate } from 'react-router-dom'
 
 import { USER_ROLE_LABEL, USER_ROLE_PILL_CLASS } from '@/constants/user-roles'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { useSystemUsersQuery } from '@/hooks/use-system-users-query'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
 import { cn } from '@/lib/utils'
@@ -42,14 +44,7 @@ import {
 import type { UserRole } from '@/types/auth'
 import type { SystemUser, UsersListParams } from '@/types/system-user'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_OPTIONS: { value: string; label: string }[] = [
-  { value: 'username', label: 'Username A–Z' },
-  { value: '-username', label: 'Username Z–A' },
-  { value: '-created_at', label: 'Terbaru dibuat' },
-  { value: 'created_at', label: 'Terlama dibuat' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 const ROLE_FILTER: { value: string; label: string }[] = [
   { value: 'all', label: 'Semua peran' },
@@ -67,7 +62,7 @@ export function StaffUsersTable() {
 
   const [params, setParams] = useState<UsersListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'username',
   })
   const [searchInput, setSearchInput] = useState('')
@@ -80,7 +75,7 @@ export function StaffUsersTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -91,6 +86,17 @@ export function StaffUsersTable() {
       search: searchInput.trim() || undefined,
     }))
   }, [searchInput])
+
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'username',
+    onOrderingChange,
+  })
 
   const openDeactivate = useCallback((u: SystemUser) => {
     setStatusTarget({ user: u, intent: 'deactivate' })
@@ -104,19 +110,19 @@ export function StaffUsersTable() {
     () => [
       {
         accessorKey: 'username',
-        header: 'Username',
+        header: () => sortHeader('Username', 'username'),
         cell: ({ row }) => (
           <span className="font-medium">{row.original.username}</span>
         ),
       },
       {
         accessorKey: 'full_name',
-        header: 'Nama',
+        header: () => sortHeader('Nama', 'full_name'),
         cell: ({ row }) => row.original.full_name || '—',
       },
       {
         accessorKey: 'role',
-        header: 'Peran',
+        header: () => sortHeader('Peran', 'role'),
         cell: ({ row }) => {
           const role = row.original.role
           const label = USER_ROLE_LABEL[role] ?? role
@@ -135,7 +141,7 @@ export function StaffUsersTable() {
       },
       {
         id: 'phone',
-        header: 'Telepon',
+        header: () => sortHeader('Telepon', 'phone_number'),
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[14rem] truncate text-sm">
             {formatRegionalPhonePreview(row.original.phone_number ?? '')}
@@ -144,7 +150,7 @@ export function StaffUsersTable() {
       },
       {
         id: 'employee_code',
-        header: 'Kode karyawan',
+        header: () => sortHeader('Kode karyawan', 'employee_profile__employee_code'),
         cell: ({ row }) => (
           <span className="font-mono text-xs">
             {row.original.employee_profile?.employee_code ?? '—'}
@@ -153,7 +159,7 @@ export function StaffUsersTable() {
       },
       {
         accessorKey: 'is_active',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>
@@ -206,7 +212,7 @@ export function StaffUsersTable() {
         },
       },
     ],
-    [navigate, openActivate, openDeactivate]
+    [navigate, openActivate, openDeactivate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table row API */
@@ -302,24 +308,6 @@ export function StaffUsersTable() {
             <SelectItem value="all">Semua status</SelectItem>
             <SelectItem value="true">Aktif saja</SelectItem>
             <SelectItem value="false">Nonaktif saja</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? 'username'}
-          onValueChange={(ordering) =>
-            setParams((p) => ({ ...p, page: 1, ordering }))
-          }
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,14rem)]">
-            <SelectValue placeholder="Urutan" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 

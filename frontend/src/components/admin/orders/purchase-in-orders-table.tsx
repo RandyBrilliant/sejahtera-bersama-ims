@@ -43,22 +43,14 @@ import {
   useVerifyPurchaseInOrderMutation,
 } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, PurchaseInOrder, PurchaseInOrdersListParams } from '@/types/purchase'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_DEFAULT = '__default__' as const
-
-const ORDERING: { value: string; label: string }[] = [
-  { value: ORDERING_DEFAULT, label: 'Default (terbaru)' },
-  { value: '-created_at', label: 'Terbaru' },
-  { value: 'created_at', label: 'Terlama' },
-  { value: '-total_idr', label: 'Total tertinggi' },
-  { value: 'order_code', label: 'Kode A–Z' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 function fmtShort(iso: string) {
   const d = new Date(iso)
@@ -72,7 +64,8 @@ export function PurchaseInOrdersTable() {
   const canManagePurchase = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP' || user?.role === 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<PurchaseInOrdersListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: '-created_at',
   })
   const [searchInput, setSearchInput] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -88,7 +81,7 @@ export function PurchaseInOrdersTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -99,6 +92,17 @@ export function PurchaseInOrdersTable() {
       search: searchInput.trim() || undefined,
     }))
   }, [searchInput])
+
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: '-created_at',
+    onOrderingChange,
+  })
 
   async function submitQuickAction() {
     if (!confirmTarget) return
@@ -120,26 +124,26 @@ export function PurchaseInOrdersTable() {
     () => [
       {
         accessorKey: 'order_code',
-        header: 'Kode',
+        header: () => sortHeader('Kode', 'order_code'),
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.order_code}</span>
         ),
       },
       {
         accessorKey: 'status',
-        header: 'Status',
+        header: () => sortHeader('Status', 'status'),
         cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
       },
       {
         accessorKey: 'total_idr',
-        header: 'Total',
+        header: () => sortHeader('Total', 'total_idr'),
         cell: ({ row }) => (
           <span className="tabular-nums">{formatIdr(row.original.total_idr)}</span>
         ),
       },
       {
         accessorKey: 'created_at',
-        header: 'Tanggal',
+        header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),
         cell: ({ row }) => (
           <span className="text-on-surface-variant text-sm whitespace-nowrap">
             {fmtShort(row.original.created_at)}
@@ -202,7 +206,7 @@ export function PurchaseInOrdersTable() {
         ),
       },
     ],
-    [canManagePurchase, navigate]
+    [canManagePurchase, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -289,28 +293,6 @@ export function PurchaseInOrdersTable() {
             {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => (
               <SelectItem key={s} value={s}>
                 {ORDER_STATUS_LABEL[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? ORDERING_DEFAULT}
-          onValueChange={(ordering) =>
-            setParams((p) => ({
-              ...p,
-              page: 1,
-              ordering: ordering === ORDERING_DEFAULT ? undefined : ordering,
-            }))
-          }
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,15rem)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
               </SelectItem>
             ))}
           </SelectContent>

@@ -29,18 +29,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useIngredientsQuery } from '@/hooks/use-inventory-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import type { Ingredient, IngredientsListParams } from '@/types/inventory'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING: { value: string; label: string }[] = [
-  { value: 'name', label: 'Nama A–Z' },
-  { value: '-name', label: 'Nama Z–A' },
-  { value: '-created_at', label: 'Terbaru' },
-  { value: 'created_at', label: 'Terlama' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 export function IngredientsTable() {
   const navigate = useNavigate()
@@ -48,7 +43,7 @@ export function IngredientsTable() {
   const canDelete = user?.role !== 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<IngredientsListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'name',
   })
   const [searchInput, setSearchInput] = useState('')
@@ -58,7 +53,7 @@ export function IngredientsTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -70,21 +65,32 @@ export function IngredientsTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'name',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<Ingredient>[]>(
     () => [
       {
         accessorKey: 'name',
-        header: 'Nama bahan',
+        header: () => sortHeader('Nama bahan', 'name'),
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
       },
       {
         accessorKey: 'default_unit',
-        header: 'Satuan',
+        header: () => sortHeader('Satuan', 'default_unit'),
         cell: ({ row }) => STOCK_UNIT_LABEL[row.original.default_unit] ?? row.original.default_unit,
       },
       {
         accessorKey: 'is_active',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>
@@ -126,7 +132,7 @@ export function IngredientsTable() {
         },
       },
     ],
-    [canDelete, navigate]
+    [canDelete, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -194,22 +200,6 @@ export function IngredientsTable() {
             <SelectItem value="all">Semua status</SelectItem>
             <SelectItem value="true">Aktif saja</SelectItem>
             <SelectItem value="false">Nonaktif saja</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? 'name'}
-          onValueChange={(ordering) => setParams((p) => ({ ...p, page: 1, ordering }))}
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,14rem)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 

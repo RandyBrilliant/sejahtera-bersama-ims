@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { alert } from '@/lib/alert'
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/constants/table-pagination'
 import type { AttendanceReportEnvelope, AttendanceReportRow } from '@/types/attendance'
 import type { SystemUser } from '@/types/system-user'
 import { isAxiosError } from 'axios'
@@ -113,7 +114,7 @@ export function AdminAttendanceReportPage() {
   const [staff, setStaff] = useState<SystemUser[]>([])
   const [envelope, setEnvelope] = useState<AttendanceReportEnvelope | null>(null)
   const [loading, setLoading] = useState(false)
-  const pageSize = 50
+  const pageSize = DEFAULT_TABLE_PAGE_SIZE
 
   useEffect(() => {
     let cancelled = false

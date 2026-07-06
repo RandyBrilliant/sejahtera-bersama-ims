@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { OperationalCashEntryDeleteModal } from '@/components/admin/kas/operational-cash-entry-delete-modal'
 import { useOperationalCashEntriesQuery } from '@/hooks/use-expenses-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,15 +38,9 @@ import type {
   OperationalCashEntryListParams,
   PaymentMethod,
 } from '@/types/expenses'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_OPTIONS: { value: string; label: string }[] = [
-  { value: '-occurred_on,-id', label: 'Tanggal terbaru' },
-  { value: 'occurred_on,id', label: 'Tanggal terlama' },
-  { value: '-amount_idr', label: 'Jumlah tertinggi' },
-  { value: 'amount_idr', label: 'Jumlah terendah' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 const DIR_FILTER: { value: string; label: string }[] = [
   { value: 'all', label: 'Semua arah' },
@@ -68,7 +63,7 @@ export function OperationalCashEntriesTable() {
   const navigate = useNavigate()
   const [params, setParams] = useState<OperationalCashEntryListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: '-occurred_on,-id',
   })
   const [searchInput, setSearchInput] = useState('')
@@ -102,7 +97,7 @@ export function OperationalCashEntriesTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -114,37 +109,53 @@ export function OperationalCashEntriesTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: '-occurred_on,-id',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<OperationalCashEntry>[]>(
     () => [
       {
         accessorKey: 'occurred_on',
-        header: 'Tanggal',
+        header: () =>
+          sortHeader('Tanggal', {
+            field: 'occurred_on',
+            asc: 'occurred_on,id',
+            desc: '-occurred_on,-id',
+          }, { preferDesc: true }),
         cell: ({ row }) => (
           <span className="tabular-nums">{row.original.occurred_on}</span>
         ),
       },
       {
         accessorKey: 'direction',
-        header: 'Jenis',
+        header: () => sortHeader('Jenis', 'direction'),
         cell: ({ row }) => (
           <Badge variant="outline">{ENTRY_KIND_LABEL[row.original.direction]}</Badge>
         ),
       },
       {
         accessorKey: 'payment_method',
-        header: 'Metode',
+        header: () => sortHeader('Metode', 'payment_method'),
         cell: ({ row }) => (
           <Badge variant="secondary">{PAYMENT_METHOD_LABEL[row.original.payment_method]}</Badge>
         ),
       },
       {
         accessorKey: 'category_name',
-        header: 'Kategori',
+        header: () => sortHeader('Kategori', 'category__name'),
         cell: ({ row }) => row.original.category_name,
       },
       {
         accessorKey: 'amount_idr',
-        header: 'Jumlah',
+        header: () => sortHeader('Jumlah', 'amount_idr'),
         cell: ({ row }) => (
           <span className="font-medium tabular-nums">
             {formatIdr(row.original.amount_idr)}
@@ -153,7 +164,7 @@ export function OperationalCashEntriesTable() {
       },
       {
         accessorKey: 'description',
-        header: 'Deskripsi',
+        header: () => sortHeader('Deskripsi', 'description'),
         cell: ({ row }) => (
           <span className="max-w-[220px]">{truncate(row.original.description, 80)}</span>
         ),
@@ -187,7 +198,7 @@ export function OperationalCashEntriesTable() {
         ),
       },
     ],
-    [navigate]
+    [navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table row API */
@@ -287,21 +298,6 @@ export function OperationalCashEntriesTable() {
             minDate={fromDate || undefined}
           />
         </div>
-        <Select
-          value={params.ordering ?? '-occurred_on,-id'}
-          onValueChange={(ordering) => setParams((p) => ({ ...p, page: 1, ordering }))}
-        >
-          <SelectTrigger className="border-outline-variant w-[200px]">
-            <SelectValue placeholder="Urutan" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         {isFetching ? (
           <span className="text-on-surface-variant text-xs">Memperbarui…</span>
         ) : null}

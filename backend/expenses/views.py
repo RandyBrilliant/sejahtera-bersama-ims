@@ -75,7 +75,7 @@ class OperationalCategoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = OperationalCategoryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "slug", "description"]
-    ordering_fields = ["name", "sort_order", "entry_kind", "created_at", "updated_at"]
+    ordering_fields = ["name", "sort_order", "entry_kind", "is_active", "created_at", "updated_at"]
     ordering = ["entry_kind", "sort_order", "name"]
 
     def get_queryset(self):
@@ -100,6 +100,8 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         "amount_idr",
         "direction",
         "payment_method",
+        "category__name",
+        "description",
         "created_at",
         "updated_at",
     ]

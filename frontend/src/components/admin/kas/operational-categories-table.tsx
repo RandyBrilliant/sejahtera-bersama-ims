@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { ENTRY_KIND_LABEL } from '@/constants/expenses'
 import { OperationalCategoryDeleteModal } from '@/components/admin/kas/operational-category-delete-modal'
 import { useOperationalCategoriesQuery } from '@/hooks/use-expenses-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,15 +31,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { EntryKind, OperationalCategory, OperationalCategoryListParams } from '@/types/expenses'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_OPTIONS: { value: string; label: string }[] = [
-  { value: 'entry_kind,sort_order,name', label: 'Jenis & urutan & nama' },
-  { value: 'name', label: 'Nama A–Z' },
-  { value: '-name', label: 'Nama Z–A' },
-  { value: '-created_at', label: 'Terbaru' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 const KIND_FILTER: { value: string; label: string }[] = [
   { value: 'all', label: 'Semua jenis' },
@@ -50,8 +45,8 @@ export function OperationalCategoriesTable() {
   const navigate = useNavigate()
   const [params, setParams] = useState<OperationalCategoryListParams>({
     page: 1,
-    page_size: 20,
-    ordering: 'entry_kind,sort_order,name',
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: 'name',
   })
   const [searchInput, setSearchInput] = useState('')
   const [kindFilter, setKindFilter] = useState<string>('all')
@@ -71,7 +66,7 @@ export function OperationalCategoriesTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -83,28 +78,39 @@ export function OperationalCategoriesTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'name',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<OperationalCategory>[]>(
     () => [
       {
         accessorKey: 'name',
-        header: 'Nama',
+        header: () => sortHeader('Nama', 'name'),
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
       },
       {
         accessorKey: 'entry_kind',
-        header: 'Jenis',
+        header: () => sortHeader('Jenis', 'entry_kind'),
         cell: ({ row }) => (
           <Badge variant="outline">{ENTRY_KIND_LABEL[row.original.entry_kind]}</Badge>
         ),
       },
       {
         accessorKey: 'sort_order',
-        header: 'Urutan',
+        header: () => sortHeader('Urutan', 'sort_order'),
         cell: ({ row }) => row.original.sort_order,
       },
       {
         id: 'active',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge className="bg-emerald-500/15 text-emerald-800 dark:text-emerald-300">
@@ -143,7 +149,7 @@ export function OperationalCategoriesTable() {
         ),
       },
     ],
-    [navigate]
+    [navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table row API */
@@ -196,21 +202,6 @@ export function OperationalCategoriesTable() {
           </SelectTrigger>
           <SelectContent>
             {KIND_FILTER.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={params.ordering ?? 'entry_kind,sort_order,name'}
-          onValueChange={(ordering) => setParams((p) => ({ ...p, page: 1, ordering }))}
-        >
-          <SelectTrigger className="border-outline-variant w-[220px]">
-            <SelectValue placeholder="Urutan" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>

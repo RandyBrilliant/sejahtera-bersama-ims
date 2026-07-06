@@ -27,21 +27,12 @@ import {
 } from '@/components/ui/table'
 import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
 import { useIngredientStockMovementsQuery } from '@/hooks/use-inventory-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { cn } from '@/lib/utils'
 import type { IngredientStockMovement, IngredientStockMovementListParams, StockMovementType } from '@/types/inventory'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_DEFAULT = '__default__' as const
-
-const ORDERING: { value: string; label: string }[] = [
-  { value: ORDERING_DEFAULT, label: 'Default (terbaru)' },
-  { value: 'movement_at', label: 'Waktu mutasi terlama' },
-  { value: '-movement_at', label: 'Waktu mutasi terbaru' },
-  { value: '-created_at', label: 'Dicatat terbaru' },
-  { value: 'quantity', label: 'Kuantitas terendah' },
-  { value: '-quantity', label: 'Kuantitas tertinggi' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 function fmtQty(v: string) {
   const n = Number(v)
@@ -65,7 +56,8 @@ function fmtDt(iso: string) {
 export function IngredientStockMovementsTable() {
   const [params, setParams] = useState<IngredientStockMovementListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: '-movement_at',
   })
   const [searchInput, setSearchInput] = useState('')
 
@@ -73,7 +65,7 @@ export function IngredientStockMovementsTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -85,16 +77,27 @@ export function IngredientStockMovementsTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: '-movement_at',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<IngredientStockMovement>[]>(
     () => [
       {
         accessorKey: 'ingredient_name',
-        header: 'Bahan',
+        header: () => sortHeader('Bahan', 'ingredient_inventory__ingredient__name'),
         cell: ({ row }) => <span className="font-medium">{row.original.ingredient_name}</span>,
       },
       {
         accessorKey: 'movement_type',
-        header: 'Jenis',
+        header: () => sortHeader('Jenis', 'movement_type'),
         cell: ({ row }) =>
           row.original.movement_type === 'IN' ? (
             <Badge variant="default">Masuk</Badge>
@@ -104,7 +107,7 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'quantity',
-        header: 'Kuantitas',
+        header: () => sortHeader('Kuantitas', 'quantity'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.quantity)}{' '}
@@ -114,7 +117,7 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'note',
-        header: 'Catatan',
+        header: () => sortHeader('Catatan', 'note'),
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[200px] truncate text-sm">
             {row.original.note || '—'}
@@ -123,13 +126,13 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'movement_at',
-        header: 'Waktu mutasi',
+        header: () => sortHeader('Waktu mutasi', 'movement_at', { preferDesc: true }),
         cell: ({ row }) => (
           <span className="text-sm whitespace-nowrap">{fmtDt(row.original.movement_at)}</span>
         ),
       },
     ],
-    []
+    [sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -181,28 +184,6 @@ export function IngredientStockMovementsTable() {
             <SelectItem value="all">Semua jenis</SelectItem>
             <SelectItem value="IN">Masuk</SelectItem>
             <SelectItem value="OUT">Keluar</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? ORDERING_DEFAULT}
-          onValueChange={(ordering) =>
-            setParams((p) => ({
-              ...p,
-              page: 1,
-              ordering: ordering === ORDERING_DEFAULT ? undefined : ordering,
-            }))
-          }
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,15rem)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 

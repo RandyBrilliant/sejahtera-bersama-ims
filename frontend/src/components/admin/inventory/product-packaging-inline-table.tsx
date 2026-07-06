@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -13,9 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/constants/table-pagination'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { formatIdr } from '@/lib/format-idr'
-import type { ProductPackaging } from '@/types/inventory'
+import type { ProductPackaging, ProductPackagingListParams } from '@/types/inventory'
 
 type Props = {
   productId: number
@@ -36,12 +38,24 @@ function fmtKg(v: string) {
 export function ProductPackagingInlineTable({ productId }: Props) {
   const navigate = useNavigate()
   const [deleteRow, setDeleteRow] = useState<ProductPackaging | null>(null)
-
-  const { data, isLoading, isError } = useProductPackagingListQuery({
+  const [listParams, setListParams] = useState<ProductPackagingListParams>({
     product: productId,
-    page_size: 100,
-    ordering: 'net_mass_kg',
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: 'label',
   })
+
+  const onOrderingChange = useCallback(
+    (ordering: string) => setListParams((p) => ({ ...p, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: listParams.ordering,
+    defaultOrdering: 'label',
+    onOrderingChange,
+  })
+
+  const { data, isLoading, isError } = useProductPackagingListQuery(listParams)
 
   const rows = data?.results ?? []
 
@@ -88,13 +102,27 @@ export function ProductPackagingInlineTable({ productId }: Props) {
           <Table>
             <TableHeader>
               <TableRow className="border-outline-variant hover:bg-transparent">
-                <TableHead className="text-on-surface-variant">Label</TableHead>
-                <TableHead className="text-on-surface-variant">Berat (kg)</TableHead>
-                <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
-                <TableHead className="text-on-surface-variant">Harga pokok</TableHead>
-                <TableHead className="text-on-surface-variant">Harga jual</TableHead>
-                <TableHead className="text-on-surface-variant">SKU</TableHead>
-                <TableHead className="text-on-surface-variant">Status</TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Label', 'label')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Berat (kg)', 'net_mass_kg')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Setara unit kemasan', 'remaining_stock')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Harga pokok', 'base_price_idr')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Harga jual', 'list_price_idr')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('SKU', 'sku')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Status', 'is_active')}
+                </TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>

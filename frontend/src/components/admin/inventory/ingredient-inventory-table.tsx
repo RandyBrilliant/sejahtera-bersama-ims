@@ -28,20 +28,12 @@ import {
 } from '@/components/ui/table'
 import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
 import { useIngredientInventoriesQuery } from '@/hooks/use-inventory-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { cn } from '@/lib/utils'
 import type { IngredientInventory, IngredientInventoryListParams } from '@/types/inventory'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_DEFAULT = '__default__' as const
-
-const ORDERING: { value: string; label: string }[] = [
-  { value: ORDERING_DEFAULT, label: 'Default (nama bahan)' },
-  { value: 'remaining_stock', label: 'Stok sisa terendah' },
-  { value: '-remaining_stock', label: 'Stok sisa tertinggi' },
-  { value: 'minimum_stock', label: 'Minimum terendah' },
-  { value: '-updated_at', label: 'Pembaruan terbaru' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 function fmtQty(v: string) {
   const n = Number(v)
@@ -57,7 +49,7 @@ export function IngredientInventoryTable() {
   const navigate = useNavigate()
   const [params, setParams] = useState<IngredientInventoryListParams>({
     page: 1,
-    page_size: 20,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
   })
   const [searchInput, setSearchInput] = useState('')
 
@@ -65,7 +57,7 @@ export function IngredientInventoryTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -77,11 +69,22 @@ export function IngredientInventoryTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'ingredient__name',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<IngredientInventory>[]>(
     () => [
       {
         accessorKey: 'ingredient_name',
-        header: 'Bahan',
+        header: () => sortHeader('Bahan', 'ingredient__name'),
         cell: ({ row }) => (
           <div>
             <span className="font-medium">{row.original.ingredient_name}</span>
@@ -93,7 +96,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'remaining_stock',
-        header: 'Stok sisa',
+        header: () => sortHeader('Stok sisa', 'remaining_stock'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.remaining_stock)} {row.original.ingredient_unit}
@@ -102,7 +105,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'minimum_stock',
-        header: 'Minimum',
+        header: () => sortHeader('Minimum', 'minimum_stock'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.minimum_stock)} {row.original.ingredient_unit}
@@ -111,7 +114,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'is_below_minimum',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_below_minimum'),
         cell: ({ row }) =>
           row.original.is_below_minimum ? (
             <Badge variant="destructive">Di bawah minimum</Badge>
@@ -140,7 +143,7 @@ export function IngredientInventoryTable() {
         ),
       },
     ],
-    [navigate]
+    [navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -197,29 +200,6 @@ export function IngredientInventoryTable() {
             <SelectItem value="all">Semua baris</SelectItem>
             <SelectItem value="below">Di bawah minimum saja</SelectItem>
             <SelectItem value="ok">Stok aman saja</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? ORDERING_DEFAULT}
-          onValueChange={(ordering) =>
-            setParams((p) => ({
-              ...p,
-              page: 1,
-              ordering:
-                ordering === ORDERING_DEFAULT ? undefined : ordering,
-            }))
-          }
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,15rem)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 

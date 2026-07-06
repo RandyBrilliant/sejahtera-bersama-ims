@@ -65,7 +65,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     filterset_class = CustomerFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "phone", "address", "notes", "wilayah__name"]
-    ordering_fields = ["name", "created_at", "updated_at"]
+    ordering_fields = ["name", "phone", "address", "is_active", "wilayah__name", "created_at", "updated_at"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -337,7 +337,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     filterset_class = SalesOrderFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["order_code", "invoice_number", "notes", "customer__name"]
-    ordering_fields = ["created_at", "updated_at", "status", "total_idr", "order_code"]
+    ordering_fields = ["created_at", "updated_at", "status", "total_idr", "order_code", "customer__name"]
     ordering = ["-created_at"]
 
     def get_queryset(self):

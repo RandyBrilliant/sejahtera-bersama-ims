@@ -28,21 +28,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useProductsQuery } from '@/hooks/use-inventory-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { useAuth } from '@/hooks/use-auth'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { Product, ProductsListParams } from '@/types/inventory'
+import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const ORDERING_OPTIONS: { value: string; label: string }[] = [
-  { value: 'variant_name', label: 'Varian A–Z' },
-  { value: '-variant_name', label: 'Varian Z–A' },
-  { value: '-remaining_mass_grams', label: 'Stok utama tertinggi' },
-  { value: 'remaining_mass_grams', label: 'Stok utama terendah' },
-  { value: '-created_at', label: 'Terbaru dibuat' },
-  { value: 'created_at', label: 'Terlama dibuat' },
-]
+const PAGE_SIZES = TABLE_PAGE_SIZES
 
 export function ProductsTable() {
   const navigate = useNavigate()
@@ -50,8 +43,8 @@ export function ProductsTable() {
   const canManage = user?.role !== 'SALES_STAFF' && user?.role !== 'FINANCE_STAFF'
   const [params, setParams] = useState<ProductsListParams>({
     page: 1,
-    page_size: 20,
-    ordering: 'variant_name',
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: 'name',
   })
   const [searchInput, setSearchInput] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
@@ -60,7 +53,7 @@ export function ProductsTable() {
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
-  const pageSize = params.page_size ?? 20
+  const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -72,23 +65,34 @@ export function ProductsTable() {
     }))
   }, [searchInput])
 
+  const onOrderingChange = useCallback(
+    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
+    []
+  )
+
+  const { sortHeader } = useTableSorting({
+    ordering: params.ordering,
+    defaultOrdering: 'name',
+    onOrderingChange,
+  })
+
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
       {
         accessorKey: 'variant_name',
-        header: 'Varian',
+        header: () => sortHeader('Varian', 'variant_name'),
         cell: ({ row }) => (
           <span className="font-medium">{row.original.variant_name}</span>
         ),
       },
       {
         accessorKey: 'name',
-        header: 'Nama produk',
+        header: () => sortHeader('Nama produk', 'name'),
         cell: ({ row }) => row.original.name,
       },
       {
         accessorKey: 'remaining_mass_grams',
-        header: 'Stok utama',
+        header: () => sortHeader('Stok utama', 'remaining_mass_grams'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {formatProductMassKgFromGrams(row.original.remaining_mass_grams)} kg
@@ -97,7 +101,7 @@ export function ProductsTable() {
       },
       {
         accessorKey: 'is_active',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>
@@ -107,7 +111,7 @@ export function ProductsTable() {
       },
       {
         id: 'updated',
-        header: 'Diubah',
+        header: () => sortHeader('Diubah', 'updated_at', { preferDesc: true }),
         cell: ({ row }) => (
           <span className="text-on-surface-variant text-sm tabular-nums">
             {new Date(row.original.updated_at).toLocaleString('id-ID', {
@@ -156,7 +160,7 @@ export function ProductsTable() {
         },
       },
     ],
-    [canManage, navigate]
+    [canManage, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table */
@@ -228,22 +232,6 @@ export function ProductsTable() {
             <SelectItem value="all">Semua status</SelectItem>
             <SelectItem value="true">Aktif saja</SelectItem>
             <SelectItem value="false">Nonaktif saja</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={params.ordering ?? 'variant_name'}
-          onValueChange={(ordering) => setParams((p) => ({ ...p, page: 1, ordering }))}
-        >
-          <SelectTrigger className="border-outline-variant w-[min(100%,14rem)]">
-            <SelectValue placeholder="Urutan" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORDERING_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 
