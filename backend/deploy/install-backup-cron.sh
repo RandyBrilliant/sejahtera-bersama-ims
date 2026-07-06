@@ -12,7 +12,12 @@ BACKUP_SCRIPT="$SCRIPT_DIR/backup-db-to-s3.sh"
 CRON_LOG="${CRON_LOG:-/var/log/sejahtera-ims-backup.log}"
 CRON_SCHEDULE="${CRON_SCHEDULE:-0 0 * * *}"
 CRON_TZ="${CRON_TZ:-Asia/Jakarta}"
-CRON_USER="${CRON_USER:-$(whoami)}"
+# When run via sudo, install cron for the invoking user (not root).
+if [ -n "${SUDO_USER:-}" ]; then
+    CRON_USER="$SUDO_USER"
+else
+    CRON_USER="${CRON_USER:-$(whoami)}"
+fi
 
 print_header "Install daily database backup (Nevacloud S3)"
 
@@ -31,8 +36,10 @@ if [ "$EUID" -eq 0 ]; then
         install_aws_cli_v2
     fi
     mkdir -p /var/backups/sejahtera-ims
+    chown "$CRON_USER:$CRON_USER" /var/backups/sejahtera-ims
     chmod 700 /var/backups/sejahtera-ims
     touch "$CRON_LOG"
+    chown "$CRON_USER:$CRON_USER" "$CRON_LOG"
     chmod 640 "$CRON_LOG"
 else
     if ! command -v aws >/dev/null 2>&1; then

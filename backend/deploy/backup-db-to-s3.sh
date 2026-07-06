@@ -11,11 +11,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-BACKUP_LOCAL_DIR="${BACKUP_LOCAL_DIR:-/var/backups/sejahtera-ims}"
 BACKUP_S3_ENDPOINT="${BACKUP_S3_ENDPOINT:-https://s3.nevaobjects.id}"
 BACKUP_S3_REGION="${BACKUP_S3_REGION:-ap-southeast-1}"
 BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX:-sejahtera-ims/db-backups}"
 DB_CONTAINER="${DB_CONTAINER:-ims-db}"
+BACKUP_LOCAL_DIR=""
 
 log() {
     local level="$1"
@@ -50,6 +50,29 @@ load_backup_config() {
 
     BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
     BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX%/}"
+
+    resolve_backup_local_dir
+}
+
+resolve_backup_local_dir() {
+    local candidates=()
+    if [ -n "${BACKUP_LOCAL_DIR:-}" ]; then
+        candidates+=("$BACKUP_LOCAL_DIR")
+    fi
+    candidates+=("/var/backups/sejahtera-ims" "$PROJECT_ROOT/backups/db")
+
+    local dir
+    for dir in "${candidates[@]}"; do
+        if mkdir -p "$dir" 2>/dev/null && [ -w "$dir" ]; then
+            BACKUP_LOCAL_DIR="$dir"
+            return 0
+        fi
+    done
+
+    echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] [ERROR] No writable backup directory. Tried: ${candidates[*]}" >&2
+    echo "Fix: sudo chown -R \$(whoami) /var/backups/sejahtera-ims" >&2
+    echo "Or set BACKUP_LOCAL_DIR in .backup-s3.env to a writable path." >&2
+    exit 1
 }
 
 require_aws_cli() {
@@ -87,14 +110,15 @@ create_backup() {
     s3_key="${BACKUP_S3_PREFIX}/${filename}"
     local_path="${BACKUP_LOCAL_DIR}/${filename}"
 
-    mkdir -p "$BACKUP_LOCAL_DIR" "$BACKUP_LOG_DIR"
+    mkdir -p "$BACKUP_LOG_DIR"
 
+    log "INFO" "Using local staging directory: $BACKUP_LOCAL_DIR"
     log "INFO" "Starting pg_dump for database '$SQL_DATABASE'"
     if ! docker exec -i "$DB_CONTAINER" \
         pg_dump -U "$SQL_USER" -d "$SQL_DATABASE" --no-owner --no-acl --clean --if-exists \
         | gzip -9 > "$local_path"; then
         log "ERROR" "pg_dump failed"
-        rm -f "$local_path"
+        rm -f "$local_path" 2>/dev/null || true
         exit 1
     fi
 
