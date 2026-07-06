@@ -1,6 +1,7 @@
 """
 JWT auth views for username-based IMS authentication.
 """
+import hmac
 from datetime import timedelta
 
 from django.conf import settings as django_settings
@@ -52,8 +53,13 @@ def _refresh_max_age_seconds():
     return int(lifetime.total_seconds())
 
 
-def _is_mobile_client(request):
-    return request.META.get("HTTP_X_CLIENT_TYPE", "").lower() == "mobile"
+def _is_trusted_mobile_client(request):
+    """Extended refresh + token-in-body only for clients that prove a shared secret."""
+    expected = getattr(django_settings, "JWT_MOBILE_CLIENT_SECRET", "") or ""
+    if not expected:
+        return False
+    provided = request.META.get("HTTP_X_MOBILE_CLIENT_KEY", "")
+    return bool(provided) and hmac.compare_digest(provided, expected)
 
 
 def _mobile_refresh_lifetime():
@@ -131,15 +137,20 @@ class CookieTokenObtainPairView(APIView):
         access = data["access"]
         refresh = data["refresh"]
 
-        if _is_mobile_client(request):
+        if _is_trusted_mobile_client(request):
             mobile_token = _mobile_refresh_token_for_user(user)
             access = str(mobile_token.access_token)
             refresh = str(mobile_token)
 
         cookie_settings = _cookie_settings()
+        payload = {"user": _user_summary(user)}
+        if _is_trusted_mobile_client(request):
+            payload["access"] = access
+            payload["refresh"] = refresh
+
         response = Response(
             success_response(
-                data={"user": _user_summary(user), "access": access, "refresh": refresh},
+                data=payload,
                 detail="Login berhasil.",
                 code=ApiCode.SUCCESS,
             ),
@@ -184,12 +195,14 @@ class CookieTokenRefreshView(APIView):
         data = serializer.validated_data
         access = data["access"]
         new_refresh = data.get("refresh")
-        if new_refresh and _is_mobile_client(request):
+        if new_refresh and _is_trusted_mobile_client(request):
             new_refresh = _extend_refresh_token(new_refresh)
 
-        response_data = {"access": access}
-        if new_refresh:
-            response_data["refresh"] = new_refresh
+        response_data = {}
+        if _is_trusted_mobile_client(request):
+            response_data["access"] = access
+            if new_refresh:
+                response_data["refresh"] = new_refresh
 
         response = Response(
             success_response(data=response_data, detail="Token diperbarui.", code=ApiCode.SUCCESS),
@@ -207,6 +220,15 @@ class CookieTokenRefreshView(APIView):
         return response
 
 
+def _blacklist_refresh_token(raw_token: str | None) -> None:
+    if not raw_token:
+        return
+    try:
+        RefreshToken(raw_token).blacklist()
+    except (InvalidToken, TokenError):
+        pass
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class CookieLogoutView(APIView):
     permission_classes = ()
@@ -214,6 +236,8 @@ class CookieLogoutView(APIView):
 
     def post(self, request):
         cookie_settings = _cookie_settings()
+        refresh_raw = request.COOKIES.get(cookie_settings["refresh_key"]) or request.data.get("refresh")
+        _blacklist_refresh_token(refresh_raw)
         response = Response(
             success_response(detail="Logout berhasil.", code=ApiCode.SUCCESS),
             status=status.HTTP_200_OK,
@@ -278,6 +302,10 @@ class ChangePasswordView(APIView):
 
         user.set_password(new_password)
         user.save(update_fields=["password"])
+        cookie_settings = _cookie_settings()
+        _blacklist_refresh_token(
+            request.COOKIES.get(cookie_settings["refresh_key"]) or request.data.get("refresh")
+        )
         return Response(
             success_response(
                 detail=ApiMessage.RESET_PASSWORD_SUCCESS,

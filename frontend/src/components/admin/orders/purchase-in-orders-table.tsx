@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { resolveMediaUrl } from '@/lib/media-url'
 import {
   flexRender,
   getCoreRowModel,
@@ -160,7 +161,7 @@ export function PurchaseInOrdersTable() {
                 size="sm"
                 asChild
               >
-                <a href={row.original.payment_proof} target="_blank" rel="noopener noreferrer">
+                <a href={resolveMediaUrl(row.original.payment_proof) ?? '#'} target="_blank" rel="noopener noreferrer">
                   Lihat bukti
                 </a>
               </Button>

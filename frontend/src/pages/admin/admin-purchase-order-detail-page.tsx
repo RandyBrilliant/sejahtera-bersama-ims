@@ -26,6 +26,7 @@ import {
 } from '@/hooks/use-purchase-query'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { resolveMediaUrl } from '@/lib/media-url'
 
 function fmtDt(iso: string | null | undefined) {
   if (!iso) return '—'
@@ -204,7 +205,7 @@ export function AdminPurchaseOrderDetailPage() {
             {order.payment_proof ? (
               <p>
                 <a
-                  href={order.payment_proof}
+                  href={resolveMediaUrl(order.payment_proof) ?? '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary font-medium underline"

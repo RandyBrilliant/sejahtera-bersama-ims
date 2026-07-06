@@ -61,7 +61,7 @@ fi
 
 echo ""
 print_header "Pulling $TARGET_APP_IMAGE"
-compose pull api
+compose pull api celery celery-beat
 
 echo ""
 print_header "Restarting API"

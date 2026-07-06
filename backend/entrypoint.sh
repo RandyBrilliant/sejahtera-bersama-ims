@@ -19,7 +19,10 @@ fi
 
 # Production checks
 if [ "${DEBUG:-0}" = "0" ]; then
-    if [ -z "${SECRET_KEY:-}" ] || [ "${SECRET_KEY}" = "change-me" ] || [ "${SECRET_KEY}" = "change-me-to-secure-random-key" ]; then
+    if [ -z "${SECRET_KEY:-}" ] \
+        || [ "${SECRET_KEY}" = "change-me" ] \
+        || [ "${SECRET_KEY}" = "change-me-to-secure-random-key" ] \
+        || printf '%s' "${SECRET_KEY}" | grep -q '^django-insecure-'; then
         echo "ERROR: SECRET_KEY must be set to a secure value in production!"
         exit 1
     fi
@@ -28,11 +31,7 @@ if [ "${DEBUG:-0}" = "0" ]; then
     fi
 fi
 
-# Run Django commands as appuser (so DB/files are owned correctly).
-# In development, auto-generate migration files before applying migrations.
-if [ "${DEBUG:-0}" = "1" ] || [ "${DEBUG:-0}" = "true" ] || [ "${DEBUG:-0}" = "True" ]; then
-    gosu ${APP_UID}:${APP_GID} python manage.py makemigrations --noinput
-fi
+# Run Django migrations as appuser (migrations are committed in git — never makemigrations here).
 gosu ${APP_UID}:${APP_GID} python manage.py migrate --noinput
 
 # Production: collect static files (for nginx to serve)

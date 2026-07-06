@@ -248,7 +248,7 @@ rollback_app_deployment() {
 
     print_warning "Rolling back to $rollback_image"
     export APP_IMAGE="$rollback_image"
-    compose pull api 2>/dev/null || true
+    compose pull api celery celery-beat 2>/dev/null || true
     compose up -d --no-deps api
 
     if wait_for_healthy api 50; then

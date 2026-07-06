@@ -2,6 +2,7 @@ import csv
 from datetime import date
 
 from django.http import FileResponse, HttpResponse
+from django.core.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -13,6 +14,7 @@ from rest_framework.views import APIView
 from account.api_responses import success_response
 from account.pagination import StandardResultsSetPagination
 from account.permissions import FinanceAccess
+from account.upload_validation import upload_validation_error_response, validate_uploaded_file
 
 from .filters import OperationalCashEntryFilter, OperationalCategoryFilter
 from .models import OperationalCashEntry, OperationalCategory
@@ -120,6 +122,10 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
                 {"detail": "Field attachment (file) wajib diisi.", "code": "validation_error"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            validate_uploaded_file(upload, field_name="attachment")
+        except ValidationError as exc:
+            return upload_validation_error_response(exc)
         entry.attachment = upload
         entry.updated_by = request.user
         entry.save(update_fields=["attachment", "updated_by", "updated_at"])

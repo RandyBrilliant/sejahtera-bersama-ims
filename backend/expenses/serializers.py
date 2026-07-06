@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from account.media_fields import SignedMediaUrlField
+
 from .models import EntryKind, OperationalCashEntry, OperationalCategory, PaymentMethod
 
 
@@ -48,6 +50,7 @@ class OperationalCashEntrySerializer(serializers.ModelSerializer):
     updated_by = serializers.SerializerMethodField()
     category_name = serializers.CharField(source="category.name", read_only=True)
     sales_order_code = serializers.SerializerMethodField()
+    attachment = SignedMediaUrlField(read_only=True)
 
     class Meta:
         model = OperationalCashEntry

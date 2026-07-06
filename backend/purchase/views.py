@@ -3,6 +3,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Cast, Coalesce
 from django.http import FileResponse
@@ -17,6 +18,7 @@ from rest_framework.views import APIView
 
 from account.api_responses import success_response
 from account.pagination import StandardResultsSetPagination
+from account.upload_validation import upload_validation_error_response, validate_uploaded_file
 from account.permissions import (
     CustomerAccess,
     CustomerSpecialPriceAccess,
@@ -177,6 +179,10 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
                 {"detail": "Field payment_proof (file) wajib diisi.", "code": "validation_error"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            validate_uploaded_file(upload, field_name="payment_proof")
+        except ValidationError as exc:
+            return upload_validation_error_response(exc)
         order.payment_proof = upload
         order.payment_proof_uploaded_at = timezone.now()
         order.status = OrderStatus.PAYMENT_PROOF_UPLOADED
@@ -387,6 +393,10 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 {"detail": "Field payment_proof (file) wajib diisi.", "code": "validation_error"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            validate_uploaded_file(upload, field_name="payment_proof")
+        except ValidationError as exc:
+            return upload_validation_error_response(exc)
         order.payment_proof = upload
         order.payment_proof_uploaded_at = timezone.now()
         order.status = OrderStatus.PAYMENT_PROOF_UPLOADED

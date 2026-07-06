@@ -1,5 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
+import { queryClient } from '@/lib/query-client'
+
 const baseURL = import.meta.env.VITE_API_URL
 
 if (!baseURL) {
@@ -30,6 +32,7 @@ const LOGIN_ROUTE = '/login'
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
   if (window.location.pathname === LOGIN_ROUTE) return
+  queryClient.clear()
   window.location.replace(LOGIN_ROUTE)
 }
 

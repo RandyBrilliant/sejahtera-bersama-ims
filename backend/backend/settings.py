@@ -2,6 +2,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -34,11 +36,23 @@ def _env_csv(key):
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-SECRET_KEY = _env(
-    "SECRET_KEY",
-    "django-insecure-rq39(xe))ga3c!s3vk5z_+!n+e5@4f!zbogaa-yj)3s++m=_(l",
-)
-DEBUG = _env_bool("DEBUG", True)
+_INSECURE_SECRET_KEY = "django-insecure-rq39(xe))ga3c!s3vk5z_+!n+e5@4f!zbogaa-yj)3s++m=_(l"
+_SECRET_FROM_ENV = (_env("SECRET_KEY", "") or "").strip()
+DEBUG = _env_bool("DEBUG", False)
+
+if _SECRET_FROM_ENV:
+    SECRET_KEY = _SECRET_FROM_ENV
+elif DEBUG:
+    SECRET_KEY = _INSECURE_SECRET_KEY
+else:
+    raise ImproperlyConfigured("SECRET_KEY environment variable is required when DEBUG is False.")
+
+if not DEBUG and SECRET_KEY in (
+    _INSECURE_SECRET_KEY,
+    "change-me",
+    "change-me-to-secure-random-key",
+):
+    raise ImproperlyConfigured("SECRET_KEY must be set to a secure random value in production.")
 # Loopback hosts are always allowed for Docker healthchecks and deploy probes (not publicly routed).
 _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "[::1]")
 ALLOWED_HOSTS = list(dict.fromkeys((*_env_csv("ALLOWED_HOSTS"), *_LOOPBACK_HOSTS)))
@@ -64,6 +78,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "corsheaders",
     "account.apps.AccountConfig",
@@ -145,6 +160,16 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_SIGNATURE_TTL_SECONDS = int(_env("MEDIA_SIGNATURE_TTL_SECONDS", "3600"))
+
+# Upload limits (payment proofs, expense attachments)
+MAX_UPLOAD_FILE_BYTES = int(_env("MAX_UPLOAD_FILE_BYTES", str(10 * 1024 * 1024)))
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_FILE_BYTES
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_FILE_BYTES
+
+# Mobile app: set a long random secret; clients send it as X-Mobile-Client-Key for token-in-body + extended refresh.
+JWT_MOBILE_CLIENT_SECRET = (_env("JWT_MOBILE_CLIENT_SECRET", "") or "").strip()
+JWT_MOBILE_REFRESH_DAYS = int(_env("JWT_MOBILE_REFRESH_DAYS", "365"))
 
 CORS_ALLOWED_ORIGINS = _env_csv("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
@@ -207,7 +232,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(_env("JWT_ACCESS_MINUTES", "15"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(_env("JWT_REFRESH_DAYS", "90"))),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_COOKIE_ACCESS_KEY": _env("JWT_ACCESS_COOKIE_NAME", "ims_access"),
     "AUTH_COOKIE_REFRESH_KEY": _env("JWT_REFRESH_COOKIE_NAME", "ims_refresh"),
     "AUTH_COOKIE_SECURE": not DEBUG,

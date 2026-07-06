@@ -10,6 +10,7 @@ import {
   useUpdateSystemUserMutation,
 } from '@/hooks/use-system-users-query'
 import { alert } from '@/lib/alert'
+import { generateTempPassword } from '@/lib/generate-temp-password'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -72,6 +73,9 @@ export function StaffUserForm({
       ? initialUser.employee_profile.joined_date
       : todayIsoDate()
   )
+  const [tempPassword, setTempPassword] = useState(() =>
+    mode === 'create' ? generateTempPassword() : ''
+  )
 
   const createMutation = useCreateSystemUserMutation()
   const updateMutation = useUpdateSystemUserMutation(initialUser?.id ?? 0)
@@ -87,18 +91,26 @@ export function StaffUserForm({
         alert.error('Validasi', 'Nama lengkap wajib diisi.')
         return
       }
+      if (!tempPassword.trim()) {
+        alert.error('Validasi', 'Password sementara wajib diisi.')
+        return
+      }
 
       try {
         const trimmedUsername = username.trim()
         await createMutation.mutateAsync({
           username: trimmedUsername,
-          password: trimmedUsername,
+          password: tempPassword,
           full_name: fullName.trim(),
           role,
           phone_number: phone.trim() || undefined,
           joined_date: joinedDate.trim() || null,
         })
         alert.success('Berhasil', 'Pengguna berhasil dibuat.')
+        alert.info(
+          'Password sementara',
+          `Berikan password ini kepada pengguna (sekali tampil): ${tempPassword}`
+        )
         onSaved()
       } catch (err) {
         alert.error('Gagal menyimpan', parseStaffUserMutationError(err))
@@ -133,7 +145,7 @@ export function StaffUserForm({
           </CardTitle>
           <CardDescription>
             {mode === 'create'
-              ? 'Buat akun staf atau admin baru. Password awal otomatis sama dengan username.'
+              ? 'Buat akun staf atau admin baru. Password sementara dibuat otomatis — salin dan berikan ke pengguna.'
               : 'Ubah data pengguna. Username tidak dapat diubah dari halaman ini.'}
           </CardDescription>
         </CardHeader>
@@ -161,6 +173,33 @@ export function StaffUserForm({
               className="border-outline-variant"
             />
           </div>
+          {mode === 'create' ? (
+            <div className="grid gap-2">
+              <Label htmlFor="su-temp-password">Password sementara</Label>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id="su-temp-password"
+                  value={tempPassword}
+                  onChange={(e) => setTempPassword(e.target.value)}
+                  forceUppercase={false}
+                  disabled={submitting}
+                  autoComplete="new-password"
+                  className="border-outline-variant min-w-[12rem] flex-1 font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={submitting}
+                  onClick={() => setTempPassword(generateTempPassword())}
+                >
+                  Buat ulang
+                </Button>
+              </div>
+              <p className="text-on-surface-variant text-xs">
+                Password tidak boleh sama dengan username. Pengguna harus mengganti setelah login pertama.
+              </p>
+            </div>
+          ) : null}
           <div className="grid gap-2">
             <Label htmlFor="su-phone">Nomor telepon</Label>
             <RegionalPhoneInput

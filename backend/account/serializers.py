@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .api_responses import ApiMessage, validate_username_unique
@@ -82,17 +84,34 @@ class UserSerializer(serializers.ModelSerializer):
         if not attrs.get("full_name") and not (self.instance and self.instance.full_name):
             raise serializers.ValidationError({"full_name": [ApiMessage.PROFILE_FULL_NAME_REQUIRED]})
 
-        # Initial password defaults to username when omitted (staff reset it after first login).
-        if not self.instance and not attrs.get("password"):
-            username = attrs.get("username")
-            if username:
-                attrs["password"] = username
+        password = attrs.get("password")
+        if not self.instance:
+            if not password:
+                raise serializers.ValidationError(
+                    {"password": ["Password wajib diisi saat membuat pengguna."]}
+                )
+            candidate = User(**{k: v for k, v in attrs.items() if k != "password"})
+            candidate.username = attrs.get("username", "")
+            candidate.full_name = attrs.get("full_name", "")
+            try:
+                validate_password(password, candidate)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"password": list(exc.messages)}) from exc
+            if password == attrs.get("username"):
+                raise serializers.ValidationError(
+                    {"password": ["Password tidak boleh sama dengan username."]}
+                )
+        elif password:
+            try:
+                validate_password(password, self.instance)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"password": list(exc.messages)}) from exc
 
         return attrs
 
     def create(self, validated_data):
         joined_date = validated_data.pop("joined_date", None)
-        password = validated_data.pop("password", None) or validated_data["username"]
+        password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         _set_employee_joined_date(user, joined_date)
         return user
@@ -103,6 +122,10 @@ class UserSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:
+            try:
+                validate_password(password, instance)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"password": list(exc.messages)}) from exc
             instance.set_password(password)
         instance.save()
         if joined_date is not serializers.empty:

@@ -358,13 +358,21 @@ export default function App() {
 
               <Route
                 element={
+                  <InAppRoleRoute
+                    allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF', 'FINANCE_STAFF']}
+                  />
+                }
+              >
+                <Route path="pelanggan" element={<AdminCustomersPage />} />
+              </Route>
+              <Route
+                element={
                   <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF']} />
                 }
               >
                 <Route path="pelanggan/baru" element={<AdminCustomerNewPage />} />
                 <Route path="pelanggan/:id/edit" element={<AdminCustomerEditPage />} />
               </Route>
-              <Route path="pelanggan" element={<AdminCustomersPage />} />
               <Route path="saya/presensi" element={<Navigate to="/admin/profil/presensi" replace />} />
               <Route path="saya/gaji" element={<Navigate to="/admin/profil/slip-gaji" replace />} />
               <Route path="absensi" element={<AdminAttendanceLayout />}>
@@ -436,14 +444,22 @@ export default function App() {
                 </Route>
                 <Route
                   element={
+                    <InAppRoleRoute
+                      allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF', 'FINANCE_STAFF']}
+                    />
+                  }
+                >
+                  <Route path="penjualan/:orderId" element={<AdminSalesOrderDetailPage />} />
+                  <Route path="penjualan" element={<AdminSalesOrdersListPage />} />
+                </Route>
+                <Route
+                  element={
                     <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF']} />
                   }
                 >
                   <Route path="penjualan/baru" element={<AdminSalesOrderNewPage />} />
                   <Route path="penjualan/:orderId/edit" element={<AdminSalesOrderEditPage />} />
                 </Route>
-                <Route path="penjualan/:orderId" element={<AdminSalesOrderDetailPage />} />
-                <Route path="penjualan" element={<AdminSalesOrdersListPage />} />
               </Route>
 
               <Route

@@ -9,7 +9,12 @@ import {
 import { getMe, login as loginApi, logout as logoutApi } from '@/api/auth'
 import { AuthContext, type AuthContextValue } from '@/contexts/auth-context-object'
 import { alert } from '@/lib/alert'
+import { queryClient } from '@/lib/query-client'
 import { getDashboardRouteForRole, type User } from '@/types/auth'
+
+function clearClientSessionState() {
+  queryClient.clear()
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -44,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await logoutApi()
     } finally {
+      clearClientSessionState()
       setUser(null)
       alert.info('Logout berhasil', 'Anda telah keluar dari aplikasi.')
     }

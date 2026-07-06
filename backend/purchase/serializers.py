@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from account.media_fields import SignedMediaUrlField
 from inventory.models import ProductPackaging
 
 from .models import (
@@ -174,6 +175,7 @@ class PurchaseInOrderSerializer(serializers.ModelSerializer):
     updated_by = serializers.SerializerMethodField()
     verified_by = serializers.SerializerMethodField()
     lines = PurchaseInLineSerializer(many=True)
+    payment_proof = SignedMediaUrlField(read_only=True)
 
     class Meta:
         model = PurchaseInOrder
@@ -372,6 +374,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     verified_by = serializers.SerializerMethodField()
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     lines = SalesOrderLineSerializer(many=True)
+    payment_proof = SignedMediaUrlField(read_only=True)
 
     class Meta:
         model = SalesOrder

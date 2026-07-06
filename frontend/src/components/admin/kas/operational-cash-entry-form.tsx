@@ -145,6 +145,15 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
       alert.error('Validasi', 'Pilih berkas terlebih dahulu.')
       return
     }
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      alert.error('Validasi', 'Hanya PDF, JPEG, PNG, atau WebP yang diizinkan.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert.error('Validasi', 'Ukuran file maksimal 10 MB.')
+      return
+    }
     try {
       await uploadMutation.mutateAsync(file)
       alert.success('Berhasil', 'Lampiran diunggah.')
@@ -337,6 +346,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
                 <Input
                   id="attach"
                   type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
                   disabled={uploading}
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="border-outline-variant max-w-xs cursor-pointer"
