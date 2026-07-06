@@ -24,10 +24,11 @@ if [ ! -x "$BACKUP_SCRIPT" ]; then
 fi
 
 if [ "$EUID" -eq 0 ]; then
-    apt-get update -qq
+    # shellcheck source=lib/install-aws-cli.sh
+    source "$SCRIPT_DIR/lib/install-aws-cli.sh"
     if ! command -v aws >/dev/null 2>&1; then
-        echo "Installing AWS CLI..."
-        apt-get install -y -qq awscli
+        echo "Installing AWS CLI v2 (official bundle — apt awscli is unavailable on Ubuntu 24.04+)..."
+        install_aws_cli_v2
     fi
     mkdir -p /var/backups/sejahtera-ims
     chmod 700 /var/backups/sejahtera-ims
@@ -35,7 +36,7 @@ if [ "$EUID" -eq 0 ]; then
     chmod 640 "$CRON_LOG"
 else
     if ! command -v aws >/dev/null 2>&1; then
-        print_error "AWS CLI not installed. Run with sudo or install: sudo apt-get install -y awscli"
+        print_error "AWS CLI not installed. Run: sudo ./deploy/install-backup-cron.sh"
         exit 1
     fi
     CRON_LOG="$PROJECT_ROOT/logs/backup-s3-cron.log"

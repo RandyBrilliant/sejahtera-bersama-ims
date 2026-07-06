@@ -230,7 +230,7 @@ Adjust `-U` and `-d` to match your `SQL_USER` and `SQL_DATABASE`.
 
 | Problem | Fix |
 |---------|-----|
-| `AWS CLI not found` | Run `sudo apt-get install -y awscli` or `sudo ./deploy/install-backup-cron.sh` |
+| `AWS CLI not found` | Run `sudo ./deploy/install-backup-cron.sh` (installs official AWS CLI v2 bundle) |
 | `Cannot access bucket` | Check bucket name, keys, and endpoint URL |
 | `Database container not running` | `docker compose -f docker-compose.prod.yml up -d db` |
 | `pg_dump failed` | Verify `SQL_USER` / `SQL_PASSWORD` in `.env` match the running Postgres volume |
