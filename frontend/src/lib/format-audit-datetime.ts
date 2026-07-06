@@ -1,3 +1,12 @@
+/** Format ISO date (`YYYY-MM-DD`) untuk tampilan `dd/MM/yyyy`. */
+export function formatAuditDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const datePart = iso.slice(0, 10)
+  const [year, month, day] = datePart.split('-')
+  if (!year || !month || !day) return iso
+  return `${day}/${month}/${year}`
+}
+
 /** Format ISO datetime dari backend untuk audit: `dd/MM/yyyy HH:mm` (zona Asia/Jakarta, jam 24 jam). */
 export function formatAuditDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'

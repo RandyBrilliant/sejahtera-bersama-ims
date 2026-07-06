@@ -1,7 +1,5 @@
-import { StaffAttendanceBadgePanel } from '@/components/admin/staff/staff-attendance-badge-panel'
-import { StaffCompensationPanel } from '@/components/admin/staff/staff-compensation-panel'
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
-import { formatAuditDateTime } from '@/lib/format-audit-datetime'
+import { formatAuditDate, formatAuditDateTime } from '@/lib/format-audit-datetime'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
 import type { SystemUser } from '@/types/system-user'
 
@@ -75,7 +73,15 @@ export function StaffUserMetadataAside({ user }: { user: SystemUser }) {
                 Tanggal masuk kerja
               </dt>
               <dd className="text-on-surface mt-0.5">
-                {formatAuditDateTime(emp.joined_date)}
+                {formatAuditDate(emp.joined_date)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-on-surface-variant text-xs font-medium uppercase">
+                Tanggal resign
+              </dt>
+              <dd className="text-on-surface mt-0.5">
+                {formatAuditDate(emp.resigned_date)}
               </dd>
             </div>
             <div>
@@ -93,10 +99,6 @@ export function StaffUserMetadataAside({ user }: { user: SystemUser }) {
           </dl>
         </div>
       ) : null}
-
-      <StaffAttendanceBadgePanel userId={user.id} />
-
-      <StaffCompensationPanel userId={user.id} />
 
       <div className="border-outline-variant border-t pt-4">
         <h2 className="text-on-surface mb-4 text-sm font-semibold tracking-wide uppercase">Audit</h2>

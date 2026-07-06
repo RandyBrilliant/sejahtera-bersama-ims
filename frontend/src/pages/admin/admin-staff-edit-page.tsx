@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
+import { StaffAttendanceBadgePanel } from '@/components/admin/staff/staff-attendance-badge-panel'
+import { StaffCompensationPanel } from '@/components/admin/staff/staff-compensation-panel'
+import { StaffUserDetailSubnav, type StaffDetailTab } from '@/components/admin/staff/staff-user-detail-subnav'
 import { StaffUserMetadataAside } from '@/components/admin/staff/staff-user-metadata-aside'
 import { StaffUserForm } from '@/components/admin/staff/staff-user-form'
+import { USER_ROLE_LABEL } from '@/constants/user-roles'
 import { useAuth } from '@/hooks/use-auth'
 import { useSystemUserQuery } from '@/hooks/use-system-users-query'
 
@@ -10,6 +15,7 @@ export function AdminStaffEditPage() {
   const navigate = useNavigate()
   const { user: authUser } = useAuth()
   const actorRole = authUser?.role ?? 'ADMIN'
+  const [activeTab, setActiveTab] = useState<StaffDetailTab>('profile')
 
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
@@ -40,6 +46,8 @@ export function AdminStaffEditPage() {
     )
   }
 
+  const positionLabel = USER_ROLE_LABEL[user.role] ?? user.role
+
   return (
     <div className="space-y-6">
       <div>
@@ -50,25 +58,43 @@ export function AdminStaffEditPage() {
           ← Kembali ke daftar
         </Link>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Edit pengguna
+          Detail pengguna
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Mengubah <span className="text-on-surface font-medium">{user.username}</span>. Username tidak
-          dapat diubah. Metadata di samping menampilkan nilai tersimpan di server.
+          Mengelola <span className="text-on-surface font-medium">{user.full_name}</span> (
+          {user.username}). Gunakan tab di bawah untuk mengedit profil, mengisi gaji pokok, atau mencetak
+          kartu staf.
         </p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-start lg:gap-10">
-        <StaffUserForm
-          key={user.id}
-          mode="edit"
-          initialUser={user}
-          actorRole={actorRole}
-          onCancel={() => navigate('/admin/staf')}
-          onSaved={() => navigate('/admin/staf')}
+      <StaffUserDetailSubnav active={activeTab} onChange={setActiveTab} />
+
+      {activeTab === 'profile' ? (
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-start lg:gap-10">
+          <StaffUserForm
+            key={user.id}
+            mode="edit"
+            initialUser={user}
+            actorRole={actorRole}
+            onCancel={() => navigate('/admin/staf')}
+            onSaved={() => navigate('/admin/staf')}
+          />
+          <StaffUserMetadataAside user={user} />
+        </div>
+      ) : null}
+
+      {activeTab === 'compensation' ? (
+        <StaffCompensationPanel userId={user.id} variant="standalone" />
+      ) : null}
+
+      {activeTab === 'card' ? (
+        <StaffAttendanceBadgePanel
+          userId={user.id}
+          fullName={user.full_name}
+          positionLabel={positionLabel}
+          variant="standalone"
         />
-        <StaffUserMetadataAside user={user} />
-      </div>
+      ) : null}
     </div>
   )
 }

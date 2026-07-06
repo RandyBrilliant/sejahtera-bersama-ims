@@ -1,6 +1,7 @@
 import { ArrowRight, Box, Lock, User } from 'lucide-react'
 import { type FormEvent } from 'react'
 
+import { APP_FULL_NAME } from '@/constants/brand'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,7 +33,7 @@ export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
             <Box className="size-5" />
           </div>
           <span className="text-xl font-semibold tracking-tight text-primary">
-            Sejahtera Bersama IMS
+            {APP_FULL_NAME}
           </span>
         </div>
 

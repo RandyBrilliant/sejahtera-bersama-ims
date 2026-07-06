@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { fetchEmployeeCompensation, patchEmployeeCompensation } from '@/api/payroll'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { alert } from '@/lib/alert'
@@ -10,6 +11,7 @@ import { isAxiosError } from 'axios'
 
 type Props = {
   userId: number
+  variant?: 'embedded' | 'standalone'
 }
 
 function axiosDetail(err: unknown): string | undefined {
@@ -19,7 +21,7 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof detail === 'string' ? detail : undefined
 }
 
-export function StaffCompensationPanel({ userId }: Props) {
+export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [snap, setSnap] = useState<EmployeeCompensation | null>(null)
@@ -62,6 +64,49 @@ export function StaffCompensationPanel({ userId }: Props) {
     }
   }
 
+  const dirty = salaryText.trim() !== String(snap?.monthly_base_salary_idr ?? '').trim()
+
+  const form = loading ? (
+    <p className="text-on-surface-variant text-sm">Memuat…</p>
+  ) : (
+  <div className="space-y-2">
+    <Label htmlFor={`salary-${userId}`} className="text-xs font-semibold uppercase">
+      Nominal IDR per bulan
+    </Label>
+    <Input
+      id={`salary-${userId}`}
+      inputMode="decimal"
+      placeholder={snap ? undefined : 'Mis. 5000000'}
+      value={salaryText}
+      onChange={(e) => setSalaryText(e.target.value)}
+      disabled={saving}
+    />
+    <Button
+      type="button"
+      disabled={saving || !salaryText.trim() || (snap != null && !dirty)}
+      onClick={() => void handleSave()}
+    >
+      {saving ? 'Menyimpan…' : snap ? 'Simpan perubahan' : 'Simpan gaji pokok'}
+    </Button>
+  </div>
+  )
+
+  if (variant === 'standalone') {
+    return (
+      <Card className="border-outline-variant bg-surface-container-lowest ambient-shadow max-w-xl border shadow-none">
+        <CardHeader className="border-outline-variant border-b pb-4">
+          <CardTitle className="font-heading text-lg">Pengisian gaji pokok</CardTitle>
+          <CardDescription className="text-on-surface-variant">
+            {snap
+              ? 'Digunakan sebagai dasar slip gaji per periode. Potongan tambahan diatur di halaman payroll per periode.'
+              : 'Belum ada data kompensasi untuk pengguna ini. Simpan nominal di bawah untuk membuat rekaman.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">{form}</CardContent>
+      </Card>
+    )
+  }
+
   if (loading) {
     return (
       <section className="border-outline-variant border-t pt-4">
@@ -82,28 +127,10 @@ export function StaffCompensationPanel({ userId }: Props) {
         <p className="text-on-surface-variant text-sm">
           Belum ada data kompensasi untuk pengguna ini. Simpan nominal di bawah untuk membuat rekaman.
         </p>
-        <div className="mt-4 space-y-2">
-          <Label htmlFor={`salary-${userId}`} className="text-xs font-semibold uppercase">
-            Nominal IDR per bulan
-          </Label>
-          <Input
-            id={`salary-${userId}`}
-            inputMode="decimal"
-            placeholder="Mis. 5000000"
-            value={salaryText}
-            onChange={(e) => setSalaryText(e.target.value)}
-            disabled={saving}
-          />
-          <Button type="button" disabled={saving || !salaryText.trim()} onClick={() => void handleSave()}>
-            {saving ? 'Menyimpan…' : 'Simpan gaji pokok'}
-          </Button>
-        </div>
+        <div className="mt-4">{form}</div>
       </section>
     )
   }
-
-  const dirty =
-    salaryText.trim() !== String(snap.monthly_base_salary_idr ?? '').trim()
 
   return (
     <section className="border-outline-variant border-t pt-4">
@@ -114,21 +141,7 @@ export function StaffCompensationPanel({ userId }: Props) {
         Digunakan sebagai dasar slip gaji per periode. Potongan tambahan diatur di halaman payroll per
         periode.
       </p>
-      <div className="space-y-2">
-        <Label htmlFor={`salary-${userId}`} className="text-xs font-semibold uppercase">
-          Nominal IDR per bulan
-        </Label>
-        <Input
-          id={`salary-${userId}`}
-          inputMode="decimal"
-          value={salaryText}
-          onChange={(e) => setSalaryText(e.target.value)}
-          disabled={saving}
-        />
-        <Button type="button" disabled={saving || !dirty} onClick={() => void handleSave()}>
-          {saving ? 'Menyimpan…' : 'Simpan perubahan'}
-        </Button>
-      </div>
+      {form}
     </section>
   )
 }

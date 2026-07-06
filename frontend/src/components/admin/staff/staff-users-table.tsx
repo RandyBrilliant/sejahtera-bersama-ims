@@ -20,6 +20,7 @@ import { USER_ROLE_LABEL, USER_ROLE_PILL_CLASS } from '@/constants/user-roles'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { useSystemUsersQuery } from '@/hooks/use-system-users-query'
+import { formatAuditDate } from '@/lib/format-audit-datetime'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
 import { cn } from '@/lib/utils'
 import { StaffUserStatusModal } from '@/components/admin/staff/staff-user-status-modal'
@@ -154,6 +155,15 @@ export function StaffUsersTable() {
         cell: ({ row }) => (
           <span className="font-mono text-xs">
             {row.original.employee_profile?.employee_code ?? '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'joined_date',
+        header: () => sortHeader('Tanggal masuk', 'employee_profile__joined_date'),
+        cell: ({ row }) => (
+          <span className="text-on-surface-variant whitespace-nowrap text-sm tabular-nums">
+            {formatAuditDate(row.original.employee_profile?.joined_date)}
           </span>
         ),
       },

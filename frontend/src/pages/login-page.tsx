@@ -1,3 +1,4 @@
+import { APP_FULL_NAME } from '@/constants/brand'
 import { LoginForm } from '@/components/auth/login-form'
 import { MarketingPanel } from '@/components/auth/marketing-panel'
 import { alert } from '@/lib/alert'
@@ -54,7 +55,7 @@ export function LoginPage() {
 
         <footer className="mt-14 w-full max-w-md text-center">
           <p className="text-muted-foreground mt-2 text-[11px]">
-            © {new Date().getFullYear()} Sejahtera Bersama IMS. Seluruh hak cipta dilindungi.
+            © {new Date().getFullYear()} {APP_FULL_NAME}. Seluruh hak cipta dilindungi.
           </p>
         </footer>
       </section>

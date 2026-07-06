@@ -3,17 +3,6 @@ import { IngredientSummaryStats } from '@/components/admin/inventory/ingredient-
 export function AdminWarehousePage() {
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Gudang
-        </h1>
-        <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Bahan baku, stok bahan, dan mutasi gudang (bahan maupun kemasan produk jadi). Master produk
-          dan SKU untuk penjualan tetap di menu{' '}
-          <span className="text-on-surface font-medium">Inventaris</span>.
-        </p>
-      </div>
-
       <IngredientSummaryStats />
 
       <div className="border-outline-variant bg-surface-container-lowest ambient-shadow rounded-xl border p-5 text-sm leading-relaxed">

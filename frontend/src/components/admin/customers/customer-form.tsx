@@ -155,7 +155,7 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={submitting}
                 rows={3}
-                className="border-outline-variant bg-background focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             <div className="grid gap-2 md:col-span-2">
@@ -166,7 +166,7 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={submitting}
                 rows={2}
-                className="border-outline-variant bg-background focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>

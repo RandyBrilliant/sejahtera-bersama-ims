@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { APP_FULL_NAME } from '@/constants/brand'
 import { LogoutConfirmModal } from '@/components/auth/logout-confirm-modal'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
@@ -17,7 +18,7 @@ export function DashboardPlaceholder({ title, subtitle }: DashboardPlaceholderPr
     <main className="page-enter from-background to-muted/40 flex min-h-screen items-center justify-center bg-gradient-to-b p-6">
       <section className="bg-card w-full max-w-xl rounded-xl border p-6 shadow-sm">
         <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          Sejahtera Bersama IMS
+          {APP_FULL_NAME}
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-muted-foreground mt-2">{subtitle}</p>

@@ -7,14 +7,20 @@ import {
   revokeStaffAttendanceBadge,
   unrevokeStaffAttendanceBadge,
 } from '@/api/attendance'
+import { StaffBadgeReissueModal } from '@/components/admin/staff/staff-badge-reissue-modal'
+import { downloadStaffIdCardPdf, StaffIdCardPreview } from '@/components/admin/staff/staff-id-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { alert } from '@/lib/alert'
 import { cn } from '@/lib/utils'
 import { isAxiosError } from 'axios'
 
 type Props = {
   userId: number
+  fullName: string
+  positionLabel: string
+  variant?: 'embedded' | 'standalone'
 }
 
 function axiosDetail(err: unknown): string | undefined {
@@ -24,12 +30,29 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof detail === 'string' ? detail : undefined
 }
 
-export function StaffAttendanceBadgePanel({ userId }: Props) {
+export function StaffAttendanceBadgePanel({
+  userId,
+  fullName,
+  positionLabel,
+  variant = 'embedded',
+}: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [printDataUrl, setPrintDataUrl] = useState<string | null>(null)
   const [revoked, setRevoked] = useState(false)
   const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [reissueOpen, setReissueOpen] = useState(false)
+  const [reissueError, setReissueError] = useState<string | null>(null)
+
+  const generateQrImages = useCallback(async (badgeToken: string) => {
+    const [previewUrl, printUrl] = await Promise.all([
+      QRCode.toDataURL(badgeToken, { width: 220, margin: 2 }),
+      QRCode.toDataURL(badgeToken, { width: 512, margin: 1 }),
+    ])
+    setDataUrl(previewUrl)
+    setPrintDataUrl(printUrl)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -39,18 +62,19 @@ export function StaffAttendanceBadgePanel({ userId }: Props) {
       setToken(b.badge_token)
       if (b.is_revoked) {
         setDataUrl(null)
+        setPrintDataUrl(null)
         return
       }
-      const url = await QRCode.toDataURL(b.badge_token, { width: 220, margin: 2 })
-      setDataUrl(url)
+      await generateQrImages(b.badge_token)
     } catch {
       setDataUrl(null)
+      setPrintDataUrl(null)
       setToken(null)
       alert.error('Badge presensi', 'Gagal memuat QR kartu. Coba muat ulang halaman.')
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [generateQrImages, userId])
 
   useEffect(() => {
     void load()
@@ -64,6 +88,23 @@ export function StaffAttendanceBadgePanel({ userId }: Props) {
     } catch {
       alert.error('Salin gagal', 'Salin secara manual.')
     }
+  }
+
+  function handleDownloadCardPdf() {
+    if (!printDataUrl) {
+      alert.error('Unduh PDF', 'QR kartu belum tersedia untuk diunduh.')
+      return
+    }
+    void (async () => {
+      const ok = await downloadStaffIdCardPdf({
+        fullName,
+        positionLabel,
+        qrDataUrl: printDataUrl,
+      })
+      if (!ok) {
+        alert.error('Unduh PDF', 'Gagal membuat file PDF kartu staf. Coba lagi.')
+      }
+    })()
   }
 
   async function handleRevoke() {
@@ -92,41 +133,33 @@ export function StaffAttendanceBadgePanel({ userId }: Props) {
     }
   }
 
-  async function handleReissue() {
-    const ok =
-      typeof window !== 'undefined'
-        ? window.confirm(
-            'Keluarkan ulang kartu? Token akan berubah dan QR lama tidak akan lagi berlaku untuk presensi.'
-          )
-        : true
-    if (!ok) return
+  function openReissueModal() {
+    setReissueError(null)
+    setReissueOpen(true)
+  }
+
+  async function handleConfirmReissue() {
     setBusy(true)
+    setReissueError(null)
     try {
       const b = await reissueStaffAttendanceBadge(userId)
+      setReissueOpen(false)
       alert.success(
         'Kartu baru',
-        'Badge dikeluarkan ulang — cetak ulang kartu fisik atau salin token baru.'
+        'Kartu presensi telah diterbitkan ulang. Cetak kartu fisik baru atau salin token yang baru.'
       )
       setRevoked(b.is_revoked)
       setToken(b.badge_token)
-      const url = await QRCode.toDataURL(b.badge_token, { width: 220, margin: 2 })
-      setDataUrl(url)
+      await generateQrImages(b.badge_token)
     } catch (e) {
-      alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+      setReissueError(axiosDetail(e) ?? 'Gagal menerbitkan ulang kartu. Coba lagi.')
     } finally {
       setBusy(false)
     }
   }
 
-  return (
-    <section className="border-outline-variant border-t pt-4">
-      <h2 className="text-on-surface mb-3 text-sm font-semibold tracking-wide uppercase">
-        Kartu presensi (QR)
-      </h2>
-      <p className="text-on-surface-variant mb-4 text-xs leading-relaxed">
-        Kartu cetak fisik menyandikan token di bawah. Admin memindai kartu dengan tablet dan memastikan orang
-        di depan sama dengan nama sebelum menyetujui.
-      </p>
+  const content = (
+    <>
       {loading ? (
         <p className="text-on-surface-variant text-sm">Memuat QR…</p>
       ) : revoked ? (
@@ -136,37 +169,59 @@ export function StaffAttendanceBadgePanel({ userId }: Props) {
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleUnrevoke()}>
               Aktifkan kembali
             </Button>
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleReissue()}>
-              Keluaran ulang (token baru)
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={openReissueModal}>
+              Terbitkan ulang kartu
             </Button>
           </div>
         </div>
       ) : dataUrl ? (
-        <div className="flex flex-col items-start gap-3">
-          <img
-            src={dataUrl}
-            alt="Kode QR token presensi staf"
-            className={cn('rounded-lg border')}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="font-mono text-xs tracking-tight">
-              {token ?? '—'}
-            </Badge>
-            <button
-              type="button"
-              className="text-primary text-xs font-semibold underline"
-              onClick={() => void handleCopyToken()}
-            >
-              Salin token
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleRevoke()}>
-              Cabut akses kartu
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleReissue()}>
-              Keluaran ulang
-            </Button>
+        <div className="space-y-4">
+          {variant === 'standalone' ? (
+            <div className="space-y-3">
+              <h3 className="text-on-surface text-sm font-semibold">Pratinjau kartu staf</h3>
+              <StaffIdCardPreview
+                fullName={fullName}
+                positionLabel={positionLabel}
+                qrDataUrl={dataUrl}
+              />
+              <p className="text-on-surface-variant text-xs leading-relaxed">
+                Unduh PDF dengan ukuran tetap kartu ID vertikal (CR80, 54 × 86 mm) untuk dicetak.
+              </p>
+            </div>
+          ) : (
+            <img
+              src={dataUrl}
+              alt="Kode QR token presensi staf"
+              className={cn('rounded-lg border')}
+            />
+          )}
+
+          <div className="flex flex-col items-start gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs tracking-tight">
+                {token ?? '—'}
+              </Badge>
+              <button
+                type="button"
+                className="text-primary text-xs font-semibold underline"
+                onClick={() => void handleCopyToken()}
+              >
+                Salin token
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {variant === 'standalone' ? (
+                <Button type="button" disabled={busy || !printDataUrl} onClick={handleDownloadCardPdf}>
+                  Unduh PDF kartu
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleRevoke()}>
+                Cabut akses kartu
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={openReissueModal}>
+                Terbitkan ulang
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
@@ -177,6 +232,44 @@ export function StaffAttendanceBadgePanel({ userId }: Props) {
           </Button>
         </div>
       )}
+    </>
+  )
+
+  const panel = variant === 'standalone' ? (
+    <Card className="border-outline-variant bg-surface-container-lowest ambient-shadow max-w-2xl border shadow-none">
+      <CardHeader className="border-outline-variant border-b pb-4">
+        <CardTitle className="font-heading text-lg">Cetak kartu staf</CardTitle>
+        <CardDescription className="text-on-surface-variant">
+          Kartu fisik berisi QR presensi. Admin memindai kartu dengan tablet dan memastikan orang di depan
+          sama dengan nama sebelum menyetujui.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">{content}</CardContent>
+    </Card>
+  ) : (
+    <section className="border-outline-variant border-t pt-4">
+      <h2 className="text-on-surface mb-3 text-sm font-semibold tracking-wide uppercase">
+        Kartu presensi (QR)
+      </h2>
+      <p className="text-on-surface-variant mb-4 text-xs leading-relaxed">
+        Kartu cetak fisik menyandikan token di bawah. Admin memindai kartu dengan tablet dan memastikan orang
+        di depan sama dengan nama sebelum menyetujui.
+      </p>
+      {content}
     </section>
+  )
+
+  return (
+    <>
+      {panel}
+      <StaffBadgeReissueModal
+        open={reissueOpen}
+        onOpenChange={setReissueOpen}
+        staffName={fullName}
+        pending={busy}
+        errorMessage={reissueError}
+        onConfirm={() => void handleConfirmReissue()}
+      />
+    </>
   )
 }

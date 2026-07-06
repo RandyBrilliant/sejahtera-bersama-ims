@@ -147,6 +147,11 @@ const AdminProductMovementNewPage = lazy(() =>
     default: m.AdminProductMovementNewPage,
   }))
 )
+const AdminWarehouseLayout = lazy(() =>
+  import('@/pages/admin/admin-warehouse-layout').then((m) => ({
+    default: m.AdminWarehouseLayout,
+  }))
+)
 const AdminWarehousePage = lazy(() =>
   import('@/pages/admin/admin-warehouse-page').then((m) => ({
     default: m.AdminWarehousePage,
@@ -297,22 +302,24 @@ export default function App() {
                   <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF']} />
                 }
               >
-                <Route path="gudang/bahan-baku/baru" element={<AdminIngredientNewPage />} />
-                <Route
-                  path="gudang/bahan-baku/:ingredientId/edit"
-                  element={<AdminIngredientEditPage />}
-                />
-                <Route path="gudang/bahan-baku" element={<AdminIngredientsPage />} />
-                <Route
-                  path="gudang/stok-bahan/:inventoryId/edit"
-                  element={<AdminIngredientInventoryEditPage />}
-                />
-                <Route path="gudang/stok-bahan" element={<AdminIngredientInventoryPage />} />
-                <Route path="gudang/mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
-                <Route path="gudang/mutasi-bahan" element={<AdminIngredientMovementsPage />} />
-                <Route path="gudang/mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
-                <Route path="gudang/mutasi-produk" element={<AdminProductMovementsPage />} />
-                <Route path="gudang" element={<AdminWarehousePage />} />
+                <Route path="gudang" element={<AdminWarehouseLayout />}>
+                  <Route index element={<AdminWarehousePage />} />
+                  <Route path="bahan-baku/baru" element={<AdminIngredientNewPage />} />
+                  <Route
+                    path="bahan-baku/:ingredientId/edit"
+                    element={<AdminIngredientEditPage />}
+                  />
+                  <Route path="bahan-baku" element={<AdminIngredientsPage />} />
+                  <Route
+                    path="stok-bahan/:inventoryId/edit"
+                    element={<AdminIngredientInventoryEditPage />}
+                  />
+                  <Route path="stok-bahan" element={<AdminIngredientInventoryPage />} />
+                  <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
+                  <Route path="mutasi-bahan" element={<AdminIngredientMovementsPage />} />
+                  <Route path="mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
+                  <Route path="mutasi-produk" element={<AdminProductMovementsPage />} />
+                </Route>
               </Route>
 
               <Route

@@ -4,6 +4,7 @@ export interface EmployeeProfileDto {
   id: number
   employee_code: string
   joined_date: string | null
+  resigned_date: string | null
   created_at: string
   updated_at: string
 }
@@ -40,10 +41,10 @@ export type UsersListParams = {
 
 export type SystemUserCreateInput = {
   username: string
-  password: string
   full_name: string
   role: UserRole
   phone_number?: string
+  joined_date?: string | null
 }
 
 export type SystemUserUpdateInput = {
@@ -52,4 +53,5 @@ export type SystemUserUpdateInput = {
   role?: UserRole
   phone_number?: string
   password?: string
+  joined_date?: string | null
 }

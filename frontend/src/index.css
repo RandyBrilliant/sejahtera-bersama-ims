@@ -201,6 +201,12 @@
   box-shadow: 0 4px 12px rgb(31 16 142 / 0.08);
 }
 
+@layer utilities {
+  .bg-field {
+    @apply bg-white dark:bg-card;
+  }
+}
+
 /* html5-qrcode attendance tablet: single preview, no stacked duplicates on init */
 [id^='attendance-scan-'] video {
   display: block;

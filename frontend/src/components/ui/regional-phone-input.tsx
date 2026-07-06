@@ -50,10 +50,10 @@ export function RegionalPhoneInput({
         <label className="sr-only" htmlFor={id ? `${id}-country` : undefined}>
           Negara / kode
         </label>
-        <div className="border-outline-variant bg-background shrink-0 rounded-md border">
+        <div className="border-outline-variant bg-field shrink-0 rounded-md border">
           <select
             id={id ? `${id}-country` : undefined}
-            className="focus-visible:ring-ring h-9 max-w-[min(13rem,44vw)] cursor-pointer rounded-md bg-transparent py-2 pr-8 pl-2 text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="focus-visible:ring-ring bg-field h-9 max-w-[min(13rem,44vw)] cursor-pointer rounded-md py-2 pr-8 pl-2 text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             value={selectedDial}
             onChange={(e) => handleDialChange(e.target.value)}
             disabled={disabled}
@@ -66,7 +66,7 @@ export function RegionalPhoneInput({
             ))}
           </select>
         </div>
-        <div className="border-outline-variant relative flex min-w-0 flex-1 items-center gap-2 rounded-md border bg-transparent px-3 shadow-xs">
+        <div className="border-outline-variant bg-field relative flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 shadow-xs">
           <span className="text-muted-foreground shrink-0 text-lg leading-none select-none">
             {selectedFlag}
           </span>

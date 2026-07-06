@@ -138,7 +138,7 @@ export function OperationalCategoryForm({ mode, initial, onCancel, onSaved }: Pr
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={submitting}
                 rows={3}
-                className="border-outline-variant bg-background focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {mode === 'edit' && initial ? (

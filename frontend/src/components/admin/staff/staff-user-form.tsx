@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { format } from 'date-fns'
 
 import {
   manageableRolesForActor,
@@ -11,6 +12,7 @@ import {
 import { alert } from '@/lib/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RegionalPhoneInput } from '@/components/ui/regional-phone-input'
@@ -25,6 +27,10 @@ import type { UserRole } from '@/types/auth'
 import type { SystemUser } from '@/types/system-user'
 
 import { parseStaffUserMutationError } from '@/components/admin/staff/staff-user-mutation-error'
+
+function todayIsoDate() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
 
 function pickDefaultRole(choices: UserRole[]): UserRole {
   if (choices.includes('WAREHOUSE_STAFF')) return 'WAREHOUSE_STAFF'
@@ -61,7 +67,11 @@ export function StaffUserForm({
   const [role, setRole] = useState<UserRole>(
     mode === 'edit' && initialUser ? initialUser.role : pickDefaultRole(roles)
   )
-  const [password, setPassword] = useState('')
+  const [joinedDate, setJoinedDate] = useState(
+    mode === 'edit' && initialUser?.employee_profile?.joined_date
+      ? initialUser.employee_profile.joined_date
+      : todayIsoDate()
+  )
 
   const createMutation = useCreateSystemUserMutation()
   const updateMutation = useUpdateSystemUserMutation(initialUser?.id ?? 0)
@@ -73,10 +83,6 @@ export function StaffUserForm({
         alert.error('Validasi', 'Username wajib diisi.')
         return
       }
-      if (!password.trim()) {
-        alert.error('Validasi', 'Password wajib diisi untuk pengguna baru.')
-        return
-      }
       if (!fullName.trim()) {
         alert.error('Validasi', 'Nama lengkap wajib diisi.')
         return
@@ -85,10 +91,10 @@ export function StaffUserForm({
       try {
         await createMutation.mutateAsync({
           username: username.trim(),
-          password,
           full_name: fullName.trim(),
           role,
           phone_number: phone.trim() || undefined,
+          joined_date: joinedDate.trim() || null,
         })
         alert.success('Berhasil', 'Pengguna berhasil dibuat.')
         onSaved()
@@ -101,20 +107,12 @@ export function StaffUserForm({
     if (!initialUser) return
 
     try {
-      const patch: {
-        full_name?: string
-        role?: UserRole
-        phone_number?: string
-        password?: string
-      } = {
+      await updateMutation.mutateAsync({
         full_name: fullName.trim(),
         role,
         phone_number: phone.trim(),
-      }
-      if (password.trim()) {
-        patch.password = password
-      }
-      await updateMutation.mutateAsync(patch)
+        joined_date: joinedDate.trim() || null,
+      })
       alert.success('Berhasil', 'Perubahan disimpan.')
       onSaved()
     } catch (err) {
@@ -133,8 +131,8 @@ export function StaffUserForm({
           </CardTitle>
           <CardDescription>
             {mode === 'create'
-              ? 'Buat akun staf atau admin baru. Password wajib pada pembuatan.'
-              : 'Ubah data pengguna. Kosongkan password jika tidak ingin mengubahnya.'}
+              ? 'Buat akun staf atau admin baru. Password awal otomatis sama dengan username.'
+              : 'Ubah data pengguna. Username tidak dapat diubah dari halaman ini.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
@@ -190,19 +188,13 @@ export function StaffUserForm({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="su-password">
-              Password {mode === 'create' ? '' : '(opsional)'}
-            </Label>
-            <Input
-              id="su-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              forceUppercase={false}
+            <Label htmlFor="su-joined-date">Tanggal masuk kerja</Label>
+            <DatePickerInput
+              id="su-joined-date"
+              value={joinedDate}
+              onChange={setJoinedDate}
               disabled={submitting}
-              autoComplete="new-password"
-              placeholder={mode === 'edit' ? 'Biarkan kosong untuk tidak mengubah' : ''}
-              className="border-outline-variant"
+              ariaLabel="Tanggal masuk kerja"
             />
           </div>
         </CardContent>

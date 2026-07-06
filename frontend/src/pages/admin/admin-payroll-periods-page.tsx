@@ -146,7 +146,7 @@ export function AdminPayrollPeriodsPage() {
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
             rows={2}
             className={cn(
-              'border-input bg-background placeholder:text-muted-foreground min-h-[4.5rem] w-full rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow]',
+              'border-input bg-field placeholder:text-muted-foreground min-h-[4.5rem] w-full rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow]',
               'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
               'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
             )}

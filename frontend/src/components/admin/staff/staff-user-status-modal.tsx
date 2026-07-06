@@ -65,8 +65,8 @@ export function StaffUserStatusModal({
     intent === 'deactivate' ? 'Nonaktifkan pengguna?' : 'Aktifkan pengguna kembali?'
   const description =
     intent === 'deactivate'
-      ? `Akun ${user?.username ?? ''} akan dinonaktifkan dan tidak dapat masuk sampai diaktifkan lagi.`
-      : `Akun ${user?.username ?? ''} akan dapat masuk kembali.`
+      ? `Akun ${user?.username ?? ''} akan dinonaktifkan dan tidak dapat masuk. Tanggal resign dicatat hari ini.`
+      : `Akun ${user?.username ?? ''} dapat masuk kembali. Tanggal masuk kerja diperbarui ke hari ini dan tanggal resign dihapus.`
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

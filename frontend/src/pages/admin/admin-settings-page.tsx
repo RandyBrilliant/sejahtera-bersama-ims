@@ -1,6 +1,7 @@
 import { ChevronRight, Info, Shield } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { APP_FULL_NAME } from '@/constants/brand'
 import { QuickActionsCardGrid } from '@/components/dashboard/admin/admin-quick-actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -159,7 +160,7 @@ export function AdminSettingsPage() {
           <dl className="space-y-1 text-sm">
             <div>
               <dt className="text-on-surface-variant text-xs uppercase">Nama</dt>
-              <dd className="text-on-surface font-medium">Sejahtera Bersama IMS</dd>
+              <dd className="text-on-surface font-medium">{APP_FULL_NAME}</dd>
             </div>
             <div>
               <dt className="text-on-surface-variant text-xs uppercase">Versi UI</dt>

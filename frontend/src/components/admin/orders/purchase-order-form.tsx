@@ -208,7 +208,7 @@ function PurchaseOrderFormInner({
               disabled={pending}
               rows={3}
               className={cn(
-                'border-outline-variant bg-background placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
                 'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
               )}
             />
@@ -241,7 +241,7 @@ function PurchaseOrderFormInner({
                   : 'Kuantitas'
 
                 return (
-                  <div key={idx} className="border-outline-variant bg-background space-y-3 rounded-lg border p-3">
+                  <div key={idx} className="border-outline-variant bg-field space-y-3 rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className="bg-surface-container text-on-surface-variant rounded-md px-2 py-0.5 text-xs font-medium">

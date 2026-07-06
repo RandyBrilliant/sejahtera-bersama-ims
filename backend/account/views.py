@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -16,6 +17,28 @@ from .serializers import EmployeeProfileSerializer, UserSerializer
 from .user_payload import build_user_payload
 
 User = get_user_model()
+
+
+def _employee_profile_for(user):
+    try:
+        return user.employee_profile
+    except EmployeeProfile.DoesNotExist:
+        return None
+
+
+def _record_resignation(user):
+    profile = _employee_profile_for(user)
+    if profile is None:
+        return
+    profile.resigned_date = timezone.localdate()
+    profile.save(update_fields=["resigned_date", "updated_at"])
+
+
+def _record_rejoin(user):
+    profile, _ = EmployeeProfile.objects.get_or_create(user=user)
+    profile.joined_date = timezone.localdate()
+    profile.resigned_date = None
+    profile.save(update_fields=["joined_date", "resigned_date", "updated_at"])
 
 
 def _user_payload(user):
@@ -60,7 +83,7 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = UserListFilterSet
     search_fields = ["username", "full_name", "phone_number"]
-    ordering_fields = ["username", "full_name", "role", "phone_number", "is_active", "employee_profile__employee_code", "created_at", "updated_at", "date_joined"]
+    ordering_fields = ["username", "full_name", "role", "phone_number", "is_active", "employee_profile__employee_code", "employee_profile__joined_date", "created_at", "updated_at", "date_joined"]
     ordering = ["username"]
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
@@ -98,6 +121,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(error_response(detail=ApiMessage.ALREADY_DEACTIVATED, code=ApiCode.ALREADY_DEACTIVATED), status=status.HTTP_400_BAD_REQUEST)
         user.is_active = False
         user.save(update_fields=["is_active"])
+        _record_resignation(user)
+        user = User.objects.select_related("employee_profile").get(pk=user.pk)
         return Response(success_response(data=UserSerializer(user, context={"request": request}).data, detail=ApiMessage.DEACTIVATED, code=ApiCode.DEACTIVATED), status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="activate")
@@ -107,6 +132,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(error_response(detail=ApiMessage.ALREADY_ACTIVATED, code=ApiCode.ALREADY_ACTIVATED), status=status.HTTP_400_BAD_REQUEST)
         user.is_active = True
         user.save(update_fields=["is_active"])
+        _record_rejoin(user)
+        user = User.objects.select_related("employee_profile").get(pk=user.pk)
         return Response(success_response(data=UserSerializer(user, context={"request": request}).data, detail=ApiMessage.ACTIVATED, code=ApiCode.ACTIVATED), status=status.HTTP_200_OK)
 
 
@@ -115,7 +142,7 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ["employee_code", "user__username", "user__full_name"]
-    ordering_fields = ["employee_code", "joined_date", "created_at", "updated_at"]
+    ordering_fields = ["employee_code", "joined_date", "resigned_date", "created_at", "updated_at"]
     ordering = ["employee_code"]
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
@@ -152,6 +179,8 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
             )
         user.is_active = False
         user.save(update_fields=["is_active"])
+        _record_resignation(user)
+        profile.refresh_from_db()
         return Response(
             success_response(
                 data=EmployeeProfileSerializer(profile, context={"request": request}).data,
@@ -172,6 +201,8 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
             )
         user.is_active = True
         user.save(update_fields=["is_active"])
+        _record_rejoin(user)
+        profile.refresh_from_db()
         return Response(
             success_response(
                 data=EmployeeProfileSerializer(profile, context={"request": request}).data,

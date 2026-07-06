@@ -72,15 +72,15 @@ class EmployeeProfileAdmin(admin.ModelAdmin):
     Admin configuration for employee profile records.
     """
 
-    list_display = ("employee_code", "user", "joined_date", "created_at")
-    list_filter = ("joined_date", "created_at", "updated_at")
+    list_display = ("employee_code", "user", "joined_date", "resigned_date", "created_at")
+    list_filter = ("joined_date", "resigned_date", "created_at", "updated_at")
     search_fields = ("employee_code", "user__username", "user__full_name")
     raw_id_fields = ("user",)
     readonly_fields = ("employee_code", "created_at", "updated_at")
     ordering = ("employee_code",)
 
     fieldsets = (
-        (_("Employee"), {"fields": ("user", "employee_code", "joined_date")}),
+        (_("Employee"), {"fields": ("user", "employee_code", "joined_date", "resigned_date")}),
         (_("Timestamps"), {"fields": ("created_at", "updated_at")}),
     )
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
+import { APP_BRAND_NAME } from '@/constants/brand'
 import { LogoutConfirmModal } from '@/components/auth/logout-confirm-modal'
 import { AdminQuickActionsDropdown } from '@/components/dashboard/admin/admin-quick-actions'
 import { useAuth } from '@/hooks/use-auth'
@@ -98,7 +99,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           S
         </div>
         <div>
-          <div className="font-heading text-lg font-semibold tracking-tight">Sejahtera Bersama</div>
+          <div className="font-heading text-lg font-semibold tracking-tight">{APP_BRAND_NAME}</div>
           <div className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
             IMS v1.0.0
           </div>

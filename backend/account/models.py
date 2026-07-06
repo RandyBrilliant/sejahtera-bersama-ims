@@ -92,6 +92,7 @@ class EmployeeProfile(models.Model):
     )
     employee_code = models.CharField(_("employee code"), max_length=30, unique=True)
     joined_date = models.DateField(_("joined date"), null=True, blank=True)
+    resigned_date = models.DateField(_("resigned date"), null=True, blank=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
