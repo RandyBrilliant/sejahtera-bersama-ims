@@ -17,7 +17,6 @@ import { Link } from 'react-router-dom'
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { Button } from '@/components/ui/button'
 import { useAdminDashboardQuery } from '@/hooks/use-admin-dashboard-query'
-import { useInventorySummaryQuery } from '@/hooks/use-inventory-query'
 import { formatRangeSubtitle } from '@/lib/dashboard-ranges'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { formatIdr } from '@/lib/format-idr'
@@ -71,18 +70,17 @@ function KpiSkeleton() {
 }
 
 export function AdminDashboardHome() {
-  const inventory = useInventorySummaryQuery()
   const dash = useAdminDashboardQuery()
 
   const versusPrev = 'vs 7 hari sebelumnya'
 
   const stockValueLabel =
-    inventory.data?.products.total_product_stock_value_idr != null
-      ? formatIdr(inventory.data.products.total_product_stock_value_idr)
+    dash.inventorySummary?.products.total_product_stock_value_idr != null
+      ? formatIdr(dash.inventorySummary.products.total_product_stock_value_idr)
       : '—'
 
-  const stockQtySub = inventory.data
-    ? `${formatProductMassKgFromGrams(inventory.data.products.total_product_mass_grams)} kg utama · ${inventory.data.products.active_packaging.toLocaleString('id-ID')} SKU aktif`
+  const stockQtySub = dash.inventorySummary
+    ? `${formatProductMassKgFromGrams(dash.inventorySummary.products.total_product_mass_grams)} kg utama · ${dash.inventorySummary.products.active_packaging.toLocaleString('id-ID')} SKU aktif`
     : ''
 
   const revenueTrend = formatTrend(dash.revenueNow, dash.revenueThen, versusPrev)
@@ -93,59 +91,14 @@ export function AdminDashboardHome() {
     dash.rangeCurrent.endDate
   )
 
-  const topRows = dash.topPackaging.data?.results ?? []
+  const topRows = dash.topPackagingRows
   const quantities = topRows.map((r) => Number(r.remaining_stock))
   const maxQty = Math.max(1, ...quantities.map((n) => (Number.isNaN(n) ? 0 : n)))
 
-  const lowRows = dash.lowIngredientStock.data?.results ?? []
-  const lowCount =
-    inventory.data?.ingredients.low_stock_items ?? lowRows.length
+  const lowRows = dash.lowIngredientRows
+  const lowCount = dash.inventorySummary?.ingredients.low_stock_items ?? lowRows.length
 
-  type ActivityRow =
-    | {
-        kind: 'sales'
-        id: number
-        code: string
-        status: OrderStatus
-        at: string
-      }
-    | {
-        kind: 'purchase'
-        id: number
-        code: string
-        status: OrderStatus
-        at: string
-      }
-
-  const activityRows: ActivityRow[] = [
-    ...(dash.recentSales.data?.results ?? []).map((o) => ({
-      kind: 'sales' as const,
-      id: o.id,
-      code: o.order_code,
-      status: o.status,
-      at: o.created_at,
-    })),
-    ...(dash.recentPurchases.data?.results ?? []).map((o) => ({
-      kind: 'purchase' as const,
-      id: o.id,
-      code: o.order_code,
-      status: o.status,
-      at: o.created_at,
-    })),
-  ]
-    .sort((a, b) => parseISO(b.at).getTime() - parseISO(a.at).getTime())
-    .slice(0, 8)
-
-  const totalUsers = dash.usersTotal.data?.count ?? 0
-  const activeUsers = dash.usersActive.data?.count ?? 0
-  const activePct =
-    totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0
-
-  const kpiLoading =
-    inventory.isPending ||
-    dash.ordersPending ||
-    dash.revenueCurrent.isPending ||
-    dash.opsCashCurrent.isPending
+  const kpiLoading = dash.ordersPending || dash.inventoryPending
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -207,10 +160,10 @@ export function AdminDashboardHome() {
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {inventory.isError ? '—' : stockValueLabel}
+                  {dash.inventoryError ? '—' : stockValueLabel}
                 </div>
                 <div className="text-on-surface-variant mt-1 text-[13px] leading-[18px] font-medium tabular-nums">
-                  {inventory.isError
+                  {dash.inventoryError
                     ? 'Gagal memuat ringkasan inventaris.'
                     : stockQtySub}
                 </div>
@@ -228,7 +181,7 @@ export function AdminDashboardHome() {
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {(dash.activeOrdersTotal ?? 0).toLocaleString('id-ID')}
+                  {dash.activeOrdersTotal.toLocaleString('id-ID')}
                 </div>
                 <div className="text-on-surface-variant mt-1 flex flex-wrap items-center gap-x-2 text-[13px] leading-[18px] font-medium tabular-nums">
                   <span>
@@ -254,26 +207,24 @@ export function AdminDashboardHome() {
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {dash.revenueCurrent.isError
-                    ? '—'
-                    : formatIdr(dash.revenueNow)}
+                  {dash.revenueError ? '—' : formatIdr(dash.revenueNow)}
                 </div>
                 <div
                   className={cn(
                     'mt-1 flex items-center gap-1 text-[13px] leading-[18px] font-medium tabular-nums',
-                    dash.revenueCurrent.isError && 'text-on-surface-variant',
-                    !dash.revenueCurrent.isError &&
+                    dash.revenueError && 'text-on-surface-variant',
+                    !dash.revenueError &&
                       revenueTrend.type === 'up' &&
                       'text-trend-positive',
-                    !dash.revenueCurrent.isError &&
+                    !dash.revenueError &&
                       revenueTrend.type === 'down' &&
                       'text-error-app',
-                    !dash.revenueCurrent.isError &&
+                    !dash.revenueError &&
                       revenueTrend.type === 'steady' &&
                       'text-on-surface-variant'
                   )}
                 >
-                  {!dash.revenueCurrent.isError && (
+                  {!dash.revenueError && (
                     <>
                       {revenueTrend.type === 'up' && (
                         <TrendingUp className="size-4 shrink-0" />
@@ -286,7 +237,7 @@ export function AdminDashboardHome() {
                       )}
                     </>
                   )}
-                  {dash.revenueCurrent.isError
+                  {dash.revenueError
                     ? 'Tidak dapat memuat laporan pendapatan.'
                     : revenueTrend.text}
                 </div>
@@ -304,26 +255,24 @@ export function AdminDashboardHome() {
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {dash.opsCashCurrent.isError
-                    ? '—'
-                    : formatIdr(dash.expenseNow)}
+                  {dash.opsCashError ? '—' : formatIdr(dash.expenseNow)}
                 </div>
                 <div
                   className={cn(
                     'mt-1 flex items-center gap-1 text-[13px] leading-[18px] font-medium tabular-nums',
-                    dash.opsCashCurrent.isError && 'text-on-surface-variant',
-                    !dash.opsCashCurrent.isError &&
+                    dash.opsCashError && 'text-on-surface-variant',
+                    !dash.opsCashError &&
                       expenseTrend.type === 'up' &&
                       'text-error-app',
-                    !dash.opsCashCurrent.isError &&
+                    !dash.opsCashError &&
                       expenseTrend.type === 'down' &&
                       'text-trend-positive',
-                    !dash.opsCashCurrent.isError &&
+                    !dash.opsCashError &&
                       expenseTrend.type === 'steady' &&
                       'text-on-surface-variant'
                   )}
                 >
-                  {!dash.opsCashCurrent.isError && (
+                  {!dash.opsCashError && (
                     <>
                       {expenseTrend.type === 'up' && (
                         <TrendingUp className="size-4 shrink-0" />
@@ -336,7 +285,7 @@ export function AdminDashboardHome() {
                       )}
                     </>
                   )}
-                  {dash.opsCashCurrent.isError
+                  {dash.opsCashError
                     ? 'Akun ini mungkin tidak punya akses kas operasional — hubungi admin.'
                     : expenseTrend.text}
                 </div>
@@ -361,7 +310,7 @@ export function AdminDashboardHome() {
                 <MoreHorizontal className="size-5" />
               </button>
             </div>
-            {dash.topPackaging.isPending ? (
+            {dash.topPackagingPending ? (
               <div className="text-on-surface-variant flex h-48 items-center justify-center text-sm">
                 Memuat data kemasan…
               </div>
@@ -419,13 +368,13 @@ export function AdminDashboardHome() {
                 Lihat semua
               </Link>
             </div>
-            {dash.recentSales.isPending || dash.recentPurchases.isPending ? (
+            {dash.activityPending ? (
               <p className="text-on-surface-variant text-sm">Memuat…</p>
-            ) : activityRows.length === 0 ? (
+            ) : dash.activityRows.length === 0 ? (
               <p className="text-on-surface-variant text-sm">Belum ada pesanan.</p>
             ) : (
               <ul className="divide-outline-variant max-h-72 divide-y overflow-auto">
-                {activityRows.map((row) => {
+                {dash.activityRows.map((row) => {
                   const href =
                     row.kind === 'sales'
                       ? `/admin/pesanan/penjualan/${row.id}`
@@ -439,16 +388,16 @@ export function AdminDashboardHome() {
                       >
                         <div>
                           <div className="text-on-surface text-sm font-semibold">
-                            {row.code}{' '}
+                            {row.order_code}{' '}
                             <span className="text-on-surface-variant font-normal">
                               · {kindLabel}
                             </span>
                           </div>
                           <div className="text-on-surface-variant text-xs tabular-nums">
-                            {format(parseISO(row.at), 'd MMM yyyy, HH:mm')}
+                            {format(parseISO(row.created_at), 'd MMM yyyy, HH:mm')}
                           </div>
                         </div>
-                        <OrderStatusBadge status={row.status} />
+                        <OrderStatusBadge status={row.status as OrderStatus} />
                       </Link>
                     </li>
                   )
@@ -475,7 +424,7 @@ export function AdminDashboardHome() {
                 {lowCount.toLocaleString('id-ID')} di bawah minimum
               </span>
             </div>
-            {dash.lowIngredientStock.isPending ? (
+            {dash.lowIngredientPending ? (
               <p className="text-on-surface-variant text-sm">Memuat…</p>
             ) : lowRows.length === 0 ? (
               <p className="text-on-surface-variant text-sm">
@@ -513,19 +462,22 @@ export function AdminDashboardHome() {
               <h2 className="text-on-surface font-heading text-lg font-semibold">Staf</h2>
               <Users className="text-on-surface-variant size-5" aria-hidden />
             </div>
-            {dash.usersTotal.isPending ? (
+            {dash.usersPending ? (
               <p className="text-on-surface-variant text-sm">Memuat…</p>
             ) : (
               <div className="flex items-center gap-4 py-2">
                 <div className="border-primary bg-surface-container-low text-primary flex size-16 items-center justify-center rounded-full border-4 border-r-surface-container-low">
                   <span className="font-heading text-lg font-bold tabular-nums">
-                    {activePct}%
+                    {dash.usersTotal > 0
+                      ? Math.round((dash.usersActive / dash.usersTotal) * 100)
+                      : 0}
+                    %
                   </span>
                 </div>
                 <div>
                   <div className="text-on-surface text-base">
-                    <strong>{activeUsers.toLocaleString('id-ID')}</strong> /{' '}
-                    {totalUsers.toLocaleString('id-ID')}
+                    <strong>{dash.usersActive.toLocaleString('id-ID')}</strong> /{' '}
+                    {dash.usersTotal.toLocaleString('id-ID')}
                   </div>
                   <div className="text-on-surface-variant text-sm">
                     Akun aktif di sistem

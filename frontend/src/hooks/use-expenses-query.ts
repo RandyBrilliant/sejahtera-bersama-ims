@@ -35,6 +35,8 @@ export const expensesKeys = {
   entryList: (params: OperationalCashEntryListParams) =>
     [...expensesKeys.entries(), 'list', params] as const,
   entryDetail: (id: number) => [...expensesKeys.entries(), 'detail', id] as const,
+  cashSummary: (startDate: string, endDate: string) =>
+    [...expensesKeys.all, 'cash-summary', startDate, endDate] as const,
 }
 
 function invalidateExpensesAll(qc: ReturnType<typeof useQueryClient>) {

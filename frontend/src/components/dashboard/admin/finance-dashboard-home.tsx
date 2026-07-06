@@ -1,11 +1,14 @@
 import { Banknote, Landmark, Receipt, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { fetchOperationalCashEntries, fetchOperationalCashSummary } from '@/api/expenses'
 import { Button } from '@/components/ui/button'
+import { expensesKeys } from '@/hooks/use-expenses-query'
 import { formatIdr } from '@/lib/format-idr'
+import { todayDateKey } from '@/lib/dashboard-ranges'
 
 function toYMD(d: Date): string {
   const y = d.getFullYear()
@@ -29,15 +32,20 @@ function fmtDate(iso: string) {
 }
 
 export function FinanceDashboardHome() {
-  const { start, end } = rollingMonthRange()
+  const todayKey = todayDateKey()
+  const { start, end } = useMemo(() => rollingMonthRange(), [todayKey])
 
   const summary = useQuery({
-    queryKey: ['finance-dashboard', 'cash-summary', start, end],
+    queryKey: expensesKeys.cashSummary(start, end),
     queryFn: () => fetchOperationalCashSummary(start, end),
   })
 
   const recent = useQuery({
-    queryKey: ['finance-dashboard', 'recent-entries'],
+    queryKey: expensesKeys.entryList({
+      page: 1,
+      page_size: 8,
+      ordering: '-occurred_on,-created_at',
+    }),
     queryFn: () =>
       fetchOperationalCashEntries({
         page: 1,

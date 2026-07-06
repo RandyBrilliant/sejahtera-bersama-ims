@@ -24,7 +24,6 @@ export type AttendancePreviewResponse = {
   can_check_out: boolean
   checkout_blocked_reason: string | null
   checkout_available_at: string | null
-  badge_token: string
 }
 
 export type AttendanceConfirmResponse = {

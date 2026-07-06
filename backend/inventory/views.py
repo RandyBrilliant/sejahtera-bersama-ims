@@ -1,8 +1,8 @@
 from datetime import date
 from decimal import Decimal
 
-from django.db import models, transaction
-from django.db.models import Case, Count, DecimalField, ExpressionWrapper, F, IntegerField, Sum, Value, When
+from django.db import transaction
+from django.db.models import Case, DecimalField, ExpressionWrapper, F, IntegerField, Sum, Value, When
 from django.db.models.functions import Cast, Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -50,6 +50,7 @@ from .serializers import (
     ProductSerializer,
     ProductStockMovementSerializer,
 )
+from .summary import get_inventory_summary_cached, invalidate_inventory_summary_cache
 
 
 def _decimal_zero(max_digits: int = 12, decimal_places: int = 3) -> Value:
@@ -86,7 +87,26 @@ class AuditTrailMixin:
         serializer.save(updated_by=self.request.user)
 
 
-class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class InventorySummaryCacheMixin:
+    def _touch_inventory_summary_cache(self) -> None:
+        invalidate_inventory_summary_cache()
+
+
+class InventoryWriteMixin(InventorySummaryCacheMixin, AuditTrailMixin):
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self._touch_inventory_summary_cache()
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self._touch_inventory_summary_cache()
+
+    def perform_destroy(self, instance):
+        super().perform_destroy(instance)
+        self._touch_inventory_summary_cache()
+
+
+class ProductViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -112,7 +132,7 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         return Response(status=status.HTTP_200_OK, data=success_response(data=data))
 
 
-class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = ProductPackagingSerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -127,7 +147,7 @@ class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         return annotate_packaging_derived_remaining(qs)
 
 
-class IngredientViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = IngredientSerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -141,7 +161,7 @@ class IngredientViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         return Ingredient.objects.select_related("created_by", "updated_by")
 
 
-class IngredientInventoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class IngredientInventoryViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = IngredientInventorySerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -169,36 +189,7 @@ class InventorySummaryView(APIView):
     permission_classes = [InventoryAccess]
 
     def get(self, request):
-        product_aggregates = ProductPackaging.objects.aggregate(
-            total_packaging=Count("id"),
-            active_packaging=Count("id", filter=models.Q(is_active=True)),
-        )
-        mass_total = Product.objects.aggregate(
-            total_product_mass_grams=Coalesce(Sum("remaining_mass_grams"), _decimal_zero()),
-        )
-
-        inventory_value_total = sum(
-            product_financial_value_idr(p)
-            for p in Product.objects.prefetch_related("packaging_variants").only(
-                "id",
-                "remaining_mass_grams",
-            )
-        )
-
-        ingredient_aggregates = IngredientInventory.objects.aggregate(
-            total_ingredient_items=Count("id"),
-            low_stock_items=Count("id", filter=models.Q(remaining_stock__lt=F("minimum_stock"))),
-            total_ingredient_stock=Coalesce(Sum("remaining_stock"), _decimal_zero()),
-        )
-
-        payload = {
-            "products": {
-                **product_aggregates,
-                **mass_total,
-                "total_product_stock_value_idr": str(inventory_value_total),
-            },
-            "ingredients": ingredient_aggregates,
-        }
+        payload = get_inventory_summary_cached()
         return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
 
 
@@ -417,7 +408,7 @@ class RangeInventoryRecapView(APIView):
         return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
 
 
-class IngredientStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, viewsets.ModelViewSet):
     serializer_class = IngredientStockMovementSerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -462,6 +453,7 @@ class IngredientStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             created_by=self.request.user,
             updated_by=self.request.user,
         )
+        self._touch_inventory_summary_cache()
 
     def create(self, request, *args, **kwargs):
         try:
@@ -473,7 +465,7 @@ class IngredientStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             )
 
 
-class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
+class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, viewsets.ModelViewSet):
     serializer_class = ProductStockMovementSerializer
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
@@ -540,6 +532,7 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             created_by=self.request.user,
             updated_by=self.request.user,
         )
+        self._touch_inventory_summary_cache()
 
     def create(self, request, *args, **kwargs):
         try:
@@ -653,6 +646,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
 
             output = self.get_serializer(batch)
             headers = self.get_success_headers(output.data)
+            invalidate_inventory_summary_cache()
             return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
         except ValueError as exc:
             return Response(

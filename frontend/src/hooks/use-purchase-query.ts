@@ -62,6 +62,8 @@ export const purchaseKeys = {
     [...purchaseKeys.salesOrders(), 'list', params] as const,
   salesOrderDetail: (id: number) =>
     [...purchaseKeys.salesOrders(), 'detail', id] as const,
+  revenueReport: (startDate: string, endDate: string) =>
+    [...purchaseKeys.all, 'revenue-report', startDate, endDate] as const,
 }
 
 function invalidatePurchaseQueries(qc: ReturnType<typeof useQueryClient>) {

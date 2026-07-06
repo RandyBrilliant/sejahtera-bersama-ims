@@ -10,6 +10,9 @@ import { AppAlert } from '@/components/ui/app-alert'
 const LoginPage = lazy(() =>
   import('@/pages/login-page').then((m) => ({ default: m.LoginPage }))
 )
+const NotFoundPage = lazy(() =>
+  import('@/pages/not-found-page').then((m) => ({ default: m.NotFoundPage }))
+)
 const AdminAppShell = lazy(() =>
   import('@/components/dashboard/admin/admin-app-shell').then((m) => ({
     default: m.AdminAppShell,
@@ -520,7 +523,7 @@ export default function App() {
               }
             />
             <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
         <AppAlert />

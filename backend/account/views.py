@@ -10,9 +10,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
+from .dashboard import build_admin_dashboard_payload
 from .filters import UserListFilterSet
 from .models import EmployeeProfile, UserRole
-from .permissions import IsAdminOrOwner, user_is_owner
+from .permissions import AdminDashboardAccess, IsAdminOrOwner, user_is_owner
 from .serializers import EmployeeProfileSerializer, UserSerializer
 from .user_payload import build_user_payload
 
@@ -214,5 +215,17 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
                 detail=ApiMessage.ACTIVATED,
                 code=ApiCode.ACTIVATED,
             ),
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminDashboardView(APIView):
+    """Single payload for admin/leadership home dashboard."""
+
+    permission_classes = [AdminDashboardAccess]
+
+    def get(self, request):
+        return Response(
+            success_response(data=build_admin_dashboard_payload()),
             status=status.HTTP_200_OK,
         )

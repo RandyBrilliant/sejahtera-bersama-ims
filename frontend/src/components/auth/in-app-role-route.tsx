@@ -12,7 +12,14 @@ type InAppRoleRouteProps = {
 export function InAppRoleRoute({ allowedRoles, children }: InAppRoleRouteProps) {
   const { user, isLoading } = useAuth()
 
-  if (isLoading) return null
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="border-primary size-8 animate-spin rounded-full border-2 border-t-transparent" />
+        <span className="sr-only">Memuat</span>
+      </div>
+    )
+  }
   if (!user) return <Navigate to="/login" replace />
   if (!allowedRoles.includes(user.role)) return <Navigate to="/admin/dashboard" replace />
   if (children) return <>{children}</>

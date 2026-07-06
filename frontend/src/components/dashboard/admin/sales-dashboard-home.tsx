@@ -1,12 +1,12 @@
 import { CheckCircle2, Clock3, Receipt, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useQueries } from '@tanstack/react-query'
 
-import { fetchSalesOrders } from '@/api/purchase'
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { Button } from '@/components/ui/button'
-import { useCustomersQuery, useSalesOrdersQuery } from '@/hooks/use-purchase-query'
+import { purchaseKeys, useCustomersQuery, useSalesOrdersQuery } from '@/hooks/use-purchase-query'
 import { formatIdr } from '@/lib/format-idr'
+import { useQueries } from '@tanstack/react-query'
+import { fetchSalesOrders } from '@/api/purchase'
 
 function fmtDate(iso: string) {
   const d = new Date(iso)
@@ -18,15 +18,19 @@ export function SalesDashboardHome() {
   const [ordersTotal, ordersVerified, ordersAwaiting] = useQueries({
     queries: [
       {
-        queryKey: ['sales-dashboard', 'orders-total'],
+        queryKey: purchaseKeys.salesOrderList({ page: 1, page_size: 1 }),
         queryFn: () => fetchSalesOrders({ page: 1, page_size: 1 }),
       },
       {
-        queryKey: ['sales-dashboard', 'orders-verified'],
+        queryKey: purchaseKeys.salesOrderList({ page: 1, page_size: 1, status: 'VERIFIED' }),
         queryFn: () => fetchSalesOrders({ page: 1, page_size: 1, status: 'VERIFIED' }),
       },
       {
-        queryKey: ['sales-dashboard', 'orders-awaiting'],
+        queryKey: purchaseKeys.salesOrderList({
+          page: 1,
+          page_size: 1,
+          status: 'AWAITING_PAYMENT',
+        }),
         queryFn: () => fetchSalesOrders({ page: 1, page_size: 1, status: 'AWAITING_PAYMENT' }),
       },
     ],

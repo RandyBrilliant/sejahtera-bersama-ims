@@ -248,8 +248,30 @@ class PayrollPeriodListCreateView(APIView):
     permission_classes = [PayrollManageAccess]
 
     def get(self, request):
+        try:
+            page_size = min(max(int(request.query_params.get("page_size", "20")), 1), 100)
+            page = max(int(request.query_params.get("page", "1")), 1)
+        except ValueError:
+            return Response(
+                error_response(detail="page / page_size tidak valid.", code=ApiCode.VALIDATION_ERROR),
+                status=400,
+            )
+
         qs = PayrollPeriod.objects.order_by("-pay_date")
-        return Response(success_response(data=PayrollPeriodSerializer(qs, many=True).data), status=200)
+        total = qs.count()
+        start = (page - 1) * page_size
+        slice_qs = qs[start : start + page_size]
+        return Response(
+            success_response(
+                data={
+                    "count": total,
+                    "page": page,
+                    "page_size": page_size,
+                    "results": PayrollPeriodSerializer(slice_qs, many=True).data,
+                }
+            ),
+            status=200,
+        )
 
     def post(self, request):
         ser = PayrollPeriodCreateSerializer(data=request.data)

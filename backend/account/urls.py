@@ -8,7 +8,7 @@ from .auth_cookie_views import (
     CookieTokenObtainPairView,
     CookieTokenRefreshView,
 )
-from .views import EmployeeProfileViewSet, MeView, UserViewSet
+from .views import AdminDashboardView, EmployeeProfileViewSet, MeView, UserViewSet
 
 app_name = "account"
 
@@ -23,5 +23,6 @@ urlpatterns = [
     path("auth/change-password/", ChangePasswordView.as_view(), name="auth-change-password"),
     path("auth/change-password-user/", AdminResetUserPasswordView.as_view(), name="auth-change-password-user"),
     path("me/", MeView.as_view(), name="me"),
+    path("dashboard/admin/", AdminDashboardView.as_view(), name="admin-dashboard"),
     path("", include(router.urls)),
 ]

@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import {
   createPayrollPeriod,
@@ -30,6 +31,8 @@ import { alert } from '@/lib/alert'
 import type { PayrollPeriod } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
+const PERIODS_PAGE_SIZE = 20
+
 function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
   const d = err.response?.data as { detail?: unknown } | undefined
@@ -38,11 +41,15 @@ function axiosDetail(err: unknown): string | undefined {
 
 export function AdminPayrollPeriodsPage() {
   const [rows, setRows] = useState<PayrollPeriod[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [payDate, setPayDate] = useState(() => toIsoDateOnly(upcomingPaySaturday()))
   const [cutoffDate, setCutoffDate] = useState('')
   const [notes, setNotes] = useState('')
+
+  const totalPages = Math.max(1, Math.ceil(total / PERIODS_PAGE_SIZE))
 
   const periodPreview = useMemo(() => {
     if (!payDate) return null
@@ -57,11 +64,15 @@ export function AdminPayrollPeriodsPage() {
     }
   }, [payDate, cutoffDate])
 
-  async function reload() {
+  async function reload(targetPage = page) {
     setLoading(true)
     try {
-      const list = await fetchPayrollPeriods()
-      setRows(list)
+      const list = await fetchPayrollPeriods({ page: targetPage, page_size: PERIODS_PAGE_SIZE })
+      setRows(list.results)
+      setTotal(list.count)
+      if (list.page !== page) {
+        setPage(list.page)
+      }
     } catch (e) {
       alert.error('Payroll', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
@@ -70,8 +81,10 @@ export function AdminPayrollPeriodsPage() {
   }
 
   useEffect(() => {
-    void reload()
-  }, [])
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load paginated list when page changes
+    void reload(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
   async function handleCreate() {
     if (!payDate) {
@@ -88,7 +101,11 @@ export function AdminPayrollPeriodsPage() {
       setNotes('')
       setCutoffDate('')
       alert.success('Periode', 'Periode draft dibuat.')
-      await reload()
+      if (page === 1) {
+        await reload(1)
+      } else {
+        setPage(1)
+      }
     } catch (e) {
       alert.error('Gagal membuat periode', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
@@ -103,7 +120,7 @@ export function AdminPayrollPeriodsPage() {
     try {
       await deletePayrollPeriod(id)
       alert.success('Dihapus', 'Periode draft dihapus.')
-      await reload()
+      await reload(page)
     } catch (e) {
       alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     }
@@ -232,6 +249,37 @@ export function AdminPayrollPeriodsPage() {
             </Table>
           </div>
         )}
+        {total > 0 ? (
+          <div className="text-on-surface-variant flex flex-col items-center justify-between gap-3 text-sm sm:flex-row">
+            <span>
+              Menampilkan {(page - 1) * PERIODS_PAGE_SIZE + 1}–
+              {Math.min(page * PERIODS_PAGE_SIZE, total)} dari {total}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="tabular-nums">
+                {page} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   )

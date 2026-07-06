@@ -26,7 +26,7 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
   }
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/admin/dashboard" replace />
   }
 
   return <>{children}</>

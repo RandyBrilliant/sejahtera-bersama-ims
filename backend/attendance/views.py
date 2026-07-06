@@ -93,7 +93,7 @@ class StaffBadgeUnrevokeView(APIView):
 
     def post(self, request, user_id: int):
         try:
-            badge = unrevoke_badge(user_id)
+            unrevoke_badge(user_id)
         except AttendanceError as e:
             return Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
         return Response(
@@ -101,7 +101,6 @@ class StaffBadgeUnrevokeView(APIView):
                 data={
                     "user_id": user_id,
                     "is_revoked": False,
-                    "badge_token": str(badge.id),
                 },
                 detail="Kartu diaktifkan kembali.",
             ),
@@ -150,7 +149,6 @@ class AdminAttendancePreviewView(APIView):
             return Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
 
         data = build_tablet_preview(badge, jakarta_today_date())
-        data["badge_token"] = str(badge.id)
         return Response(success_response(data=data), status=200)
 
 

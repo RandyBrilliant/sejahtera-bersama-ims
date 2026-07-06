@@ -1,5 +1,10 @@
 import { format, parseISO, subDays } from 'date-fns'
 
+/** Kunci tanggal hari ini (WIB-agnostic calendar day) untuk invalidasi cache dashboard. */
+export function todayDateKey(): string {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
 /** Rentang 7 hari berakhir hari ini (inklusif): dari (hari_ini − 6) s/d hari_ini. */
 export function rolling7DaysThroughToday(): { startDate: string; endDate: string } {
   const end = new Date()

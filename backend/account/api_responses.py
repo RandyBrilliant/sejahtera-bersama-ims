@@ -34,6 +34,7 @@ class ApiMessage:
     NOT_FOUND = "Resource tidak ditemukan."
     PERMISSION_DENIED = "Anda tidak memiliki izin untuk aksi ini."
     METHOD_NOT_ALLOWED = "Metode tidak diizinkan."
+    INTERNAL_ERROR = "Terjadi kesalahan pada server. Silakan coba lagi."
 
     DELETE_NOT_ALLOWED = "Penghapusan tidak diizinkan. Gunakan aksi deactivate untuk menonaktifkan akun."
     ALREADY_DEACTIVATED = "Akun sudah nonaktif."
@@ -87,10 +88,27 @@ def validate_username_unique(model_class, value: str, instance=None):
 def api_exception_handler(exc, context):
     response = exception_handler(exc, context)
     if response is None:
-        return response
+        from rest_framework.response import Response
+
+        return Response(
+            error_response(
+                detail=ApiMessage.INTERNAL_ERROR,
+                code=ApiCode.INTERNAL_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ),
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     data = response.data
     if not isinstance(data, dict):
+        return response
+
+    if response.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
+        response.data = error_response(
+            detail=ApiMessage.INTERNAL_ERROR,
+            code=ApiCode.INTERNAL_ERROR,
+            status_code=response.status_code,
+        )
         return response
 
     if response.status_code == status.HTTP_400_BAD_REQUEST and "detail" not in data and "code" not in data:

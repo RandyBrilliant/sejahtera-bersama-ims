@@ -43,3 +43,7 @@ jobs:
         env:
           VITE_API_URL: https://api.sejahterabersama.my.id
         run: npm run build
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true

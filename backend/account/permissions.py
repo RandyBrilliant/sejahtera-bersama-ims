@@ -88,6 +88,17 @@ class IsAdminOrOwner(permissions.BasePermission):
         return has_role(request.user, UserRole.ADMIN)
 
 
+class AdminDashboardAccess(permissions.BasePermission):
+    """Leadership or admin — consolidated home dashboard."""
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        return user_is_owner(request.user) or has_role(request.user, UserRole.ADMIN)
+
+
 class StaffReadOnlyWriteForOwner(permissions.BasePermission):
     """
     Owner can write; staff can only read.

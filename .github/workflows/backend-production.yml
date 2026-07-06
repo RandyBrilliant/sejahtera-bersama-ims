@@ -89,6 +89,10 @@ jobs:
       - name: Run tests
         run: python manage.py test --verbosity=2
 
+      - name: pip audit
+        run: pip install pip-audit && pip-audit -r requirements.txt
+        continue-on-error: true
+
   build-and-deploy:
     name: Build image & deploy
     needs: test
@@ -118,7 +122,6 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
