@@ -99,7 +99,7 @@ export function ProductsTable() {
       },
       {
         accessorKey: 'is_active',
-        header: () => sortHeader('Status', 'is_active'),
+        header: 'Status',
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>
@@ -109,7 +109,7 @@ export function ProductsTable() {
       },
       {
         id: 'updated',
-        header: () => sortHeader('Diubah', 'updated_at', { preferDesc: true }),
+        header: 'Diubah',
         cell: ({ row }) => (
           <span className="text-on-surface-variant text-sm tabular-nums">
             {new Date(row.original.updated_at).toLocaleString('id-ID', {

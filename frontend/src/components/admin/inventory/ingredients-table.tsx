@@ -83,12 +83,12 @@ export function IngredientsTable() {
       },
       {
         accessorKey: 'default_unit',
-        header: () => sortHeader('Satuan', 'default_unit'),
+        header: 'Satuan',
         cell: ({ row }) => STOCK_UNIT_LABEL[row.original.default_unit] ?? row.original.default_unit,
       },
       {
         accessorKey: 'is_active',
-        header: () => sortHeader('Status', 'is_active'),
+        header: 'Status',
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>

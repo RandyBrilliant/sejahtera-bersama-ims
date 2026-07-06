@@ -83,8 +83,13 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = UserListFilterSet
     search_fields = ["username", "full_name", "phone_number"]
-    ordering_fields = ["username", "full_name", "role", "phone_number", "is_active", "employee_profile__employee_code", "employee_profile__joined_date", "created_at", "updated_at", "date_joined"]
-    ordering = ["username"]
+    ordering_fields = [
+        "full_name",
+        "role",
+        "employee_profile__employee_code",
+        "employee_profile__joined_date",
+    ]
+    ordering = ["full_name"]
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_queryset(self):

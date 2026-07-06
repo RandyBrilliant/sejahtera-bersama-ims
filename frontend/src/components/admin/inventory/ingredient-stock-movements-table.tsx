@@ -95,7 +95,7 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'movement_type',
-        header: () => sortHeader('Jenis', 'movement_type'),
+        header: 'Jenis',
         cell: ({ row }) =>
           row.original.movement_type === 'IN' ? (
             <Badge variant="default">Masuk</Badge>
@@ -105,7 +105,7 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'quantity',
-        header: () => sortHeader('Kuantitas', 'quantity'),
+        header: 'Kuantitas',
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.quantity)}{' '}
@@ -115,7 +115,7 @@ export function IngredientStockMovementsTable() {
       },
       {
         accessorKey: 'note',
-        header: () => sortHeader('Catatan', 'note'),
+        header: 'Catatan',
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[200px] truncate text-sm">
             {row.original.note || '—'}

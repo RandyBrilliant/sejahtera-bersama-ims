@@ -134,26 +134,26 @@ export function OperationalCashEntriesTable() {
       },
       {
         accessorKey: 'direction',
-        header: () => sortHeader('Jenis', 'direction'),
+        header: 'Jenis',
         cell: ({ row }) => (
           <Badge variant="outline">{ENTRY_KIND_LABEL[row.original.direction]}</Badge>
         ),
       },
       {
         accessorKey: 'payment_method',
-        header: () => sortHeader('Metode', 'payment_method'),
+        header: 'Metode',
         cell: ({ row }) => (
           <Badge variant="secondary">{PAYMENT_METHOD_LABEL[row.original.payment_method]}</Badge>
         ),
       },
       {
         accessorKey: 'category_name',
-        header: () => sortHeader('Kategori', 'category__name'),
+        header: 'Kategori',
         cell: ({ row }) => row.original.category_name,
       },
       {
         accessorKey: 'amount_idr',
-        header: () => sortHeader('Jumlah', 'amount_idr'),
+        header: 'Jumlah',
         cell: ({ row }) => (
           <span className="font-medium tabular-nums">
             {formatIdr(row.original.amount_idr)}
@@ -162,7 +162,7 @@ export function OperationalCashEntriesTable() {
       },
       {
         accessorKey: 'description',
-        header: () => sortHeader('Deskripsi', 'description'),
+        header: 'Deskripsi',
         cell: ({ row }) => (
           <span className="max-w-[220px]">{truncate(row.original.description, 80)}</span>
         ),

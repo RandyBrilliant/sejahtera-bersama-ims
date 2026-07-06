@@ -65,7 +65,7 @@ export function StaffUsersTable() {
   const [params, setParams] = useState<UsersListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
-    ordering: 'username',
+    ordering: 'full_name',
   })
   const [searchInput, setSearchInput] = useState('')
   const [statusTarget, setStatusTarget] = useState<{
@@ -93,7 +93,7 @@ export function StaffUsersTable() {
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,
-    defaultOrdering: 'username',
+    defaultOrdering: 'full_name',
     onOrderingChange,
   })
 
@@ -108,16 +108,11 @@ export function StaffUsersTable() {
   const columns = useMemo<ColumnDef<SystemUser>[]>(
     () => [
       {
-        accessorKey: 'username',
-        header: () => sortHeader('Username', 'username'),
-        cell: ({ row }) => (
-          <span className="font-medium">{row.original.username}</span>
-        ),
-      },
-      {
         accessorKey: 'full_name',
         header: () => sortHeader('Nama', 'full_name'),
-        cell: ({ row }) => row.original.full_name || '—',
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.full_name || '—'}</span>
+        ),
       },
       {
         accessorKey: 'role',
@@ -140,7 +135,7 @@ export function StaffUsersTable() {
       },
       {
         id: 'phone',
-        header: () => sortHeader('Telepon', 'phone_number'),
+        header: 'Telepon',
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[14rem] truncate text-sm">
             {formatRegionalPhonePreview(row.original.phone_number ?? '')}
@@ -167,7 +162,7 @@ export function StaffUsersTable() {
       },
       {
         accessorKey: 'is_active',
-        header: () => sortHeader('Status', 'is_active'),
+        header: 'Status',
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>

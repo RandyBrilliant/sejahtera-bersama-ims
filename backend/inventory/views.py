@@ -93,7 +93,7 @@ class ProductViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
-    ordering_fields = ["name", "variant_name", "remaining_mass_grams", "is_active", "created_at", "updated_at"]
+    ordering_fields = ["name", "variant_name", "remaining_mass_grams"]
     ordering = ["variant_name"]
 
     def get_queryset(self):
@@ -119,17 +119,7 @@ class ProductPackagingViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = ProductPackagingFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
-    ordering_fields = [
-        "label",
-        "net_mass_kg",
-        "remaining_stock",
-        "base_price_idr",
-        "list_price_idr",
-        "sku",
-        "is_active",
-        "created_at",
-        "updated_at",
-    ]
+    ordering_fields = ["label"]
     ordering = ["product__variant_name", "net_mass_kg"]
 
     def get_queryset(self):
@@ -144,7 +134,7 @@ class IngredientViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = IngredientFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name"]
-    ordering_fields = ["name", "default_unit", "is_active", "created_at", "updated_at"]
+    ordering_fields = ["name"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -158,14 +148,7 @@ class IngredientInventoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filterset_class = IngredientInventoryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["ingredient__name"]
-    ordering_fields = [
-        "ingredient__name",
-        "remaining_stock",
-        "minimum_stock",
-        "is_below_minimum",
-        "created_at",
-        "updated_at",
-    ]
+    ordering_fields = ["ingredient__name"]
     ordering = ["ingredient__name"]
 
     def get_queryset(self):
@@ -442,12 +425,9 @@ class IngredientStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["ingredient_inventory__ingredient__name", "note"]
     ordering_fields = [
-        "movement_at",
-        "created_at",
-        "quantity",
-        "movement_type",
-        "note",
         "ingredient_inventory__ingredient__name",
+        "movement_at",
+        "id",
     ]
     ordering = ["-movement_at"]
     http_method_names = ["get", "post", "head", "options"]
@@ -506,15 +486,9 @@ class ProductStockMovementViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         "note",
     ]
     ordering_fields = [
-        "movement_at",
-        "created_at",
-        "mass_grams",
-        "bonus_mass_grams",
-        "total_mass_grams",
-        "movement_type",
-        "note",
         "product__variant_name",
-        "product_packaging__label",
+        "movement_at",
+        "id",
     ]
     ordering = ["-movement_at"]
     http_method_names = ["get", "post", "head", "options"]

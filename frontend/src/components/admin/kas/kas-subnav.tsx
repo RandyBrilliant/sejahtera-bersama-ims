@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 
-import { cn } from '@/lib/utils'
+import { pillSubnavItemClass, pillSubnavNavClass } from '@/lib/pill-subnav'
 
 const links = [
   { to: '/admin/kas/entri', label: 'Transaksi', end: false },
@@ -9,24 +9,17 @@ const links = [
 
 export function KasSubnav() {
   return (
-    <div className="border-outline-variant flex flex-wrap gap-2 border-b pb-3">
+    <nav className={pillSubnavNavClass} aria-label="Bagian kas">
       {links.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           end={item.end}
-          className={({ isActive }) =>
-            cn(
-              'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-on-surface-variant hover:bg-surface-container-low bg-surface-container-lowest'
-            )
-          }
+          className={({ isActive }) => pillSubnavItemClass(isActive)}
         >
           {item.label}
         </NavLink>
       ))}
-    </div>
+    </nav>
   )
 }

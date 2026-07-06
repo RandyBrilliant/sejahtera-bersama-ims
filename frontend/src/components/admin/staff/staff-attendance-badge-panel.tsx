@@ -8,7 +8,7 @@ import {
   unrevokeStaffAttendanceBadge,
 } from '@/api/attendance'
 import { StaffBadgeReissueModal } from '@/components/admin/staff/staff-badge-reissue-modal'
-import { downloadStaffIdCardPdf, StaffIdCardPreview } from '@/components/admin/staff/staff-id-card'
+import { downloadStaffIdCardJpg, StaffIdCardPreview } from '@/components/admin/staff/staff-id-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,19 +90,19 @@ export function StaffAttendanceBadgePanel({
     }
   }
 
-  function handleDownloadCardPdf() {
+  function handleDownloadCardJpg() {
     if (!printDataUrl) {
-      alert.error('Unduh PDF', 'QR kartu belum tersedia untuk diunduh.')
+      alert.error('Unduh JPG', 'QR kartu belum tersedia untuk diunduh.')
       return
     }
     void (async () => {
-      const ok = await downloadStaffIdCardPdf({
+      const ok = await downloadStaffIdCardJpg({
         fullName,
         positionLabel,
         qrDataUrl: printDataUrl,
       })
       if (!ok) {
-        alert.error('Unduh PDF', 'Gagal membuat file PDF kartu staf. Coba lagi.')
+        alert.error('Unduh JPG', 'Gagal membuat file JPG kartu staf. Coba lagi.')
       }
     })()
   }
@@ -185,7 +185,7 @@ export function StaffAttendanceBadgePanel({
                 qrDataUrl={dataUrl}
               />
               <p className="text-on-surface-variant text-xs leading-relaxed">
-                Unduh PDF dengan ukuran tetap kartu ID vertikal (CR80, 54 × 86 mm) untuk dicetak.
+                Unduh JPG dengan ukuran tetap kartu ID vertikal (CR80, 54 × 86 mm) untuk dicetak.
               </p>
             </div>
           ) : (
@@ -211,8 +211,8 @@ export function StaffAttendanceBadgePanel({
             </div>
             <div className="flex flex-wrap gap-2">
               {variant === 'standalone' ? (
-                <Button type="button" disabled={busy || !printDataUrl} onClick={handleDownloadCardPdf}>
-                  Unduh PDF kartu
+                <Button type="button" disabled={busy || !printDataUrl} onClick={handleDownloadCardJpg}>
+                  Unduh JPG kartu
                 </Button>
               ) : null}
               <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleRevoke()}>

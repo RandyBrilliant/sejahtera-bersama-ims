@@ -106,24 +106,12 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                 <TableHead className="text-on-surface-variant">
                   {sortHeader('Label', 'label')}
                 </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('Berat (kg)', 'net_mass_kg')}
-                </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('Setara unit kemasan', 'remaining_stock')}
-                </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('Harga pokok', 'base_price_idr')}
-                </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('Harga jual', 'list_price_idr')}
-                </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('SKU', 'sku')}
-                </TableHead>
-                <TableHead className="text-on-surface-variant">
-                  {sortHeader('Status', 'is_active')}
-                </TableHead>
+                <TableHead className="text-on-surface-variant">Berat (kg)</TableHead>
+                <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
+                <TableHead className="text-on-surface-variant">Harga pokok</TableHead>
+                <TableHead className="text-on-surface-variant">Harga jual</TableHead>
+                <TableHead className="text-on-surface-variant">SKU</TableHead>
+                <TableHead className="text-on-surface-variant">Status</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
