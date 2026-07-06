@@ -4,13 +4,14 @@ import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import {
   getSortDirection,
   toggleOrdering,
+  type OrderingChangeHandler,
   type SortFieldConfig,
 } from '@/lib/table-sorting'
 
 type UseTableSortingOptions = {
   ordering?: string
   defaultOrdering?: string
-  onOrderingChange: (ordering: string) => void
+  onOrderingChange: OrderingChangeHandler
 }
 
 export function useTableSorting({
@@ -20,14 +21,14 @@ export function useTableSorting({
 }: UseTableSortingOptions) {
   const handleSort = useCallback(
     (config: SortFieldConfig, options?: { preferDesc?: boolean }) => {
-      onOrderingChange(
-        toggleOrdering(ordering, config, {
+      onOrderingChange((current) =>
+        toggleOrdering(current, config, {
           defaultOrdering,
           preferDesc: options?.preferDesc,
         })
       )
     },
-    [ordering, defaultOrdering, onOrderingChange]
+    [defaultOrdering, onOrderingChange]
   )
 
   const sortHeader = useCallback(

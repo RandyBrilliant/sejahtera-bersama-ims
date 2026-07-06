@@ -12,6 +12,7 @@ import { CustomerDeleteModal } from '@/components/admin/customers/customer-delet
 import { WilayahManagerModal } from '@/components/admin/customers/wilayah-manager-modal'
 import { useCustomersQuery, useWilayahQuery } from '@/hooks/use-purchase-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -93,10 +94,7 @@ export function CustomersTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

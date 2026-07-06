@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -16,6 +16,7 @@ import {
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/constants/table-pagination'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import type { ProductPackaging, ProductPackagingListParams } from '@/types/inventory'
 
@@ -44,8 +45,8 @@ export function ProductPackagingInlineTable({ productId }: Props) {
     ordering: 'label',
   })
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setListParams((p) => ({ ...p, ordering })),
+  const onOrderingChange = useMemo(
+    () => createOrderingChangeHandler(setListParams, { resetPage: false }),
     []
   )
 

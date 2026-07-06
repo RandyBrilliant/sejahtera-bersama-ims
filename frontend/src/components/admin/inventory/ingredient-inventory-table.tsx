@@ -29,6 +29,7 @@ import {
 import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
 import { useIngredientInventoriesQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { cn } from '@/lib/utils'
 import type { IngredientInventory, IngredientInventoryListParams } from '@/types/inventory'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
@@ -50,6 +51,7 @@ export function IngredientInventoryTable() {
   const [params, setParams] = useState<IngredientInventoryListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: 'ingredient__name',
   })
   const [searchInput, setSearchInput] = useState('')
 
@@ -69,10 +71,7 @@ export function IngredientInventoryTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

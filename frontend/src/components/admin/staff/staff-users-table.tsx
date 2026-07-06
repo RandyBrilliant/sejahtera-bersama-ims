@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom'
 import { USER_ROLE_LABEL, USER_ROLE_PILL_CLASS } from '@/constants/user-roles'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { useSystemUsersQuery } from '@/hooks/use-system-users-query'
 import { formatAuditDate } from '@/lib/format-audit-datetime'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
@@ -88,10 +89,7 @@ export function StaffUsersTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

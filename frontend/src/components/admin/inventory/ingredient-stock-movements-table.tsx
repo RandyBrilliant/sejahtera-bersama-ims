@@ -28,6 +28,7 @@ import {
 import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
 import { useIngredientStockMovementsQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { cn } from '@/lib/utils'
 import type { IngredientStockMovement, IngredientStockMovementListParams, StockMovementType } from '@/types/inventory'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
@@ -77,10 +78,7 @@ export function IngredientStockMovementsTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

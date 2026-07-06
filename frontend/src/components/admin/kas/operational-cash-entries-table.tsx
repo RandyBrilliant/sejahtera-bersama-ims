@@ -12,6 +12,7 @@ import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { OperationalCashEntryDeleteModal } from '@/components/admin/kas/operational-cash-entry-delete-modal'
 import { useOperationalCashEntriesQuery } from '@/hooks/use-expenses-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -109,10 +110,7 @@ export function OperationalCashEntriesTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

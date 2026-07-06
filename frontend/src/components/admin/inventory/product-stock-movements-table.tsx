@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table'
 import { useProductStockMovementsQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { ProductStockMovement, ProductStockMovementListParams, StockMovementType } from '@/types/inventory'
@@ -67,10 +68,7 @@ export function ProductStockMovementsTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

@@ -12,6 +12,7 @@ import { ENTRY_KIND_LABEL } from '@/constants/expenses'
 import { OperationalCategoryDeleteModal } from '@/components/admin/kas/operational-category-delete-modal'
 import { useOperationalCategoriesQuery } from '@/hooks/use-expenses-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,10 +79,7 @@ export function OperationalCategoriesTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

@@ -44,6 +44,7 @@ import {
 } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
@@ -93,10 +94,7 @@ export function PurchaseInOrdersTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,

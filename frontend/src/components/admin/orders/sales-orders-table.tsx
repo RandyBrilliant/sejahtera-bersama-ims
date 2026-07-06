@@ -31,6 +31,7 @@ import { ORDER_STATUS_LABEL } from '@/constants/order-status'
 import { useAuth } from '@/hooks/use-auth'
 import { useSalesOrdersQuery } from '@/hooks/use-purchase-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, SalesOrder, SalesOrdersListParams } from '@/types/purchase'
@@ -73,10 +74,7 @@ export function SalesOrdersTable() {
     }))
   }, [searchInput])
 
-  const onOrderingChange = useCallback(
-    (ordering: string) => setParams((p) => ({ ...p, page: 1, ordering })),
-    []
-  )
+  const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
   const { sortHeader } = useTableSorting({
     ordering: params.ordering,
