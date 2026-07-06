@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
 import {
@@ -25,10 +25,12 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
+import { PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 const LIST_PATH = '/admin/gaji'
@@ -37,6 +39,12 @@ function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
   const d = err.response?.data as { detail?: unknown } | undefined
   return typeof d?.detail === 'string' ? d.detail : undefined
+}
+
+type EntryDraft = {
+  deductions_idr: string
+  bonus_idr: string
+  advance_deduction_idr: string
 }
 
 export function AdminPayrollPeriodDetailPage() {
@@ -51,7 +59,7 @@ export function AdminPayrollPeriodDetailPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notes, setNotes] = useState('')
-  const [draftDeductions, setDraftDeductions] = useState<Record<number, string>>({})
+  const [draft, setDraft] = useState<Record<number, EntryDraft>>({})
 
   const isDraft = period?.status === 'DRAFT'
 
@@ -64,9 +72,15 @@ export function AdminPayrollPeriodDetailPage() {
       setPeriod(p)
       setNotes(p.notes ?? '')
       setEntries(e)
-      const nextDed: Record<number, string> = {}
-      for (const row of e) nextDed[row.id] = String(row.deductions_idr ?? '0')
-      setDraftDeductions(nextDed)
+      const next: Record<number, EntryDraft> = {}
+      for (const row of e) {
+        next[row.id] = {
+          deductions_idr: String(row.deductions_idr ?? '0'),
+          bonus_idr: String(row.bonus_idr ?? '0'),
+          advance_deduction_idr: String(row.advance_deduction_idr ?? '0'),
+        }
+      }
+      setDraft(next)
     } catch (err) {
       setPeriod(null)
       alert.error('Payroll', axiosDetail(err) ?? String((err as Error)?.message ?? err))
@@ -117,7 +131,7 @@ export function AdminPayrollPeriodDetailPage() {
     const ok =
       typeof window !== 'undefined'
         ? window.confirm(
-            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date)}? Potongan tidak bisa diubah setelah dikunci.`
+            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date)}? Penyesuaian tidak bisa diubah setelah dikunci.`
           )
         : false
     if (!ok) return
@@ -134,19 +148,39 @@ export function AdminPayrollPeriodDetailPage() {
     }
   }
 
-  async function saveEntryDeduction(row: PayrollEntryRow) {
-    if (!period || !isDraft) return
-    const raw = draftDeductions[row.id] ?? ''
+  function parseAmount(raw: string): number | null {
     const n = Number(String(raw).replace(/\s/g, '').replace(',', '.'))
-    if (!Number.isFinite(n) || n < 0) {
-      alert.error('Validasi', 'Potongan harus bilangan tidak negatif.')
+    if (!Number.isFinite(n) || n < 0) return null
+    return n
+  }
+
+  async function saveEntryAdjust(row: PayrollEntryRow) {
+    if (!period || !isDraft) return
+    const d = draft[row.id]
+    if (!d) return
+    const deductions = parseAmount(d.deductions_idr)
+    const bonus = parseAmount(d.bonus_idr)
+    const advance = parseAmount(d.advance_deduction_idr)
+    if (deductions === null || bonus === null || advance === null) {
+      alert.error('Validasi', 'Nilai harus bilangan tidak negatif.')
       return
     }
     setBusy(true)
     try {
-      const updated = await patchPayrollEntry(period.id, row.id, { deductions_idr: raw })
+      const updated = await patchPayrollEntry(period.id, row.id, {
+        deductions_idr: d.deductions_idr,
+        bonus_idr: d.bonus_idr,
+        advance_deduction_idr: d.advance_deduction_idr,
+      })
       setEntries((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-      setDraftDeductions((d) => ({ ...d, [row.id]: String(updated.deductions_idr) }))
+      setDraft((prev) => ({
+        ...prev,
+        [row.id]: {
+          deductions_idr: String(updated.deductions_idr),
+          bonus_idr: String(updated.bonus_idr),
+          advance_deduction_idr: String(updated.advance_deduction_idr),
+        },
+      }))
       alert.success('Entri diperbarui.')
     } catch (e) {
       alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -215,7 +249,7 @@ export function AdminPayrollPeriodDetailPage() {
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={busy} onClick={() => void handleGenerate()}>
-              Bangkitkan ulang dari presensi terbaru dan gaji pokok
+              Bangkitkan dari pekerjaan belum dibayar (presensi / kupas)
             </Button>
             {canFinalize && period.status === 'DRAFT' ? (
               <Button type="button" disabled={busy} onClick={() => void handleFinalize()}>
@@ -228,64 +262,130 @@ export function AdminPayrollPeriodDetailPage() {
             <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">Entri per pegawai</h2>
             {entries.length === 0 ? (
               <p className="text-on-surface-variant text-sm">
-                Belum ada entri. Jalankan pembangkit dari presensi menggunakan tombol di atas.
+                Belum ada entri. Jalankan pembangkit menggunakan tombol di atas.
               </p>
             ) : (
-              <div className="border-outline-variant overflow-x-auto rounded-xl border">
+              <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nama</TableHead>
-                      <TableHead className="text-right tabular-nums">Gaji pokok (snapshot)</TableHead>
-                      <TableHead className="text-right">Hadir</TableHead>
+                      <TableHead>Tipe</TableHead>
+                      <TableHead className="text-right">Hadir / kg</TableHead>
                       <TableHead className="text-right">Telat</TableHead>
+                      <TableHead className="text-right">Kotor</TableHead>
+                      <TableHead>Bonus (TBH)</TableHead>
+                      <TableHead>Pinjam</TableHead>
                       <TableHead>Potongan</TableHead>
                       <TableHead className="text-right">Bersih</TableHead>
+                      {isDraft ? <TableHead /> : <TableHead className="text-right">Slip</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entries.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.employee_name}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatIdr(row.base_salary_snapshot_idr)}
-                        </TableCell>
-                        <TableCell className="text-right">{row.days_present}</TableCell>
-                        <TableCell className="text-right">{row.late_count}</TableCell>
-                        <TableCell>
-                          {period.status === 'DRAFT' ? (
-                            <div className="flex flex-wrap items-center gap-1">
+                    {entries.map((row) => {
+                      const isKupas = row.pay_type_snapshot === 'PIECE_RATE'
+                      const d = draft[row.id]
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">{row.employee_name}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {PAY_TYPE_LABEL[row.pay_type_snapshot]}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {isKupas ? (
+                              <span>{formatKgAmount(row.total_kg, true)}</span>
+                            ) : (
+                              <span>
+                                {row.days_present} hari @ {formatIdr(row.daily_rate_snapshot_idr)}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{isKupas ? '—' : row.late_count}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatIdr(row.gross_idr)}
+                          </TableCell>
+                          <TableCell>
+                            {isDraft && d ? (
                               <Input
-                                className="h-9 w-[120px]"
+                                className="h-9 w-[100px]"
                                 inputMode="decimal"
-                                value={draftDeductions[row.id] ?? ''}
+                                value={d.bonus_idr}
                                 onChange={(e) =>
-                                  setDraftDeductions((d) => ({
-                                    ...d,
-                                    [row.id]: e.target.value,
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    [row.id]: { ...prev[row.id], bonus_idr: e.target.value },
                                   }))
                                 }
                                 disabled={busy}
                               />
+                            ) : (
+                              formatIdr(row.bonus_idr)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isDraft && d ? (
+                              <Input
+                                className="h-9 w-[100px]"
+                                inputMode="decimal"
+                                value={d.advance_deduction_idr}
+                                onChange={(e) =>
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    [row.id]: {
+                                      ...prev[row.id],
+                                      advance_deduction_idr: e.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={busy}
+                              />
+                            ) : (
+                              formatIdr(row.advance_deduction_idr)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isDraft && d ? (
+                              <Input
+                                className="h-9 w-[100px]"
+                                inputMode="decimal"
+                                value={d.deductions_idr}
+                                onChange={(e) =>
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    [row.id]: { ...prev[row.id], deductions_idr: e.target.value },
+                                  }))
+                                }
+                                disabled={busy}
+                              />
+                            ) : (
+                              formatIdr(row.deductions_idr)
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {formatIdr(row.net_pay_idr)}
+                          </TableCell>
+                          {isDraft ? (
+                            <TableCell>
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 disabled={busy}
-                                onClick={() => void saveEntryDeduction(row)}
+                                onClick={() => void saveEntryAdjust(row)}
                               >
                                 Simpan
                               </Button>
-                            </div>
+                            </TableCell>
                           ) : (
-                            formatIdr(row.deductions_idr)
+                            <TableCell className="text-right">
+                              <Button type="button" variant="outline" size="sm" asChild>
+                                <Link to={`/admin/gaji/${period.id}/slip/${row.id}`}>Unduh PDF</Link>
+                              </Button>
+                            </TableCell>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          {formatIdr(row.net_pay_idr)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>

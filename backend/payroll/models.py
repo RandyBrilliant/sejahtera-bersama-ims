@@ -8,8 +8,13 @@ from django.utils.translation import gettext_lazy as _
 User = settings.AUTH_USER_MODEL
 
 
+class PayType(models.TextChoices):
+    DAILY = "DAILY", _("Daily wage (attendance)")
+    PIECE_RATE = "PIECE_RATE", _("Piece rate (kupas)")
+
+
 class EmployeeCompensation(models.Model):
-    """Gaji pokok bulanan pegawai."""
+    """Kompensasi pegawai — harian (presensi) atau borongan kupas."""
 
     user = models.OneToOneField(
         User,
@@ -17,12 +22,28 @@ class EmployeeCompensation(models.Model):
         related_name="payroll_compensation",
         verbose_name=_("employee"),
     )
+    pay_type = models.CharField(
+        _("pay type"),
+        max_length=16,
+        choices=PayType.choices,
+        default=PayType.DAILY,
+        db_index=True,
+    )
+    daily_rate_idr = models.DecimalField(
+        _("daily rate (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("Gaji per hari hadir (untuk pay_type DAILY)."),
+    )
     monthly_base_salary_idr = models.DecimalField(
         _("monthly base salary (IDR)"),
         max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
         default=Decimal("0"),
+        help_text=_("Referensi opsional; tidak dipakai untuk hitung gaji harian."),
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -30,19 +51,51 @@ class EmployeeCompensation(models.Model):
         verbose_name = _("employee compensation")
 
     def __str__(self) -> str:
-        return f"{self.user_id} @{self.monthly_base_salary_idr}"
+        return f"{self.user_id} [{self.pay_type}]"
+
+
+class KupasItem(models.Model):
+    """Jenis barang kupas dengan tarif per kg (sama untuk semua pekerja)."""
+
+    name = models.CharField(_("name"), max_length=100, unique=True)
+    rate_per_kg_idr = models.DecimalField(
+        _("rate per kg (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    resulting_ingredient = models.ForeignKey(
+        "inventory.Ingredient",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="kupas_items",
+        verbose_name=_("resulting ingredient"),
+        help_text=_("Bahan hasil kupas yang masuk stok (opsional)."),
+    )
+    is_active = models.BooleanField(_("active"), default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("kupas item")
+        verbose_name_plural = _("kupas items")
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return f"{self.name} @ {self.rate_per_kg_idr}/kg"
 
 
 class PayrollPeriod(models.Model):
-    """Satu periode gaji mingguan — dibayar setiap Sabtu (Senin–Sabtu)."""
+    """Satu periode gaji — tanggal bayar fleksibel, cutoff inklusif di period_end_date."""
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", _("Draft")
         FINALIZED = "FINALIZED", _("Final")
 
-    pay_date = models.DateField(_("pay date (Saturday)"), db_index=True)
-    period_start_date = models.DateField(_("period start (Monday)"))
-    period_end_date = models.DateField(_("period end (Saturday)"))
+    pay_date = models.DateField(_("pay date"), db_index=True)
+    period_start_date = models.DateField(_("period start"))
+    period_end_date = models.DateField(_("period end (cutoff)"))
     status = models.CharField(_("status"), max_length=16, choices=Status.choices, default=Status.DRAFT, db_index=True)
     finalized_at = models.DateTimeField(null=True, blank=True)
     finalized_by = models.ForeignKey(
@@ -69,6 +122,80 @@ class PayrollPeriod(models.Model):
         return f"{self.pay_date.isoformat()} [{self.status}]"
 
 
+class KupasProductionRecord(models.Model):
+    """Catatan kg kupas per pekerja per hari per jenis barang."""
+
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="kupas_production_records",
+        verbose_name=_("employee"),
+        db_index=True,
+    )
+    work_date = models.DateField(_("work date"), db_index=True)
+    kupas_item = models.ForeignKey(
+        KupasItem,
+        on_delete=models.PROTECT,
+        related_name="production_records",
+        verbose_name=_("kupas item"),
+    )
+    kg = models.DecimalField(
+        _("kg"),
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    rate_snapshot_idr = models.DecimalField(
+        _("rate snapshot (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("Diisi saat periode difinalisasi."),
+    )
+    amount_idr = models.DecimalField(
+        _("amount (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("kg × tarif; diisi saat generate/finalize."),
+    )
+    paid_in_period = models.ForeignKey(
+        PayrollPeriod,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="kupas_records_paid",
+        verbose_name=_("paid in period"),
+        db_index=True,
+    )
+    note = models.TextField(_("note"), blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("created by"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("kupas production record")
+        verbose_name_plural = _("kupas production records")
+        ordering = ["-work_date", "employee__full_name", "id"]
+        indexes = [
+            models.Index(fields=["employee", "work_date"]),
+            models.Index(fields=["paid_in_period"]),
+            models.Index(fields=["employee", "work_date", "kupas_item"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.employee_id} @{self.work_date} {self.kupas_item_id} {self.kg}kg"
+
+
 class PayrollEntry(models.Model):
     """Slip satu pegawai dalam satu periode (snapshot saat generate / penyusunan)."""
 
@@ -86,8 +213,22 @@ class PayrollEntry(models.Model):
         db_index=True,
     )
 
+    pay_type_snapshot = models.CharField(
+        _("pay type snapshot"),
+        max_length=16,
+        choices=PayType.choices,
+        default=PayType.DAILY,
+    )
     base_salary_snapshot_idr = models.DecimalField(
         _("base salary snapshot (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("Referensi gaji pokok bulanan saat generate."),
+    )
+    daily_rate_snapshot_idr = models.DecimalField(
+        _("daily rate snapshot (IDR)"),
         max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
@@ -95,12 +236,43 @@ class PayrollEntry(models.Model):
     )
     days_present = models.PositiveIntegerField(_("days present"), default=0)
     late_count = models.PositiveIntegerField(_("late count"), default=0)
+    total_kg = models.DecimalField(
+        _("total kg (kupas)"),
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+    )
+    gross_idr = models.DecimalField(
+        _("gross (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+    )
+    bonus_idr = models.DecimalField(
+        _("bonus (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("Tambahan (TBH)."),
+    )
+    advance_deduction_idr = models.DecimalField(
+        _("advance deduction (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        default=Decimal("0"),
+        help_text=_("Pinjaman (PINJAM)."),
+    )
     deductions_idr = models.DecimalField(
         _("deductions (IDR)"),
         max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
         default=Decimal("0"),
+        help_text=_("Potongan telat / lainnya."),
     )
     net_pay_idr = models.DecimalField(
         _("net pay (IDR)"),

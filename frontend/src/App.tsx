@@ -212,9 +212,24 @@ const AdminPayrollCompensationPage = lazy(() =>
     default: m.AdminPayrollCompensationPage,
   }))
 )
+const AdminPayrollKupasItemsPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-kupas-items-page').then((m) => ({
+    default: m.AdminPayrollKupasItemsPage,
+  }))
+)
+const AdminPayrollKupasEntryPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-kupas-entry-page').then((m) => ({
+    default: m.AdminPayrollKupasEntryPage,
+  }))
+)
 const AdminPayrollPeriodDetailPage = lazy(() =>
   import('@/pages/admin/admin-payroll-period-detail-page').then((m) => ({
     default: m.AdminPayrollPeriodDetailPage,
+  }))
+)
+const AdminPayrollEntrySlipPage = lazy(() =>
+  import('@/pages/admin/admin-payroll-entry-slip-page').then((m) => ({
+    default: m.AdminPayrollEntrySlipPage,
   }))
 )
 const AdminMyAttendancePage = lazy(() =>
@@ -225,6 +240,11 @@ const AdminMyAttendancePage = lazy(() =>
 const AdminMyPayrollPage = lazy(() =>
   import('@/pages/admin/admin-my-payroll-page').then((m) => ({
     default: m.AdminMyPayrollPage,
+  }))
+)
+const AdminMyPayrollSlipPage = lazy(() =>
+  import('@/pages/admin/admin-my-payroll-slip-page').then((m) => ({
+    default: m.AdminMyPayrollSlipPage,
   }))
 )
 const AdminOrdersLayout = lazy(() =>
@@ -309,6 +329,7 @@ export default function App() {
                 <Route index element={<AdminProfilePage />} />
                 <Route path="presensi" element={<AdminMyAttendancePage />} />
                 <Route path="slip-gaji" element={<AdminMyPayrollPage />} />
+                <Route path="slip-gaji/:periodId" element={<AdminMyPayrollSlipPage />} />
               </Route>
               <Route
                 element={
@@ -368,6 +389,9 @@ export default function App() {
                 <Route path="gaji" element={<AdminPayrollLayout />}>
                   <Route index element={<AdminPayrollPeriodsPage />} />
                   <Route path="kompensasi" element={<AdminPayrollCompensationPage />} />
+                  <Route path="jenis-kupas" element={<AdminPayrollKupasItemsPage />} />
+                  <Route path="input-kupas" element={<AdminPayrollKupasEntryPage />} />
+                  <Route path=":periodId/slip/:entryId" element={<AdminPayrollEntrySlipPage />} />
                   <Route path=":periodId" element={<AdminPayrollPeriodDetailPage />} />
                 </Route>
               </Route>

@@ -1,10 +1,14 @@
 import { api } from '@/lib/api'
 import type {
   EmployeeCompensation,
+  KupasItem,
+  KupasProductionRecord,
   MyPayrollSlip,
+  PayType,
   PayrollCompensationTableRow,
   PayrollEntryRow,
   PayrollPeriod,
+  PayrollSlipDetail,
 } from '@/types/payroll'
 
 type Envelope<T> = { code: string; data: T; detail?: string }
@@ -25,23 +29,107 @@ export async function fetchEmployeeCompensationTable(): Promise<PayrollCompensat
 
 export async function patchEmployeeCompensation(
   userId: number,
-  monthly_base_salary_idr: string | number
+  patch: {
+    pay_type?: PayType
+    daily_rate_idr?: string | number
+    monthly_base_salary_idr?: string | number
+  }
 ): Promise<EmployeeCompensation> {
-  const { data } = await api.patch<Envelope<EmployeeCompensation>>(`/api/payroll/compensation/${userId}/`, {
-    monthly_base_salary_idr,
-  })
+  const { data } = await api.patch<Envelope<EmployeeCompensation>>(
+    `/api/payroll/compensation/${userId}/`,
+    patch
+  )
   return data.data
 }
 
 export async function fetchMyCompensation(): Promise<EmployeeCompensation | null> {
   const { data } = await api.get<
-    Envelope<EmployeeCompensation | { user_id: number; monthly_base_salary_idr: null }>
+    Envelope<
+      | EmployeeCompensation
+      | { user_id: number; pay_type: null; daily_rate_idr: null; monthly_base_salary_idr: null }
+    >
   >('/api/payroll/compensation/me/')
   const body = data.data
-  if (body && typeof body === 'object' && body.monthly_base_salary_idr == null) {
+  if (body && typeof body === 'object' && 'pay_type' in body && body.pay_type == null) {
     return null
   }
   return body as EmployeeCompensation
+}
+
+export async function fetchKupasItems(activeOnly = true): Promise<KupasItem[]> {
+  const qs = activeOnly ? '?active_only=1' : '?active_only=0'
+  const { data } = await api.get<Envelope<KupasItem[]>>(`/api/payroll/kupas-items${qs}`)
+  return data.data
+}
+
+export async function createKupasItem(body: {
+  name: string
+  rate_per_kg_idr: string | number
+  resulting_ingredient?: number | null
+  is_active?: boolean
+}): Promise<KupasItem> {
+  const { data } = await api.post<Envelope<KupasItem>>('/api/payroll/kupas-items/', body)
+  return data.data
+}
+
+export async function patchKupasItem(
+  id: number,
+  body: Partial<{
+    name: string
+    rate_per_kg_idr: string | number
+    resulting_ingredient: number | null
+    is_active: boolean
+  }>
+): Promise<KupasItem> {
+  const { data } = await api.patch<Envelope<KupasItem>>(`/api/payroll/kupas-items/${id}/`, body)
+  return data.data
+}
+
+export async function fetchKupasRecords(params?: {
+  work_date?: string
+  employee_id?: number
+  unpaid_only?: boolean
+}): Promise<KupasProductionRecord[]> {
+  const search = new URLSearchParams()
+  if (params?.work_date) search.set('work_date', params.work_date)
+  if (params?.employee_id != null) search.set('employee_id', String(params.employee_id))
+  if (params?.unpaid_only) search.set('unpaid_only', '1')
+  const qs = search.toString()
+  const path = qs ? `/api/payroll/kupas-records/?${qs}` : '/api/payroll/kupas-records/'
+  const { data } = await api.get<Envelope<KupasProductionRecord[]>>(path)
+  return data.data
+}
+
+export async function createKupasRecord(body: {
+  employee: number
+  work_date: string
+  kupas_item: number
+  kg: string | number
+  note?: string
+}): Promise<KupasProductionRecord> {
+  const { data } = await api.post<Envelope<KupasProductionRecord>>('/api/payroll/kupas-records/', body)
+  return data.data
+}
+
+export async function patchKupasRecord(
+  id: number,
+  body: Partial<{
+    employee: number
+    work_date: string
+    kupas_item: number
+    kg: string | number
+    note: string
+  }>
+): Promise<KupasProductionRecord> {
+  const { data } = await api.patch<Envelope<KupasProductionRecord>>(
+    `/api/payroll/kupas-records/${id}/`,
+    body
+  )
+  return data.data
+}
+
+export async function deleteKupasRecord(id: number): Promise<void> {
+  await api.delete(`/api/payroll/kupas-records/${id}/`)
 }
 
 export async function fetchPayrollPeriod(id: number): Promise<PayrollPeriod> {
@@ -56,6 +144,7 @@ export async function fetchPayrollPeriods(): Promise<PayrollPeriod[]> {
 
 export async function createPayrollPeriod(payload: {
   pay_date: string
+  cutoff_date?: string
   notes?: string
 }): Promise<PayrollPeriod> {
   const { data } = await api.post<Envelope<PayrollPeriod>>('/api/payroll/periods/', payload)
@@ -89,18 +178,42 @@ export async function finalizePayrollPeriod(id: number): Promise<PayrollPeriod> 
 }
 
 export async function fetchPayrollEntries(periodId: number): Promise<PayrollEntryRow[]> {
-  const { data } = await api.get<Envelope<PayrollEntryRow[]>>(`/api/payroll/periods/${periodId}/entries/`)
+  const { data } = await api.get<Envelope<PayrollEntryRow[]>>(
+    `/api/payroll/periods/${periodId}/entries/`
+  )
   return data.data
 }
 
 export async function patchPayrollEntry(
   periodId: number,
   entryId: number,
-  patch: { deductions_idr?: string | number; notes?: string }
+  patch: {
+    deductions_idr?: string | number
+    bonus_idr?: string | number
+    advance_deduction_idr?: string | number
+    notes?: string
+  }
 ): Promise<PayrollEntryRow> {
   const { data } = await api.patch<Envelope<PayrollEntryRow>>(
     `/api/payroll/periods/${periodId}/entries/${entryId}/`,
     patch
+  )
+  return data.data
+}
+
+export async function fetchPayrollEntrySlip(
+  periodId: number,
+  entryId: number
+): Promise<PayrollSlipDetail> {
+  const { data } = await api.get<Envelope<PayrollSlipDetail>>(
+    `/api/payroll/periods/${periodId}/entries/${entryId}/slip/`
+  )
+  return data.data
+}
+
+export async function fetchMyPayrollSlip(periodId: number): Promise<PayrollSlipDetail> {
+  const { data } = await api.get<Envelope<PayrollSlipDetail>>(
+    `/api/payroll/me/entries/${periodId}/slip/`
   )
   return data.data
 }

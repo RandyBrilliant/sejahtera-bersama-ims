@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { AnalyticsCashCharts } from '@/components/admin/analytics/analytics-cash-charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { downloadOperationalCashReportExport } from '@/api/expenses'
@@ -73,14 +73,10 @@ export function AdminAnalyticsPage() {
     setEndDate(r.end)
   }, [])
 
-  const onStartChange = useCallback((v: string) => {
+  const onRangeChange = useCallback((value: { start: string; end: string }) => {
     setPresetSelection('custom')
-    setStartDate(v)
-  }, [])
-
-  const onEndChange = useCallback((v: string) => {
-    setPresetSelection('custom')
-    setEndDate(v)
+    setStartDate(value.start)
+    setEndDate(value.end)
   }, [])
 
   const [exportKey, setExportKey] = useState<string | null>(null)
@@ -166,25 +162,15 @@ export function AdminAnalyticsPage() {
               </Button>
             ))}
           </div>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="grid gap-2">
-              <Label htmlFor="analytics-start">Mulai</Label>
-              <DatePickerInput
-                id="analytics-start"
-                value={startDate}
-                onChange={onStartChange}
-                maxDate={endDate}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="analytics-end">Selesai</Label>
-              <DatePickerInput
-                id="analytics-end"
-                value={endDate}
-                onChange={onEndChange}
-                minDate={startDate}
-              />
-            </div>
+          <div className="max-w-md">
+            <Label htmlFor="analytics-range">Rentang kustom</Label>
+            <DateRangePickerInput
+              id="analytics-range"
+              className="mt-2"
+              startDate={startDate}
+              endDate={endDate}
+              onChange={onRangeChange}
+            />
           </div>
           {rangeError ? (
             <p className="text-destructive text-sm">{rangeError}</p>

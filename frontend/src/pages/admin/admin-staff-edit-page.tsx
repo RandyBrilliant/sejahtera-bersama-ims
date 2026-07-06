@@ -58,8 +58,8 @@ export function AdminStaffEditPage() {
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
           Mengelola <span className="text-on-surface font-medium">{user.full_name}</span> (
-          {user.username}). Gunakan tab di bawah untuk mengedit profil, mengisi gaji pokok, atau mencetak
-          kartu staf.
+          {user.username}). Gunakan tab di bawah untuk mengedit profil, mengatur kompensasi gaji, atau
+          mencetak kartu staf.
         </p>
       </div>
 

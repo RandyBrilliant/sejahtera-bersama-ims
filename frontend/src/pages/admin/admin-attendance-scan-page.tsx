@@ -166,11 +166,10 @@ export function AdminAttendanceScanPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="gap-2 border-white/25 bg-black/55 text-white hover:bg-black/75 hover:text-white"
+              className="gap-2.5 border-white/25 bg-black/55 text-base text-white hover:bg-black/75 hover:text-white"
               onClick={() => goBack('/admin/dashboard')}
             >
-              <ArrowLeft className="size-4" />
+              <ArrowLeft className="size-5" />
               Kembali
             </Button>
             <Button

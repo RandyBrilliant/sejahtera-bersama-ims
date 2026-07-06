@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
 import { fetchMyPayrollSlips } from '@/api/payroll'
@@ -11,8 +12,10 @@ import {
 } from '@/components/ui/table'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import type { MyPayrollSlip } from '@/types/payroll'
+import { PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 function axiosDetail(err: unknown): string | undefined {
@@ -53,8 +56,7 @@ export function AdminMyPayrollPage() {
           Slip gaji saya
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Gaji dibayar setiap Sabtu. Hanya slip dari periode yang sudah dikunci (finalized) akan
-          muncul.
+          Hanya slip dari periode yang sudah dikunci (finalized) akan muncul.
         </p>
       </div>
 
@@ -65,48 +67,70 @@ export function AdminMyPayrollPage() {
           Belum ada slip finalize mengenai Anda. Hubungi HR atau keuangan bila Anda merasa ada yang kurang.
         </p>
       ) : (
-        <div className="border-outline-variant overflow-x-auto rounded-xl border">
+        <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Periode</TableHead>
-                <TableHead className="text-right">Hadir</TableHead>
-                <TableHead className="text-right">Telat</TableHead>
-                <TableHead className="text-right">Gaji pokok</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead className="text-right">Detail</TableHead>
+                <TableHead className="text-right">Kotor</TableHead>
+                <TableHead className="text-right">Bonus</TableHead>
                 <TableHead className="text-right">Potongan</TableHead>
                 <TableHead className="text-right">Bersih</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.period_id}>
-                  <TableCell>
-                    <div className="font-medium">
-                      {formatPayrollWeekLabel(
-                        r.pay_date,
-                        r.period_start_date,
-                        r.period_end_date
+              {rows.map((r) => {
+                const isKupas = r.pay_type_snapshot === 'PIECE_RATE'
+                return (
+                  <TableRow key={r.period_id}>
+                    <TableCell>
+                      <Link
+                        to={`/admin/profil/slip-gaji/${r.period_id}`}
+                        className="text-primary font-medium hover:underline"
+                      >
+                        {formatPayrollWeekLabel(
+                          r.pay_date,
+                          r.period_start_date,
+                          r.period_end_date
+                        )}
+                      </Link>
+                      {r.finalized_at ? (
+                        <div className="text-on-surface-variant text-xs tabular-nums">
+                          {new Date(r.finalized_at).toLocaleString('id-ID')}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {PAY_TYPE_LABEL[r.pay_type_snapshot]}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {isKupas ? (
+                        <span>{formatKgAmount(r.total_kg, true)}</span>
+                      ) : (
+                        <span>
+                          {r.days_present} hari, {r.late_count} telat
+                        </span>
                       )}
-                    </div>
-                    {r.finalized_at ? (
-                      <div className="text-on-surface-variant text-xs tabular-nums">
-                        {new Date(r.finalized_at).toLocaleString('id-ID')}
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right">{r.days_present}</TableCell>
-                  <TableCell className="text-right">{r.late_count}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatIdr(Number(r.base_salary_snapshot_idr))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatIdr(Number(r.deductions_idr))}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatIdr(Number(r.net_pay_idr))}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatIdr(Number(r.gross_idr))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatIdr(Number(r.bonus_idr))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatIdr(
+                        Number(r.deductions_idr) + Number(r.advance_deduction_idr)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatIdr(Number(r.net_pay_idr))}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>

@@ -4,7 +4,7 @@ export type StaffDetailTab = 'profile' | 'compensation' | 'card'
 
 const tabs: { id: StaffDetailTab; label: string }[] = [
   { id: 'profile', label: 'Edit profil' },
-  { id: 'compensation', label: 'Gaji pokok' },
+  { id: 'compensation', label: 'Kompensasi' },
   { id: 'card', label: 'Cetak kartu staf' },
 ]
 

@@ -137,6 +137,16 @@ class AttendanceDailyCheckIn(models.Model):
         validators=[MinValueValidator(0)],
         help_text=_("Hanya untuk hari baru setelah cutoff toleransi."),
     )
+    paid_in_period = models.ForeignKey(
+        "payroll.PayrollPeriod",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_records_paid",
+        verbose_name=_("paid in period"),
+        db_index=True,
+        help_text=_("Diisi saat periode gaji difinalisasi."),
+    )
 
     class Meta:
         verbose_name = _("attendance daily check-in")

@@ -56,7 +56,7 @@ function ReportTable({ rows }: { rows: AttendanceReportRow[] }) {
     )
   }
   return (
-    <div className="border-outline-variant overflow-x-auto rounded-xl border">
+    <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>

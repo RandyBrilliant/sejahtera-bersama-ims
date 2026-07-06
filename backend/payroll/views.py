@@ -6,18 +6,28 @@ from rest_framework.views import APIView
 
 from account.api_responses import ApiCode, error_response, success_response
 from account.models import UserRole
-from payroll.models import EmployeeCompensation, PayrollEntry, PayrollPeriod
+from payroll.models import (
+    EmployeeCompensation,
+    KupasItem,
+    KupasProductionRecord,
+    PayType,
+    PayrollEntry,
+    PayrollPeriod,
+)
 from payroll.permissions import PayrollFinalizeAccess, PayrollManageAccess
 from payroll.serializers import (
     EmployeeCompensationSerializer,
     EmployeeCompensationUpdateSerializer,
+    KupasItemSerializer,
+    KupasProductionRecordSerializer,
+    KupasProductionRecordWriteSerializer,
     PayrollEntryAdjustSerializer,
     PayrollEntrySerializer,
     PayrollPeriodCreateSerializer,
     PayrollPeriodNotesSerializer,
     PayrollPeriodSerializer,
 )
-from payroll.services import PayrollWorkflowError, finalize_payroll_period, generate_payroll_entries
+from payroll.services import PayrollWorkflowError, build_payroll_slip_detail, finalize_payroll_period, generate_payroll_entries
 
 User = get_user_model()
 
@@ -34,7 +44,6 @@ class EmployeeCompensationTableView(APIView):
     """
     Seluruh staf aktif (+ pimpinan) dengan gaji pokok jika ada — untuk pengelolaan oleh
     pemilik/admin/keuangan (tanpa membuka formulir lengkap akun).
-    Pemilik tetap dapat melihat baris bagi semua peran yang relevan pembayaran.
     """
 
     permission_classes = [PayrollManageAccess]
@@ -63,6 +72,8 @@ class EmployeeCompensationTableView(APIView):
                     "full_name": u.full_name,
                     "role": u.role,
                     "employee_code": emp.employee_code if emp else "",
+                    "pay_type": ec.pay_type if ec else PayType.DAILY,
+                    "daily_rate_idr": str(ec.daily_rate_idr) if ec else None,
                     "monthly_base_salary_idr": str(ec.monthly_base_salary_idr) if ec else None,
                     "compensation_updated_at": ec.updated_at.isoformat() if ec else None,
                 }
@@ -87,10 +98,20 @@ class EmployeeCompensationByUserView(APIView):
 
         us = EmployeeCompensationUpdateSerializer(data=request.data)
         us.is_valid(raise_exception=True)
-        obj.monthly_base_salary_idr = us.validated_data["monthly_base_salary_idr"]
-        obj.save(update_fields=["monthly_base_salary_idr", "updated_at"])
+        data = us.validated_data
+        update_fields = ["updated_at"]
+        if "pay_type" in data:
+            obj.pay_type = data["pay_type"]
+            update_fields.append("pay_type")
+        if "daily_rate_idr" in data:
+            obj.daily_rate_idr = data["daily_rate_idr"]
+            update_fields.append("daily_rate_idr")
+        if "monthly_base_salary_idr" in data:
+            obj.monthly_base_salary_idr = data["monthly_base_salary_idr"]
+            update_fields.append("monthly_base_salary_idr")
+        obj.save(update_fields=update_fields)
         return Response(
-            success_response(data=EmployeeCompensationSerializer(obj).data, detail="Gaji pokok diperbarui."),
+            success_response(data=EmployeeCompensationSerializer(obj).data, detail="Kompensasi diperbarui."),
             status=200,
         )
 
@@ -105,13 +126,117 @@ class EmployeeCompensationMeView(APIView):
                 success_response(
                     data={
                         "user_id": request.user.pk,
+                        "pay_type": None,
+                        "daily_rate_idr": None,
                         "monthly_base_salary_idr": None,
-                        "detail": "Belum ada data gaji pokok.",
+                        "detail": "Belum ada data kompensasi.",
                     },
                 ),
                 status=200,
             )
         return Response(success_response(data=EmployeeCompensationSerializer(obj).data), status=200)
+
+
+class KupasItemListCreateView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def get(self, request):
+        active_only = request.query_params.get("active_only", "1") != "0"
+        qs = KupasItem.objects.select_related("resulting_ingredient").order_by("name")
+        if active_only:
+            qs = qs.filter(is_active=True)
+        return Response(success_response(data=KupasItemSerializer(qs, many=True).data), status=200)
+
+    def post(self, request):
+        ser = KupasItemSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        return Response(
+            success_response(data=KupasItemSerializer(obj).data, detail="Jenis kupas dibuat."),
+            status=201,
+        )
+
+
+class KupasItemDetailView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def get(self, request, pk: int):
+        obj = get_object_or_404(KupasItem.objects.select_related("resulting_ingredient"), pk=pk)
+        return Response(success_response(data=KupasItemSerializer(obj).data), status=200)
+
+    def patch(self, request, pk: int):
+        obj = get_object_or_404(KupasItem, pk=pk)
+        ser = KupasItemSerializer(obj, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        return Response(
+            success_response(data=KupasItemSerializer(obj).data, detail="Jenis kupas diperbarui."),
+            status=200,
+        )
+
+
+class KupasProductionRecordListCreateView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def get(self, request):
+        qs = KupasProductionRecord.objects.select_related("employee", "kupas_item").order_by(
+            "-work_date", "employee__full_name"
+        )
+        work_date = request.query_params.get("work_date")
+        employee_id = request.query_params.get("employee_id")
+        unpaid_only = request.query_params.get("unpaid_only") == "1"
+        if work_date:
+            qs = qs.filter(work_date=work_date)
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        if unpaid_only:
+            qs = qs.filter(paid_in_period__isnull=True)
+        return Response(success_response(data=KupasProductionRecordSerializer(qs, many=True).data), status=200)
+
+    def post(self, request):
+        ser = KupasProductionRecordWriteSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        obj = ser.save(created_by=request.user)
+        obj = KupasProductionRecord.objects.select_related("employee", "kupas_item").get(pk=obj.pk)
+        return Response(
+            success_response(
+                data=KupasProductionRecordSerializer(obj).data,
+                detail="Catatan kupas disimpan.",
+            ),
+            status=201,
+        )
+
+
+class KupasProductionRecordDetailView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def patch(self, request, pk: int):
+        obj = get_object_or_404(
+            KupasProductionRecord.objects.select_related("employee", "kupas_item"),
+            pk=pk,
+        )
+        if obj.paid_in_period_id is not None:
+            return Response(
+                error_response(detail="Catatan sudah dibayar.", code=ApiCode.BAD_REQUEST),
+                status=400,
+            )
+        ser = KupasProductionRecordWriteSerializer(obj, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        return Response(
+            success_response(data=KupasProductionRecordSerializer(obj).data, detail="Catatan kupas diperbarui."),
+            status=200,
+        )
+
+    def delete(self, request, pk: int):
+        obj = get_object_or_404(KupasProductionRecord, pk=pk)
+        if obj.paid_in_period_id is not None:
+            return Response(
+                error_response(detail="Catatan sudah dibayar.", code=ApiCode.BAD_REQUEST),
+                status=400,
+            )
+        obj.delete()
+        return Response(success_response(detail="Catatan kupas dihapus."), status=200)
 
 
 class PayrollPeriodListCreateView(APIView):
@@ -173,7 +298,7 @@ class PayrollPeriodGenerateView(APIView):
         return Response(
             success_response(
                 data={"entries_created_or_refreshed": n, "period": PayrollPeriodSerializer(p).data},
-                detail=f"Slip pegawai dibuat ulang untuk {n} pegawai aktif dengan data gaji pokok.",
+                detail=f"Slip pegawai dibuat ulang untuk {n} pegawai dengan pekerjaan belum dibayar.",
             ),
             status=200,
         )
@@ -213,7 +338,7 @@ class PayrollEntryAdjustView(APIView):
         p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
         if p.status != PayrollPeriod.Status.DRAFT:
             return Response(
-                error_response(detail="Potongan hanya di periode draft.", code=ApiCode.BAD_REQUEST),
+                error_response(detail="Penyesuaian hanya di periode draft.", code=ApiCode.BAD_REQUEST),
                 status=400,
             )
         entry = get_object_or_404(PayrollEntry.objects.filter(period=p), pk=entry_id)
@@ -224,6 +349,42 @@ class PayrollEntryAdjustView(APIView):
             success_response(data=PayrollEntrySerializer(entry).data, detail="Entri payroll diperbarui."),
             status=200,
         )
+
+
+class PayrollEntrySlipView(APIView):
+    """Slip detail satu pegawai dalam periode dikunci."""
+
+    permission_classes = [PayrollManageAccess]
+
+    def get(self, request, pk: int, entry_id: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(
+            PayrollEntry.objects.select_related("employee", "period").filter(period=p),
+            pk=entry_id,
+        )
+        try:
+            data = build_payroll_slip_detail(entry)
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        return Response(success_response(data=data), status=200)
+
+
+class PayrollMeEntrySlipView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int):
+        entry = PayrollEntry.objects.select_related("employee", "period").filter(
+            period_id=period_id,
+            employee_id=request.user.pk,
+            period__status=PayrollPeriod.Status.FINALIZED,
+        ).first()
+        if entry is None:
+            return Response(error_response(detail="Slip tidak ditemukan.", code=ApiCode.NOT_FOUND), status=404)
+        try:
+            data = build_payroll_slip_detail(entry)
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        return Response(success_response(data=data), status=200)
 
 
 class PayrollMeEntriesView(APIView):
@@ -250,9 +411,15 @@ class PayrollMeEntriesView(APIView):
                     "pay_date": str(e.period.pay_date),
                     "period_start_date": str(e.period.period_start_date),
                     "period_end_date": str(e.period.period_end_date),
+                    "pay_type_snapshot": e.pay_type_snapshot,
                     "base_salary_snapshot_idr": str(e.base_salary_snapshot_idr),
+                    "daily_rate_snapshot_idr": str(e.daily_rate_snapshot_idr),
                     "days_present": e.days_present,
                     "late_count": e.late_count,
+                    "total_kg": str(e.total_kg),
+                    "gross_idr": str(e.gross_idr),
+                    "bonus_idr": str(e.bonus_idr),
+                    "advance_deduction_idr": str(e.advance_deduction_idr),
                     "deductions_idr": str(e.deductions_idr),
                     "net_pay_idr": str(e.net_pay_idr),
                     "notes": e.notes,

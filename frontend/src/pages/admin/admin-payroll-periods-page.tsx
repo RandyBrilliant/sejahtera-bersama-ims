@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import {
   formatPayrollWeekLabel,
-  isSaturday,
   parseIsoDateOnly,
   toIsoDateOnly,
   upcomingPaySaturday,
@@ -42,20 +41,21 @@ export function AdminPayrollPeriodsPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [payDate, setPayDate] = useState(() => toIsoDateOnly(upcomingPaySaturday()))
+  const [cutoffDate, setCutoffDate] = useState('')
   const [notes, setNotes] = useState('')
 
-  const weekPreview = useMemo(() => {
+  const periodPreview = useMemo(() => {
     if (!payDate) return null
     try {
       const pay = parseIsoDateOnly(payDate)
-      if (!isSaturday(pay)) return null
-      const start = new Date(pay)
-      start.setDate(start.getDate() - 5)
-      return formatPayrollWeekLabel(payDate, toIsoDateOnly(start), payDate)
+      const end = cutoffDate ? parseIsoDateOnly(cutoffDate) : pay
+      const start = new Date(end)
+      start.setDate(start.getDate() - 6)
+      return formatPayrollWeekLabel(payDate, toIsoDateOnly(start), toIsoDateOnly(end))
     } catch {
       return null
     }
-  }, [payDate])
+  }, [payDate, cutoffDate])
 
   async function reload() {
     setLoading(true)
@@ -75,18 +75,19 @@ export function AdminPayrollPeriodsPage() {
 
   async function handleCreate() {
     if (!payDate) {
-      alert.error('Validasi', 'Pilih tanggal pembayaran (Sabtu).')
-      return
-    }
-    if (!isSaturday(parseIsoDateOnly(payDate))) {
-      alert.error('Validasi', 'Gaji dibayar setiap Sabtu — pilih tanggal yang jatuh pada hari Sabtu.')
+      alert.error('Validasi', 'Pilih tanggal pembayaran.')
       return
     }
     setCreating(true)
     try {
-      await createPayrollPeriod({ pay_date: payDate, notes: notes.trim() || undefined })
+      await createPayrollPeriod({
+        pay_date: payDate,
+        cutoff_date: cutoffDate.trim() || undefined,
+        notes: notes.trim() || undefined,
+      })
       setNotes('')
-      alert.success('Periode', 'Periode mingguan draft dibuat.')
+      setCutoffDate('')
+      alert.success('Periode', 'Periode draft dibuat.')
       await reload()
     } catch (e) {
       alert.error('Gagal membuat periode', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -112,17 +113,12 @@ export function AdminPayrollPeriodsPage() {
     <div className="space-y-10">
       <div>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Payroll mingguan
+          Periode gaji
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Gaji dibayar setiap <span className="text-on-surface font-medium">Sabtu</span> untuk minggu
-          kerja Senin–Sabtu. Buat draft periode, bangkitkan entri dari presensi dan gaji pokok, lalu
-          kunci ketika slip siap dibagikan.
-        </p>
-        <p className="mt-3 text-sm">
-          <Link to="/admin/gaji/kompensasi" className="text-primary font-semibold underline">
-            Gaji pokok pegawai (ringkasan untuk keuangan/pemilik)
-          </Link>
+          Buat draft periode dengan tanggal bayar fleksibel (mis. Jumat). Cutoff menentukan pekerjaan
+          mana yang masuk periode ini; pekerjaan setelah cutoff otomatis menggulung ke periode
+          berikutnya. Generate entri dari presensi (harian) atau hasil kupas (borongan), lalu kunci.
         </p>
       </div>
 
@@ -130,20 +126,33 @@ export function AdminPayrollPeriodsPage() {
         <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">
           Periode baru (draft)
         </h2>
-        <div className="space-y-1.5">
-          <Label htmlFor="pay-date">Tanggal pembayaran (Sabtu)</Label>
-          <DatePickerInput
-            id="pay-date"
-            value={payDate}
-            onChange={setPayDate}
-            disabled={creating}
-          />
-          {weekPreview ? (
-            <p className="text-on-surface-variant text-xs leading-relaxed">{weekPreview}</p>
-          ) : payDate ? (
-            <p className="text-destructive text-xs">Tanggal harus jatuh pada hari Sabtu.</p>
-          ) : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="pay-date">Tanggal pembayaran</Label>
+            <DatePickerInput
+              id="pay-date"
+              value={payDate}
+              onChange={setPayDate}
+              disabled={creating}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cutoff-date">Cutoff (opsional)</Label>
+            <DatePickerInput
+              id="cutoff-date"
+              value={cutoffDate}
+              onChange={setCutoffDate}
+              disabled={creating}
+            />
+            <p className="text-on-surface-variant text-xs">
+              Kosongkan = cutoff sama dengan tanggal bayar. Pekerjaan setelah cutoff masuk periode
+              berikutnya.
+            </p>
+          </div>
         </div>
+        {periodPreview ? (
+          <p className="text-on-surface-variant text-xs leading-relaxed">{periodPreview}</p>
+        ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="py-notes">Catatan (opsional)</Label>
           <textarea
@@ -172,7 +181,7 @@ export function AdminPayrollPeriodsPage() {
         ) : rows.length === 0 ? (
           <p className="text-on-surface-variant text-sm">Belum ada periode.</p>
         ) : (
-          <div className="border-outline-variant overflow-x-auto rounded-xl border">
+          <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow>

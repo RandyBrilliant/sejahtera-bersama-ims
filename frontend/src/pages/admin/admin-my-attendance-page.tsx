@@ -106,7 +106,7 @@ export function AdminMyAttendancePage() {
       ) : rows.length === 0 ? (
         <p className="text-on-surface-variant text-sm">Belum ada data dalam rentang ini.</p>
       ) : (
-        <div className="border-outline-variant overflow-x-auto rounded-xl border">
+        <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
           <Table>
             <TableHeader>
               <TableRow>

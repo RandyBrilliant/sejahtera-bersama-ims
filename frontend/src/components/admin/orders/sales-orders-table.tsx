@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { Button } from '@/components/ui/button'
-import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -181,28 +181,22 @@ export function SalesOrdersTable() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <DatePickerInput
-          value={startDate}
-          onChange={(v) => {
-            setStartDate(v)
-            setParams((p) => ({ ...p, page: 1, start_date: v || undefined }))
+        <DateRangePickerInput
+          className="w-[min(100%,280px)]"
+          startDate={startDate}
+          endDate={endDate}
+          onChange={({ start, end }) => {
+            setStartDate(start)
+            setEndDate(end)
+            setParams((p) => ({
+              ...p,
+              page: 1,
+              start_date: start || undefined,
+              end_date: end || undefined,
+            }))
           }}
-          className="w-[150px]"
-          ariaLabel="Dari tanggal"
-          maxDate={endDate || undefined}
-          placeholder="Dari tanggal"
-        />
-        <span className="text-on-surface-variant text-sm">s/d</span>
-        <DatePickerInput
-          value={endDate}
-          onChange={(v) => {
-            setEndDate(v)
-            setParams((p) => ({ ...p, page: 1, end_date: v || undefined }))
-          }}
-          className="w-[150px]"
-          ariaLabel="Sampai tanggal"
-          minDate={startDate || undefined}
-          placeholder="Sampai tanggal"
+          placeholder="Filter tanggal…"
+          ariaLabel="Filter rentang tanggal"
         />
 
         <Select

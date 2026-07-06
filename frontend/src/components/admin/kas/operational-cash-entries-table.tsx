@@ -16,7 +16,7 @@ import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -274,26 +274,17 @@ export function OperationalCashEntriesTable() {
           </SelectContent>
         </Select>
         <div className="flex flex-wrap items-center gap-2">
-          <DatePickerInput
-            value={fromDate}
-            onChange={(v) => {
-              setFromDate(v)
+          <DateRangePickerInput
+            className="w-[min(100%,280px)]"
+            startDate={fromDate}
+            endDate={toDate}
+            onChange={({ start, end }) => {
+              setFromDate(start)
+              setToDate(end)
               setParams((p) => ({ ...p, page: 1 }))
             }}
-            className="w-[150px]"
-            ariaLabel="Dari tanggal"
-            maxDate={toDate || undefined}
-          />
-          <span className="text-on-surface-variant text-sm">s/d</span>
-          <DatePickerInput
-            value={toDate}
-            onChange={(v) => {
-              setToDate(v)
-              setParams((p) => ({ ...p, page: 1 }))
-            }}
-            className="w-[150px]"
-            ariaLabel="Sampai tanggal"
-            minDate={fromDate || undefined}
+            placeholder="Filter tanggal…"
+            ariaLabel="Filter rentang tanggal"
           />
         </div>
         {isFetching ? (
