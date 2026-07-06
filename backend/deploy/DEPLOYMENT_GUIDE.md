@@ -509,7 +509,7 @@ Your KMS-Connect Backend should now be running on:
 - Test your API endpoints
 - Configure your frontend to use the API
 - Set up monitoring (optional)
-- Schedule regular backups (optional)
+- Schedule database backups: see [DATABASE_BACKUP.md](./DATABASE_BACKUP.md)
 
 ---
 
