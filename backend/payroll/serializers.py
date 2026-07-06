@@ -1,4 +1,3 @@
-from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -8,9 +7,9 @@ from payroll.models import (
     EmployeeCompensation,
     KupasItem,
     KupasProductionRecord,
-    PayType,
     PayrollEntry,
     PayrollPeriod,
+    PayType,
 )
 from payroll.period_week import PayrollPeriodError, default_bounds_for_pay_date
 

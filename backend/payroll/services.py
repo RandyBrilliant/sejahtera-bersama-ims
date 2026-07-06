@@ -13,9 +13,9 @@ from attendance.utils_lateness import get_attendance_settings
 from payroll.models import (
     EmployeeCompensation,
     KupasProductionRecord,
-    PayType,
     PayrollEntry,
     PayrollPeriod,
+    PayType,
 )
 
 

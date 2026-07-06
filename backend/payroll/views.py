@@ -10,9 +10,9 @@ from payroll.models import (
     EmployeeCompensation,
     KupasItem,
     KupasProductionRecord,
-    PayType,
     PayrollEntry,
     PayrollPeriod,
+    PayType,
 )
 from payroll.permissions import PayrollFinalizeAccess, PayrollManageAccess
 from payroll.serializers import (
@@ -27,7 +27,12 @@ from payroll.serializers import (
     PayrollPeriodNotesSerializer,
     PayrollPeriodSerializer,
 )
-from payroll.services import PayrollWorkflowError, build_payroll_slip_detail, finalize_payroll_period, generate_payroll_entries
+from payroll.services import (
+    PayrollWorkflowError,
+    build_payroll_slip_detail,
+    finalize_payroll_period,
+    generate_payroll_entries,
+)
 
 User = get_user_model()
 
