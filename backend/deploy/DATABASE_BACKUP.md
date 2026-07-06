@@ -231,7 +231,8 @@ Adjust `-U` and `-d` to match your `SQL_USER` and `SQL_DATABASE`.
 | Problem | Fix |
 |---------|-----|
 | `AWS CLI not found` | Run `sudo ./deploy/install-backup-cron.sh` (installs official AWS CLI v2 bundle) |
-| `Cannot access bucket` | Check bucket name, keys, and endpoint URL |
+| `S3 upload failed` / `NoneType` error | Script uses `s3api put-object` with path-style addressing for Nevacloud. Pull latest code and retry. Ensure access key has `PutObject` permission on the bucket. |
+| `Cannot access bucket` | Verify `BACKUP_S3_BUCKET` name matches Nevacloud portal exactly (lowercase) |
 | `Database container not running` | `docker compose -f docker-compose.prod.yml up -d db` |
 | `Permission denied` on `/var/backups/` | Run `sudo chown -R $(whoami) /var/backups/sejahtera-ims` or re-run `sudo ./deploy/install-backup-cron.sh` |
 | `pg_dump failed` | Verify `SQL_USER` / `SQL_PASSWORD` in `.env` match the running Postgres volume |

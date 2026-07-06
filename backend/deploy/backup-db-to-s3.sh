@@ -89,17 +89,38 @@ require_db_container() {
     fi
 }
 
-aws_s3() {
-    AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID" \
-    AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY" \
-    AWS_DEFAULT_REGION="$BACKUP_S3_REGION" \
-    aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3 "$@"
+AWS_CLI_CONFIG_DIR=""
+
+setup_aws_cli() {
+    if [ -z "$AWS_CLI_CONFIG_DIR" ]; then
+        AWS_CLI_CONFIG_DIR="$(mktemp -d)"
+        local addressing_style="${BACKUP_S3_ADDRESSING_STYLE:-path}"
+        cat > "$AWS_CLI_CONFIG_DIR/config" <<EOF
+[default]
+region = ${BACKUP_S3_REGION}
+s3 =
+    addressing_style = ${addressing_style}
+EOF
+    fi
+
+    export AWS_CONFIG_FILE="$AWS_CLI_CONFIG_DIR/config"
+    export AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID"
+    export AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY"
+    export AWS_DEFAULT_REGION="$BACKUP_S3_REGION"
+  # Required for AWS CLI v2 + non-AWS S3 (Nevacloud, MinIO, etc.)
+    export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+    export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+    export AWS_EC2_METADATA_DISABLED=true
+}
+
+cleanup_aws_cli() {
+    if [ -n "$AWS_CLI_CONFIG_DIR" ] && [ -d "$AWS_CLI_CONFIG_DIR" ]; then
+        rm -rf "$AWS_CLI_CONFIG_DIR"
+    fi
 }
 
 aws_s3api() {
-    AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID" \
-    AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY" \
-    AWS_DEFAULT_REGION="$BACKUP_S3_REGION" \
+    setup_aws_cli
     aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3api "$@"
 }
 
@@ -127,10 +148,13 @@ create_backup() {
     log "INFO" "Dump created: $local_path (${size_kb} KB)"
 
     log "INFO" "Uploading to s3://${BACKUP_S3_BUCKET}/${s3_key}"
-    if ! aws_s3 cp "$local_path" "s3://${BACKUP_S3_BUCKET}/${s3_key}" \
-        --only-show-errors \
-        --storage-class STANDARD; then
-        log "ERROR" "S3 upload failed"
+    local upload_err
+    if ! upload_err="$(aws_s3api put-object \
+        --bucket "$BACKUP_S3_BUCKET" \
+        --key "$s3_key" \
+        --body "$local_path" \
+        --content-type "application/gzip" 2>&1)"; then
+        log "ERROR" "S3 upload failed: $upload_err"
         exit 1
     fi
 
@@ -145,51 +169,55 @@ prune_old_backups() {
 
     log "INFO" "Pruning backups older than ${BACKUP_RETENTION_DAYS} days from s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX}/"
 
-    local listing
-    if ! listing="$(aws_s3 ls "s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX}/" 2>/dev/null)"; then
-        log "WARN" "Could not list remote backups (bucket may be empty or prefix missing)"
+    local objects
+    objects="$(aws_s3api list-objects-v2 \
+        --bucket "$BACKUP_S3_BUCKET" \
+        --prefix "${BACKUP_S3_PREFIX}/" \
+        --query 'Contents[].[LastModified,Key]' \
+        --output text 2>/dev/null || true)"
+
+    if [ -z "$objects" ]; then
+        log "INFO" "No remote backups found to prune"
         return 0
     fi
 
-    while read -r backup_date backup_time backup_size backup_key; do
-        [ -n "${backup_key:-}" ] || continue
-        [[ "$backup_key" == *.sql.gz ]] || continue
+    while read -r last_modified key; do
+        [ -n "${key:-}" ] || continue
+        [[ "$key" == *.sql.gz ]] || continue
 
-        local file_epoch remote_path
-        file_epoch="$(date -d "${backup_date} ${backup_time}" +%s 2>/dev/null || echo 0)"
+        local file_epoch
+        file_epoch="$(date -d "$last_modified" +%s 2>/dev/null || echo 0)"
         if [ "$file_epoch" -eq 0 ]; then
-            log "WARN" "Skipping unparseable date for: $backup_key"
+            log "WARN" "Skipping unparseable date for: $key"
             continue
         fi
 
         if [ "$file_epoch" -lt "$cutoff_epoch" ]; then
-            if [[ "$backup_key" == */* ]]; then
-                remote_path="s3://${BACKUP_S3_BUCKET}/${backup_key}"
-            else
-                remote_path="s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX}/${backup_key}"
-            fi
-            if aws_s3 rm "$remote_path" --only-show-errors; then
-                log "INFO" "Deleted expired backup: $backup_key (${backup_date})"
+            if aws_s3api delete-object --bucket "$BACKUP_S3_BUCKET" --key "$key" >/dev/null 2>&1; then
+                log "INFO" "Deleted expired backup: $key"
                 deleted_count=$((deleted_count + 1))
             else
-                log "WARN" "Failed to delete: $remote_path"
+                log "WARN" "Failed to delete: $key"
             fi
         fi
-    done <<< "$listing"
+    done <<< "$objects"
 
     log "INFO" "Retention prune finished — deleted ${deleted_count} object(s)"
 }
 
 verify_s3_access() {
     log "INFO" "Verifying S3 access to bucket '$BACKUP_S3_BUCKET'"
-    if ! aws_s3 ls "s3://${BACKUP_S3_BUCKET}/" >/dev/null 2>&1; then
-        log "ERROR" "Cannot access bucket. Check credentials, bucket name, and endpoint."
+    local head_err
+    if ! head_err="$(aws_s3api head-bucket --bucket "$BACKUP_S3_BUCKET" 2>&1)"; then
+        log "ERROR" "Cannot access bucket: $head_err"
+        log "ERROR" "Check bucket name, access keys, and endpoint ($BACKUP_S3_ENDPOINT)"
         exit 1
     fi
     log "INFO" "S3 access OK"
 }
 
 main() {
+    trap cleanup_aws_cli EXIT
     load_backup_config
     require_aws_cli
     require_db_container
