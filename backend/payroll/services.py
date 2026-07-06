@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
