@@ -17,11 +17,12 @@ import {
 import { canDeleteOrder, canEditOrderLines } from '@/constants/order-status'
 import { useAuth } from '@/hooks/use-auth'
 import { useGoBack } from '@/hooks/use-go-back'
+import type { SalesReceiptMode } from '@/api/purchase'
 import {
   useCancelSalesOrderMutation,
   useDeleteSalesOrderMutation,
-  useSalesInvoicePdfMutation,
   useSalesOrderQuery,
+  useSalesReceiptPdfMutation,
   useUploadSalesPaymentProofMutation,
   useVerifySalesOrderMutation,
 } from '@/hooks/use-purchase-query'
@@ -58,7 +59,7 @@ export function AdminSalesOrderDetailPage() {
   const verifyMut = useVerifySalesOrderMutation(id)
   const cancelMut = useCancelSalesOrderMutation(id)
   const deleteMut = useDeleteSalesOrderMutation()
-  const pdfMut = useSalesInvoicePdfMutation()
+  const receiptMut = useSalesReceiptPdfMutation()
 
   const totalMassKg = useMemo(
     () => (order?.lines ? salesOrderLinesTotalMassKg(order.lines) : 0),
@@ -114,17 +115,22 @@ export function AdminSalesOrderDetailPage() {
     }
   }
 
-  async function handleDownloadPdf() {
+  async function handlePrintReceipt(mode: SalesReceiptMode) {
+    // Open the tab synchronously so the popup blocker allows it, then load the PDF.
+    const printWindow = window.open('', '_blank')
     try {
-      const blob = await pdfMut.mutateAsync(id)
+      const blob = await receiptMut.mutateAsync({ orderId: id, mode })
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = order ? `${order.order_code}-invoice.pdf` : 'invoice.pdf'
-      a.click()
-      URL.revokeObjectURL(url)
+      if (printWindow) {
+        printWindow.location.href = url
+      } else {
+        window.open(url, '_blank')
+      }
+      // Revoke later so the new tab has time to load the blob.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (err) {
-      alert.error('Gagal unduh PDF', parsePurchaseMutationError(err))
+      printWindow?.close()
+      alert.error('Gagal membuat nota', parsePurchaseMutationError(err))
     }
   }
 
@@ -171,14 +177,30 @@ export function AdminSalesOrderDetailPage() {
             </Button>
           ) : null}
           {order.status !== 'CANCELLED' ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleDownloadPdf()}
-              disabled={pdfMut.isPending}
-            >
-              {pdfMut.isPending ? 'PDF…' : 'Unduh invoice PDF'}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handlePrintReceipt('preprinted')}
+                disabled={receiptMut.isPending}
+                title="Cetak hanya nilai untuk nota cetakan lama (Epson LQ 15 × 10,5 cm)"
+              >
+                {receiptMut.isPending && receiptMut.variables?.mode === 'preprinted'
+                  ? 'Nota…'
+                  : 'Cetak nota (form lama)'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handlePrintReceipt('full')}
+                disabled={receiptMut.isPending}
+                title="Cetak nota lengkap di kertas kosong (Epson LQ 15 × 10,5 cm)"
+              >
+                {receiptMut.isPending && receiptMut.variables?.mode === 'full'
+                  ? 'Nota…'
+                  : 'Cetak nota (form baru)'}
+              </Button>
+            </>
           ) : null}
           {!isFinanceReadOnly && canDeleteOrder(order.status) ? (
             <Button

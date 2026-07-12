@@ -240,6 +240,19 @@ export async function downloadSalesInvoicePdf(id: number): Promise<Blob> {
   return data
 }
 
+export type SalesReceiptMode = 'preprinted' | 'full'
+
+export async function downloadSalesReceiptPdf(
+  id: number,
+  mode: SalesReceiptMode
+): Promise<Blob> {
+  const { data } = await api.get<Blob>(
+    `/api/purchase/sales-orders/${id}/receipt-pdf/`,
+    { params: { mode }, responseType: 'blob' }
+  )
+  return data
+}
+
 export async function verifySalesOrder(id: number): Promise<SalesOrder> {
   const { data } = await api.post<SalesOrder>(
     `/api/purchase/sales-orders/${id}/verify/`

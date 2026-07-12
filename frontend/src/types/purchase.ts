@@ -90,6 +90,7 @@ export type SalesOrder = {
   order_code: string
   customer: number
   customer_name: string
+  customer_wilayah_name: string | null
   status: OrderStatus
   invoice_number: string
   invoice_date: string | null

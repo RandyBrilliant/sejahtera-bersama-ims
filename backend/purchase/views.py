@@ -51,6 +51,7 @@ from .models import (
     SalesOrderLine,
     Wilayah,
 )
+from .receipt_pdf import build_sales_order_receipt_pdf
 from .serializers import (
     CustomerProductPriceSerializer,
     CustomerSerializer,
@@ -348,7 +349,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return SalesOrder.objects.select_related(
-            "customer",
+            "customer__wilayah",
             "created_by",
             "updated_by",
             "verified_by",
@@ -417,6 +418,34 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         return FileResponse(
             pdf_buffer,
             as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
+        )
+
+    @action(detail=True, methods=["get"], url_path="receipt-pdf")
+    def receipt_pdf(self, request, pk=None):
+        """Bon/Faktur receipt (15x10.5 cm) for the Epson LQ printer.
+
+        Query param ``mode``: ``preprinted`` (default) prints values only to
+        overlay the existing pre-printed pad; ``full`` prints the whole form.
+        """
+        order = self.get_object()
+        if order.status == OrderStatus.CANCELLED:
+            return Response(
+                {"detail": "Tidak dapat membuat nota untuk order yang dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        mode = (request.query_params.get("mode") or "preprinted").strip().lower()
+        if mode not in ("preprinted", "full"):
+            return Response(
+                {"detail": "Parameter 'mode' harus 'preprinted' atau 'full'.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        pdf_buffer = build_sales_order_receipt_pdf(order, mode=mode)
+        filename = f"{order.order_code}-nota-{mode}.pdf"
+        return FileResponse(
+            pdf_buffer,
+            as_attachment=False,
             filename=filename,
             content_type="application/pdf",
         )

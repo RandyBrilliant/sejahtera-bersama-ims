@@ -172,7 +172,7 @@ export function AdminAttendanceReportPage() {
         </p>
       </div>
 
-      <section className="border-outline-variant space-y-4 rounded-xl border p-4 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
+      <section className="border-outline-variant flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="space-y-1.5">
           <Label htmlFor="rep-from">Dari</Label>
           <Input

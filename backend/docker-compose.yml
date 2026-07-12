@@ -2,6 +2,10 @@
 # Usage: docker compose up --build
 # .env must have: SQL_DATABASE, SQL_USER, SQL_PASSWORD (and optionally DATABASE_URL, CELERY_BROKER_URL)
 
+# Explicit project name so Compose does not default to the folder name ("backend"),
+# which collides with the "backend" folder used in other projects.
+name: sejahtera-bersama-ims
+
 services:
   api:
     build:

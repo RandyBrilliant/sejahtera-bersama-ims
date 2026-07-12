@@ -373,6 +373,9 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     updated_by = serializers.SerializerMethodField()
     verified_by = serializers.SerializerMethodField()
     customer_name = serializers.CharField(source="customer.name", read_only=True)
+    customer_wilayah_name = serializers.CharField(
+        source="customer.wilayah.name", read_only=True, allow_null=True
+    )
     lines = SalesOrderLineSerializer(many=True)
     payment_proof = SignedMediaUrlField(read_only=True)
 
@@ -383,6 +386,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             "order_code",
             "customer",
             "customer_name",
+            "customer_wilayah_name",
             "status",
             "invoice_number",
             "invoice_date",
@@ -405,6 +409,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             "id",
             "order_code",
             "customer_name",
+            "customer_wilayah_name",
             "status",
             "due_date",
             "subtotal_idr",

@@ -1,16 +1,34 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight, Eye, Plus, Search } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Paperclip,
+  Plus,
+  Search,
+  Upload,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
+import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Button } from '@/components/ui/button'
 import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -29,26 +47,49 @@ import {
 } from '@/components/ui/table'
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
 import { useAuth } from '@/hooks/use-auth'
-import { useSalesOrdersQuery } from '@/hooks/use-purchase-query'
+import {
+  useSalesOrdersQuery,
+  useUploadSalesPaymentProofByIdMutation,
+  useVerifySalesOrderByIdMutation,
+} from '@/hooks/use-purchase-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { alert } from '@/lib/alert'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
+import { resolveMediaUrl } from '@/lib/media-url'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, SalesOrder, SalesOrdersListParams } from '@/types/purchase'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 
 const PAGE_SIZES = TABLE_PAGE_SIZES
 
-function fmtShort(iso: string) {
+function fmtShort(iso: string | null | undefined) {
+  if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString('id-ID', { dateStyle: 'medium' })
 }
 
+/** Owner may verify once payment proof exists (mirrors the detail page rule). */
+function canVerifyOrder(order: SalesOrder): boolean {
+  if (order.status === 'VERIFIED' || order.status === 'CANCELLED') return false
+  return (
+    order.status === 'PAYMENT_PROOF_UPLOADED' ||
+    (order.status === 'AWAITING_PAYMENT' && !!order.payment_proof)
+  )
+}
+
+/** Staff/owner may still attach proof while the order is open. */
+function canUploadProof(order: SalesOrder): boolean {
+  return order.status !== 'VERIFIED' && order.status !== 'CANCELLED'
+}
+
 export function SalesOrdersTable() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canCreateSalesOrder = user?.role !== 'FINANCE_STAFF'
+  const isOwner = user?.role === 'LEADERSHIP'
+  const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
+  const canCreateSalesOrder = !isFinanceReadOnly
   const [params, setParams] = useState<SalesOrdersListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
@@ -57,6 +98,45 @@ export function SalesOrdersTable() {
   const [searchInput, setSearchInput] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadTargetRef = useRef<number | null>(null)
+  const [verifyTarget, setVerifyTarget] = useState<SalesOrder | null>(null)
+  const uploadMut = useUploadSalesPaymentProofByIdMutation()
+  const verifyMut = useVerifySalesOrderByIdMutation()
+
+  const handleUploadClick = useCallback((orderId: number) => {
+    uploadTargetRef.current = orderId
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      const orderId = uploadTargetRef.current
+      uploadTargetRef.current = null
+      if (!file || orderId == null) return
+      try {
+        await uploadMut.mutateAsync({ orderId, file })
+        alert.success('Berhasil', 'Bukti pembayaran diunggah.')
+      } catch (err) {
+        alert.error('Gagal mengunggah', parsePurchaseMutationError(err))
+      }
+    },
+    [uploadMut]
+  )
+
+  const handleConfirmVerify = useCallback(async () => {
+    if (!verifyTarget) return
+    try {
+      await verifyMut.mutateAsync(verifyTarget.id)
+      alert.success('Berhasil', 'Pembayaran diverifikasi & stok produk dikurangi.')
+      setVerifyTarget(null)
+    } catch (err) {
+      alert.error('Gagal verifikasi', parsePurchaseMutationError(err))
+    }
+  }, [verifyMut, verifyTarget])
 
   const { data, isLoading, isError, error, isFetching } = useSalesOrdersQuery(params)
 
@@ -94,7 +174,14 @@ export function SalesOrdersTable() {
       {
         accessorKey: 'customer_name',
         header: 'Pelanggan',
-        cell: ({ row }) => <span className="font-medium">{row.original.customer_name}</span>,
+        cell: ({ row }) => (
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{row.original.customer_name}</span>
+            <span className="text-on-surface-variant truncate text-xs">
+              {row.original.customer_wilayah_name ?? '—'}
+            </span>
+          </div>
+        ),
       },
       {
         accessorKey: 'status',
@@ -110,7 +197,7 @@ export function SalesOrdersTable() {
       },
       {
         accessorKey: 'created_at',
-        header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),
+        header: () => sortHeader('Tgl. transaksi', 'created_at', { preferDesc: true }),
         cell: ({ row }) => (
           <span className="text-on-surface-variant text-sm whitespace-nowrap">
             {fmtShort(row.original.created_at)}
@@ -118,25 +205,88 @@ export function SalesOrdersTable() {
         ),
       },
       {
-        id: 'actions',
-        header: '',
+        id: 'payment_date',
+        header: 'Tgl. pembayaran',
         cell: ({ row }) => (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="size-8 px-0"
-              onClick={() => navigate(`/admin/pesanan/penjualan/${row.original.id}`)}
-              aria-label={`Detail ${row.original.order_code}`}
-            >
-              <Eye className="size-4" />
-            </Button>
-          </div>
+          <span className="text-on-surface-variant text-sm whitespace-nowrap">
+            {fmtShort(row.original.payment_proof_uploaded_at)}
+          </span>
         ),
       },
+      {
+        id: 'proof',
+        header: 'Bukti',
+        cell: ({ row }) => {
+          const url = resolveMediaUrl(row.original.payment_proof)
+          return url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary inline-flex items-center hover:opacity-80"
+              title="Lihat bukti pembayaran"
+              aria-label={`Lihat bukti pembayaran ${row.original.order_code}`}
+            >
+              <Paperclip className="size-4" />
+            </a>
+          ) : (
+            <span className="text-on-surface-variant">—</span>
+          )
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        cell: ({ row }) => {
+          const order = row.original
+          const showUpload = !isFinanceReadOnly && canUploadProof(order)
+          const showVerify = isOwner && canVerifyOrder(order)
+          return (
+            <div className="flex items-center justify-end gap-1">
+              {showUpload ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-8 px-0"
+                  onClick={() => handleUploadClick(order.id)}
+                  disabled={uploadMut.isPending}
+                  title="Unggah bukti pembayaran"
+                  aria-label={`Unggah bukti pembayaran ${order.order_code}`}
+                >
+                  <Upload className="size-4" />
+                </Button>
+              ) : null}
+              {showVerify ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary size-8 px-0"
+                  onClick={() => setVerifyTarget(order)}
+                  title="Verifikasi pembayaran"
+                  aria-label={`Verifikasi pembayaran ${order.order_code}`}
+                >
+                  <CheckCircle2 className="size-4" />
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="size-8 px-0"
+                onClick={() => navigate(`/admin/pesanan/penjualan/${order.id}`)}
+                title="Lihat detail"
+                aria-label={`Detail ${order.order_code}`}
+              >
+                <Eye className="size-4" />
+              </Button>
+            </div>
+          )
+        },
+      },
     ],
-    [navigate, sortHeader]
+    [navigate, sortHeader, isOwner, isFinanceReadOnly, handleUploadClick, uploadMut.isPending]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -152,6 +302,14 @@ export function SalesOrdersTable() {
 
   return (
     <div className="space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*,.pdf"
+        onChange={handleFileChange}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">
           <div className="relative max-w-md flex-1">
@@ -247,7 +405,7 @@ export function SalesOrdersTable() {
 
       <div
         className={cn(
-          'border-outline-variant bg-surface-container-lowest ambient-shadow rounded-xl border',
+          'border-outline-variant bg-surface-container-lowest ambient-shadow overflow-x-auto rounded-xl border',
           isFetching && 'opacity-90'
         )}
       >
@@ -326,6 +484,42 @@ export function SalesOrdersTable() {
           </div>
         </div>
       ) : null}
+
+      <Dialog
+        open={!!verifyTarget}
+        onOpenChange={(open) => {
+          if (!open && !verifyMut.isPending) setVerifyTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verifikasi pembayaran</DialogTitle>
+            <DialogDescription>
+              Verifikasi pembayaran untuk order{' '}
+              <span className="text-foreground font-medium">{verifyTarget?.order_code}</span>
+              {verifyTarget?.customer_name ? ` — ${verifyTarget.customer_name}` : ''}? Stok produk
+              akan dikurangi dan tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setVerifyTarget(null)}
+              disabled={verifyMut.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleConfirmVerify()}
+              disabled={verifyMut.isPending}
+            >
+              {verifyMut.isPending ? 'Memproses…' : 'Verifikasi'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

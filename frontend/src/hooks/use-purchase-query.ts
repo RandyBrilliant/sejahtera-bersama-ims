@@ -17,6 +17,7 @@ import {
   deleteSalesOrder,
   deleteWilayah,
   downloadSalesInvoicePdf,
+  downloadSalesReceiptPdf,
   fetchCustomer,
   fetchCustomers,
   fetchPurchaseInOrder,
@@ -33,6 +34,7 @@ import {
   verifyPurchaseInOrder,
   verifySalesOrder,
 } from '@/api/purchase'
+import type { SalesReceiptMode } from '@/api/purchase'
 import type {
   CustomerUpdateInput,
   CustomersListParams,
@@ -305,6 +307,31 @@ export function useVerifySalesOrderMutation(id: number) {
   })
 }
 
+/** Row-level upload (order id passed at call time) for use in list tables. */
+export function useUploadSalesPaymentProofByIdMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, file }: { orderId: number; file: File }) =>
+      uploadSalesPaymentProof(orderId, file),
+    onSuccess: (_data, vars) => {
+      invalidatePurchaseQueries(qc)
+      void qc.invalidateQueries({ queryKey: purchaseKeys.salesOrderDetail(vars.orderId) })
+    },
+  })
+}
+
+/** Row-level verify (order id passed at call time) for use in list tables. */
+export function useVerifySalesOrderByIdMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orderId: number) => verifySalesOrder(orderId),
+    onSuccess: (_data, orderId) => {
+      invalidatePurchaseQueries(qc)
+      void qc.invalidateQueries({ queryKey: purchaseKeys.salesOrderDetail(orderId) })
+    },
+  })
+}
+
 export function useCancelSalesOrderMutation(id: number) {
   const qc = useQueryClient()
   return useMutation({
@@ -319,5 +346,12 @@ export function useCancelSalesOrderMutation(id: number) {
 export function useSalesInvoicePdfMutation() {
   return useMutation({
     mutationFn: (orderId: number) => downloadSalesInvoicePdf(orderId),
+  })
+}
+
+export function useSalesReceiptPdfMutation() {
+  return useMutation({
+    mutationFn: ({ orderId, mode }: { orderId: number; mode: SalesReceiptMode }) =>
+      downloadSalesReceiptPdf(orderId, mode),
   })
 }
