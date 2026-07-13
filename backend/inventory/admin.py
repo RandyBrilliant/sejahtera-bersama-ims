@@ -1,6 +1,5 @@
 from django.contrib import admin
 
-from .product_stock import packaging_total_price_idr
 from .models import (
     Ingredient,
     IngredientInventory,
@@ -12,6 +11,7 @@ from .models import (
     ProductPackaging,
     ProductStockMovement,
 )
+from .product_stock import packaging_total_price_idr
 
 
 @admin.register(Product)
