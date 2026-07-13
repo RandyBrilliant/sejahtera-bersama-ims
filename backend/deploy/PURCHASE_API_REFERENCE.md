@@ -54,14 +54,15 @@ List endpoints use the same pagination as inventory:
 
 ## 5) Product pricing (sales)
 
-Resolution order for **sales order line** `unit_price_idr` when omitted or null:
+Pricing is per kg. The stored line `unit_price_idr` is a per-package price computed from a
+per-kg price × the packaging net mass (kg). Resolution order:
 
-1. Explicit `unit_price_idr` in the line payload (sales negotiation)
-2. Active `CustomerProductPrice` for that customer + packaging (admin special price)
-3. `ProductPackaging.list_price_idr` (default jual), if set
-4. Fallback: `ProductPackaging.base_price_idr` (harga dasar / cost reference)
+1. Explicit `unit_price_per_kg_idr` in the line payload (custom price per kg for this order) → `unit_price_idr = round(unit_price_per_kg_idr × net_mass_kg)`
+2. Active `CustomerProductPrice` for that customer + packaging (admin special price, per package)
+3. Product's fixed price per kg → `unit_price_idr = round(Product.price_per_kg_idr × net_mass_kg)`
 
-Admin sets per-customer prices via **Customer product prices** API. Set `list_price_idr` on packaging in inventory for a global default selling price.
+`unit_price_idr` is read-only in responses; write `unit_price_per_kg_idr` (optional) to override
+per kg for a given order line. Set the default price via `Product.price_per_kg_idr` in inventory.
 
 ---
 
@@ -187,7 +188,7 @@ Nested `lines`:
 
 - `product_packaging` (ID)
 - `quantity` (decimal string)
-- `unit_price_idr` (optional; if omitted, resolved from customer special price → list price → base price)
+- `unit_price_per_kg_idr` (optional; custom price per kg for this order. If omitted, resolved from customer special price → product `price_per_kg_idr`. The stored `unit_price_idr` = per-kg × net mass, read-only.)
 
 Create example:
 
@@ -204,7 +205,7 @@ Create example:
     {
       "product_packaging": 4,
       "quantity": "30.000",
-      "unit_price_idr": 20000
+      "unit_price_per_kg_idr": 80000
     }
   ]
 }

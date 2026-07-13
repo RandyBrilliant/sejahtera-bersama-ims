@@ -75,29 +75,26 @@ def grams_delta_from_mass_fields(
 
 def product_financial_value_idr(product) -> int:
     """
-    Approximate inventory value using minimum observed cost per gram
-    among this product's kemasan rows (consistent with aggregated dashboard).
+    Inventory value from the product's fixed price per kg:
+    remaining_mass_grams × (price_per_kg_idr / 1000).
     """
     mass = getattr(product, "remaining_mass_grams", None) or Decimal("0")
-    if mass <= 0:
+    price_per_kg = getattr(product, "price_per_kg_idr", None) or Decimal("0")
+    if mass <= 0 or price_per_kg <= 0:
         return 0
-    ratios: list[Decimal] = []
-    for pkg in product.packaging_variants.all():
-        g = net_kg_to_grams(Decimal(str(pkg.net_mass_kg)))
-        if g <= 0 or not pkg.base_price_idr:
-            continue
-        ratios.append(Decimal(pkg.base_price_idr) / g)
-    if not ratios:
+    per_g = Decimal(price_per_kg) / KG_TO_GRAMS
+    return int((mass * per_g).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def packaging_total_price_idr(packaging) -> int:
+    """Harga total per kemasan: product price per kg × net mass (kg)."""
+    price_per_kg = getattr(packaging.product, "price_per_kg_idr", None) or Decimal("0")
+    if price_per_kg <= 0:
         return 0
-    return int((mass * min(ratios)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    total = Decimal(price_per_kg) * Decimal(str(packaging.net_mass_kg))
+    return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def packaging_line_stock_value_idr(packaging) -> int:
-    """Value of physical stock at this SKU's implicit cost-per-gram."""
-    prod = packaging.product
-    mass = getattr(prod, "remaining_mass_grams", None) or Decimal("0")
-    g = net_kg_to_grams(Decimal(str(packaging.net_mass_kg)))
-    if mass <= 0 or g <= 0:
-        return 0
-    per_g = Decimal(packaging.base_price_idr) / g
-    return int((mass * per_g).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    """Value of physical stock for the shared variant mass at the fixed price per kg."""
+    return product_financial_value_idr(packaging.product)

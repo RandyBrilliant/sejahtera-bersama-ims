@@ -128,7 +128,7 @@ Example response:
         "product_packaging": 4,
         "variant_name": "Original",
         "packaging_label": "Pouch 250g",
-        "base_price_idr": 15000,
+        "total_price_idr": 15000,
         "total_produced": "120.000",
         "total_bonus": "5.000",
         "total_output": "125.000",
@@ -183,7 +183,7 @@ Example response:
         "product_packaging": 4,
         "variant_name": "Original",
         "packaging_label": "Pouch 250g",
-        "base_price_idr": 15000,
+        "total_price_idr": 15000,
         "total_produced": "2100.000",
         "total_bonus": "65.000",
         "total_output": "2165.000",
@@ -229,9 +229,12 @@ Create example:
 {
   "name": "Bawang Goreng",
   "variant_name": "Original",
+  "price_per_kg_idr": 80000,
   "is_active": true
 }
 ```
+
+`price_per_kg_idr` is the admin-set fixed price per kg (required, whole Rupiah ≥ 1). All packaging totals derive from it.
 
 ### Product packaging summary
 
@@ -270,7 +273,7 @@ Search:
 
 Ordering:
 
-- `ordering=label|net_mass_grams|remaining_stock|base_price_idr|created_at|updated_at`
+- `ordering=label|net_mass_grams|remaining_stock|created_at|updated_at`
 
 Filtering examples:
 
@@ -278,11 +281,10 @@ Filtering examples:
 - `?is_active=true`
 - `?sku__icontains=BG-ORG`
 - `?net_mass_grams__gte=250`
-- `?base_price_idr__lte=50000`
 - `?min_remaining_stock=10`
 - `?max_remaining_stock=100`
 
-Create example:
+Create example (price is not set per packaging — it derives from the product's `price_per_kg_idr`):
 
 ```json
 {
@@ -290,8 +292,6 @@ Create example:
   "label": "Pouch 250g",
   "net_mass_grams": 250,
   "remaining_stock": "50.000",
-  "base_price_idr": 18000,
-  "list_price_idr": 25000,
   "sku": "BG-ORG-250",
   "is_active": true
 }
@@ -299,7 +299,9 @@ Create example:
 
 Response includes computed:
 
-- `stock_value_idr` = `remaining_stock * base_price_idr`
+- `price_per_kg_idr` = product's fixed price per kg (read-only)
+- `total_price_idr` = `price_per_kg_idr * net_mass_kg`
+- `stock_value_idr` = `remaining_mass_grams * (price_per_kg_idr / 1000)`
 
 ---
 
@@ -518,5 +520,5 @@ Role usage guidance:
 
 - Use pagination params (`page`, `page_size`) for list endpoints.
 - Keep all numeric stock values as strings when using decimals in JSON.
-- Price uses integer Rupiah (`base_price_idr`, optional `list_price_idr` for default selling price) with no decimal.
+- Price uses integer Rupiah. The product's `price_per_kg_idr` is the single fixed price per kg; each packaging's `total_price_idr` is derived (`price_per_kg_idr × net_mass_kg`) and is read-only.
 - `created_by`/`updated_by` are auto-filled by backend from current auth user.

@@ -57,7 +57,7 @@ function productionDetailRows(production: InventoryRangeRecapPayload): Row[] {
   rows.push([
     'Varian',
     'Label kemasan',
-    'Harga dasar (IDR)',
+    'Harga total kemasan (IDR)',
     'Produksi',
     'Bonus',
     'Output',
@@ -67,7 +67,7 @@ function productionDetailRows(production: InventoryRangeRecapPayload): Row[] {
     rows.push([
       r.variant_name,
       r.packaging_label,
-      r.base_price_idr,
+      r.total_price_idr,
       String(r.total_produced),
       String(r.total_bonus),
       String(r.total_output),

@@ -18,7 +18,7 @@ export function AdminSalesOrderEditPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
         <PageBackLink fallback={detailPath}>← Kembali ke detail order</PageBackLink>
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">

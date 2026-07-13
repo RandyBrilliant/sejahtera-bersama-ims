@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .product_stock import packaging_total_price_idr
 from .models import (
     Ingredient,
     IngredientInventory,
@@ -15,7 +16,7 @@ from .models import (
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "variant_name", "remaining_mass_grams", "is_active", "created_at", "updated_at")
+    list_display = ("id", "name", "variant_name", "price_per_kg_idr", "remaining_mass_grams", "is_active", "created_at", "updated_at")
     list_filter = ("is_active", "created_at", "updated_at")
     search_fields = ("name", "variant_name")
 
@@ -28,7 +29,7 @@ class ProductPackagingAdmin(admin.ModelAdmin):
         "label",
         "net_mass_kg",
         "variant_product_mass_g",
-        "base_price_idr",
+        "total_price_idr",
         "is_active",
     )
     list_filter = ("is_active", "created_at", "updated_at")
@@ -37,6 +38,10 @@ class ProductPackagingAdmin(admin.ModelAdmin):
     @admin.display(description="Stok utama varian (g)", ordering="product__remaining_mass_grams")
     def variant_product_mass_g(self, obj):
         return obj.product.remaining_mass_grams
+
+    @admin.display(description="Harga total kemasan (IDR)")
+    def total_price_idr(self, obj):
+        return packaging_total_price_idr(obj)
 
 
 @admin.register(Ingredient)

@@ -138,6 +138,8 @@ export function useUpdateProductMutation(id: number) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: inventoryKeys.products() })
       void qc.invalidateQueries({ queryKey: inventoryKeys.productDetail(id) })
+      // Kemasan totals derive from the product's price per kg, so refresh them too.
+      void qc.invalidateQueries({ queryKey: inventoryKeys.packaging() })
       void qc.invalidateQueries({ queryKey: inventoryKeys.summary() })
     },
   })

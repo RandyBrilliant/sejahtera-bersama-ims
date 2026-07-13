@@ -53,14 +53,14 @@ CUSTOMERS = [
     ("Katering Sedap Rasa", "0821 7777 8888", "Jl. Diponegoro No. 21\nSurabaya", "SURABAYA"),
 ]
 
-PRODUCT = {"name": "Bawang Goreng", "variant_name": "Original"}
+PRODUCT = {"name": "Bawang Goreng", "variant_name": "Original", "price_per_kg_idr": 80000}
 
-# (label, net_mass_kg, base_price_idr, list_price_idr, sku)
+# (label, net_mass_kg, sku)
 PACKAGINGS = [
-    ("Renceng 100 gr", Decimal("0.100"), 7000, 10000, "BG-ORI-100"),
-    ("Bungkus 250 gr", Decimal("0.250"), 16000, 22000, "BG-ORI-250"),
-    ("Bungkus 500 gr", Decimal("0.500"), 30000, 42000, "BG-ORI-500"),
-    ("Kiloan 1 kg", Decimal("1.000"), 58000, 80000, "BG-ORI-1000"),
+    ("Renceng 100 gr", Decimal("0.100"), "BG-ORI-100"),
+    ("Bungkus 250 gr", Decimal("0.250"), "BG-ORI-250"),
+    ("Bungkus 500 gr", Decimal("0.500"), "BG-ORI-500"),
+    ("Kiloan 1 kg", Decimal("1.000"), "BG-ORI-1000"),
 ]
 
 ORDER_STATUSES = [
@@ -166,24 +166,26 @@ class Command(BaseCommand):
             name=PRODUCT["name"],
             variant_name=PRODUCT["variant_name"],
             defaults={
+                "price_per_kg_idr": PRODUCT["price_per_kg_idr"],
                 "remaining_mass_grams": Decimal("100000"),
                 "is_active": True,
                 "created_by": user,
                 "updated_by": user,
             },
         )
+        if not created and not product.price_per_kg_idr:
+            product.price_per_kg_idr = PRODUCT["price_per_kg_idr"]
+            product.save(update_fields=["price_per_kg_idr", "updated_at"])
         if created:
             self.stdout.write(self.style.SUCCESS(f"+ product {product}"))
 
         packagings: list[ProductPackaging] = []
-        for label, net_mass_kg, base_price, list_price, sku in PACKAGINGS:
+        for label, net_mass_kg, sku in PACKAGINGS:
             packaging, created = ProductPackaging.objects.get_or_create(
                 product=product,
                 label=label,
                 defaults={
                     "net_mass_kg": net_mass_kg,
-                    "base_price_idr": base_price,
-                    "list_price_idr": list_price,
                     "sku": sku,
                     "is_active": True,
                     "created_by": user,
@@ -234,7 +236,10 @@ class Command(BaseCommand):
 
         chosen = rng.sample(packagings, k=rng.randint(1, min(3, len(packagings))))
         for packaging in chosen:
-            unit_price = int(packaging.list_price_idr or packaging.base_price_idr)
+            unit_price = int(
+                (Decimal(packaging.product.price_per_kg_idr) * Decimal(str(packaging.net_mass_kg)))
+                .quantize(Decimal("1"))
+            )
             SalesOrderLine.objects.create(
                 order=order,
                 product_packaging=packaging,

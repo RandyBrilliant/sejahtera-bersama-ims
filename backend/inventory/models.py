@@ -53,6 +53,16 @@ class Product(AuditModel):
 
     name = models.CharField(_("product name"), max_length=150, default="Bawang Goreng")
     variant_name = models.CharField(_("bawang goreng type"), max_length=100, db_index=True)
+    price_per_kg_idr = models.PositiveBigIntegerField(
+        _("price per kg (IDR)"),
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text=_(
+            "Fixed price per kilogram in Rupiah (set by admin). "
+            "Each kemasan total is derived from this × net mass (kg)."
+        ),
+        db_index=True,
+    )
     remaining_mass_grams = models.DecimalField(
         _("remaining mass (grams)"),
         max_digits=14,
@@ -105,19 +115,6 @@ class ProductPackaging(AuditModel):
         decimal_places=6,
         validators=[MinValueValidator(Decimal("0.000001"))],
     )
-    base_price_idr = models.PositiveBigIntegerField(
-        _("base price (IDR)"),
-        validators=[MinValueValidator(1)],
-        help_text=_("Base purchase price in Rupiah, without decimals."),
-    )
-    list_price_idr = models.PositiveBigIntegerField(
-        _("list selling price (IDR)"),
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(1)],
-        help_text=_("Default selling price in Rupiah; used when no customer special price is set."),
-        db_index=True,
-    )
     sku = models.CharField(_("SKU"), max_length=50, blank=True)
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
@@ -139,7 +136,6 @@ class ProductPackaging(AuditModel):
             models.Index(fields=["product", "is_active"]),
             models.Index(fields=["created_by"]),
             models.Index(fields=["updated_by"]),
-            models.Index(fields=["base_price_idr"]),
             models.Index(fields=["net_mass_kg"]),
             models.Index(fields=["created_at"]),
         ]

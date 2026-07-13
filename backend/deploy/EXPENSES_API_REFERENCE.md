@@ -128,6 +128,6 @@ Idempotent: skips categories whose `slug` already exists.
 
 - **Single ledger table** with `direction` keeps reporting simple and indexed for range queries.
 - **`PROTECT`** on category prevents deleting categories that still have entries.
-- **Whole IDR** amounts match other modules (`base_price_idr`, order totals).
+- **Whole IDR** amounts match other modules (`price_per_kg_idr`, order totals).
 - For **double-entry** accounting or GL posting, extend later with journal links; this module stays **operational cashbook** level.
 - **Order FKs** use `SET_NULL` if the order is deleted; the check constraint enforces **at most one** of `sales_order` / `purchase_in_order`.

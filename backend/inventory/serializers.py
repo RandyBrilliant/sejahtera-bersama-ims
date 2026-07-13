@@ -14,7 +14,11 @@ from .models import (
     ProductStockMovement,
     StockMovementType,
 )
-from .product_stock import net_kg_to_grams, packaging_line_stock_value_idr
+from .product_stock import (
+    net_kg_to_grams,
+    packaging_line_stock_value_idr,
+    packaging_total_price_idr,
+)
 
 
 class AuditUserMiniSerializer(serializers.Serializer):
@@ -26,6 +30,7 @@ class AuditUserMiniSerializer(serializers.Serializer):
 class ProductSerializer(serializers.ModelSerializer):
     created_by = AuditUserMiniSerializer(read_only=True)
     updated_by = AuditUserMiniSerializer(read_only=True)
+    price_per_kg_idr = serializers.IntegerField(min_value=1)
 
     class Meta:
         model = Product
@@ -33,6 +38,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "variant_name",
+            "price_per_kg_idr",
             "remaining_mass_grams",
             "is_active",
             "created_at",
@@ -55,6 +61,11 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Nama produk wajib diisi.")
         return cleaned
 
+    def validate_price_per_kg_idr(self, value: int):
+        if value is None or value < 1:
+            raise serializers.ValidationError("Harga per kg wajib diisi dan lebih dari 0.")
+        return value
+
     def validate_variant_name(self, value: str):
         cleaned = (value or "").strip()
         if not cleaned:
@@ -67,7 +78,9 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     updated_by = AuditUserMiniSerializer(read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
+    price_per_kg_idr = serializers.IntegerField(source="product.price_per_kg_idr", read_only=True)
     remaining_stock = serializers.SerializerMethodField(read_only=True)
+    total_price_idr = serializers.SerializerMethodField(read_only=True)
     stock_value_idr = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -77,11 +90,11 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "product",
             "product_name",
             "product_variant_name",
+            "price_per_kg_idr",
             "label",
             "net_mass_kg",
             "remaining_stock",
-            "base_price_idr",
-            "list_price_idr",
+            "total_price_idr",
             "stock_value_idr",
             "sku",
             "is_active",
@@ -94,7 +107,9 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "id",
             "product_name",
             "product_variant_name",
+            "price_per_kg_idr",
             "remaining_stock",
+            "total_price_idr",
             "stock_value_idr",
             "created_at",
             "updated_at",
@@ -112,6 +127,9 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
         if net_g <= 0:
             return Decimal("0")
         return mass / net_g
+
+    def get_total_price_idr(self, obj) -> int:
+        return packaging_total_price_idr(obj)
 
     def get_stock_value_idr(self, obj) -> int:
         return packaging_line_stock_value_idr(obj)

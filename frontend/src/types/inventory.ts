@@ -9,6 +9,8 @@ export type Product = {
   id: number
   name: string
   variant_name: string
+  /** Harga tetap per kg (IDR) yang diatur admin. */
+  price_per_kg_idr: number
   /** Bulk stock for this variant (API: grams; tampilan UI: kg). */
   remaining_mass_grams: string
   is_active: boolean
@@ -23,12 +25,14 @@ export type ProductPackaging = {
   product: number
   product_name: string
   product_variant_name: string
+  /** Harga tetap per kg (IDR) dari produk induk. */
+  price_per_kg_idr: number
   label: string
   /** Berat bersih per kemasan (kg). */
   net_mass_kg: string
   remaining_stock: string
-  base_price_idr: number
-  list_price_idr: number | null
+  /** Harga total per kemasan = price_per_kg_idr × net_mass_kg. */
+  total_price_idr: number
   stock_value_idr: number
   sku: string
   is_active: boolean
@@ -65,6 +69,7 @@ export type ProductPackagingListParams = {
 export type ProductCreateInput = {
   name: string
   variant_name: string
+  price_per_kg_idr: number
   is_active?: boolean
 }
 
@@ -74,8 +79,6 @@ export type ProductPackagingCreateInput = {
   product: number
   label: string
   net_mass_kg: string | number
-  base_price_idr: number
-  list_price_idr?: number | null
   sku?: string
   is_active?: boolean
 }
@@ -250,7 +253,7 @@ export type InventoryRangePackagingOutputRow = {
   product_packaging: number
   variant_name: string
   packaging_label: string
-  base_price_idr: number
+  total_price_idr: number
   total_produced: string | number
   total_bonus: string | number
   total_output: string | number

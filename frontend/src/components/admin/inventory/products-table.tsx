@@ -31,6 +31,7 @@ import { useProductsQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { useAuth } from '@/hooks/use-auth'
+import { formatIdr } from '@/lib/format-idr'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { Product, ProductsListParams } from '@/types/inventory'
@@ -87,6 +88,13 @@ export function ProductsTable() {
         accessorKey: 'name',
         header: () => sortHeader('Nama produk', 'name'),
         cell: ({ row }) => row.original.name,
+      },
+      {
+        accessorKey: 'price_per_kg_idr',
+        header: () => sortHeader('Harga jual / kg', 'price_per_kg_idr'),
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatIdr(row.original.price_per_kg_idr)}</span>
+        ),
       },
       {
         accessorKey: 'remaining_mass_grams',

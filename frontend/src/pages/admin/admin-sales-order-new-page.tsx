@@ -11,7 +11,7 @@ export function AdminSalesOrderNewPage() {
   const goBack = useGoBack()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
         <PageBackLink fallback={LIST_PATH}>← Kembali ke penjualan</PageBackLink>
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">

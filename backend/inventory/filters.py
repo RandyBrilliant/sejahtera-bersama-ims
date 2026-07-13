@@ -43,7 +43,6 @@ class ProductPackagingFilter(filters.FilterSet):
             "created_by": ["exact"],
             "updated_by": ["exact"],
             "net_mass_kg": ["exact", "gte", "lte"],
-            "base_price_idr": ["exact", "gte", "lte"],
         }
 
 

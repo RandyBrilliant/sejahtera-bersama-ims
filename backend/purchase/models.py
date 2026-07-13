@@ -82,7 +82,7 @@ class Wilayah(AuditModel):
 class CustomerProductPrice(AuditModel):
     """
     Per-customer selling price for a packaging SKU (set by admin / owner).
-    Overrides default list_price_idr on ProductPackaging for that customer.
+    Overrides the product's fixed price for that customer/packaging when set.
     """
 
     customer = models.ForeignKey(

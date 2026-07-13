@@ -108,8 +108,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                 </TableHead>
                 <TableHead className="text-on-surface-variant">Berat (kg)</TableHead>
                 <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
-                <TableHead className="text-on-surface-variant">Harga pokok</TableHead>
-                <TableHead className="text-on-surface-variant">Harga jual</TableHead>
+                <TableHead className="text-on-surface-variant">Harga total</TableHead>
                 <TableHead className="text-on-surface-variant">SKU</TableHead>
                 <TableHead className="text-on-surface-variant">Status</TableHead>
                 <TableHead className="w-24" />
@@ -121,10 +120,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                   <TableCell className="font-medium">{row.label}</TableCell>
                   <TableCell className="tabular-nums">{fmtKg(row.net_mass_kg)}</TableCell>
                   <TableCell className="tabular-nums">{fmtStock(row.remaining_stock)}</TableCell>
-                  <TableCell className="tabular-nums">{formatIdr(row.base_price_idr)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {row.list_price_idr != null ? formatIdr(row.list_price_idr) : '—'}
-                  </TableCell>
+                  <TableCell className="tabular-nums">{formatIdr(row.total_price_idr)}</TableCell>
                   <TableCell className="font-mono text-xs">{row.sku || '—'}</TableCell>
                   <TableCell>
                     {row.is_active ? (

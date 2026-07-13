@@ -58,12 +58,35 @@ def _decimal_zero(max_digits: int = 12, decimal_places: int = 3) -> Value:
     return Value(Decimal("0"), output_field=DecimalField(max_digits=max_digits, decimal_places=decimal_places))
 
 
-def _estimated_packaging_line_value():
-    """(produced + bonus) × harga pokok — Cast harga ke Decimal agar tidak mixed Integer × Decimal."""
-    qty_plus_bonus = F("quantity_produced") + F("bonus_quantity")
-    price_dec = Cast(F("product_packaging__base_price_idr"), DecimalField(max_digits=14, decimal_places=0))
+def _packaging_total_price_expr():
+    """Harga total per kemasan: product price per kg × net mass (kg)."""
+    price_dec = Cast(
+        F("product_packaging__product__price_per_kg_idr"),
+        DecimalField(max_digits=14, decimal_places=0),
+    )
+    net_mass = Cast(
+        F("product_packaging__net_mass_kg"),
+        DecimalField(max_digits=14, decimal_places=6),
+    )
     return ExpressionWrapper(
-        qty_plus_bonus * price_dec,
+        price_dec * net_mass,
+        output_field=DecimalField(max_digits=24, decimal_places=6),
+    )
+
+
+def _row_total_price_idr(row) -> int:
+    """Harga total per kemasan for a recap ``.values()`` row (price/kg × net mass)."""
+    price_per_kg = row.get("product_packaging__product__price_per_kg_idr") or 0
+    net_mass = row.get("product_packaging__net_mass_kg") or Decimal("0")
+    total = Decimal(price_per_kg) * Decimal(str(net_mass))
+    return int(total.quantize(Decimal("1")))
+
+
+def _estimated_packaging_line_value():
+    """(produced + bonus) × harga total per kemasan (price/kg × net mass)."""
+    qty_plus_bonus = F("quantity_produced") + F("bonus_quantity")
+    return ExpressionWrapper(
+        qty_plus_bonus * _packaging_total_price_expr(),
         output_field=DecimalField(max_digits=24, decimal_places=3),
     )
 
@@ -113,7 +136,7 @@ class ProductViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
-    ordering_fields = ["name", "variant_name", "remaining_mass_grams"]
+    ordering_fields = ["name", "variant_name", "price_per_kg_idr", "remaining_mass_grams"]
     ordering = ["variant_name"]
 
     def get_queryset(self):
@@ -229,7 +252,8 @@ class DailyInventoryRecapView(APIView):
                 "product_packaging",
                 "product_packaging__product__variant_name",
                 "product_packaging__label",
-                "product_packaging__base_price_idr",
+                "product_packaging__product__price_per_kg_idr",
+                "product_packaging__net_mass_kg",
             )
             .annotate(
                 total_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
@@ -276,7 +300,7 @@ class DailyInventoryRecapView(APIView):
                     "product_packaging": row["product_packaging"],
                     "variant_name": row["product_packaging__product__variant_name"],
                     "packaging_label": row["product_packaging__label"],
-                    "base_price_idr": row["product_packaging__base_price_idr"],
+                    "total_price_idr": _row_total_price_idr(row),
                     "total_produced": row["total_produced"],
                     "total_bonus": row["total_bonus"],
                     "total_output": row["total_output"],
@@ -343,7 +367,8 @@ class RangeInventoryRecapView(APIView):
                 "product_packaging",
                 "product_packaging__product__variant_name",
                 "product_packaging__label",
-                "product_packaging__base_price_idr",
+                "product_packaging__product__price_per_kg_idr",
+                "product_packaging__net_mass_kg",
             )
             .annotate(
                 total_produced=Coalesce(Sum("quantity_produced"), ZERO_QTY12),
@@ -396,7 +421,7 @@ class RangeInventoryRecapView(APIView):
                     "product_packaging": row["product_packaging"],
                     "variant_name": row["product_packaging__product__variant_name"],
                     "packaging_label": row["product_packaging__label"],
-                    "base_price_idr": row["product_packaging__base_price_idr"],
+                    "total_price_idr": _row_total_price_idr(row),
                     "total_produced": row["total_produced"],
                     "total_bonus": row["total_bonus"],
                     "total_output": row["total_output"],

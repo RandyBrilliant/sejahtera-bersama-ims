@@ -8,6 +8,7 @@ import { alert } from '@/lib/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -28,6 +29,9 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
   const [variantName, setVariantName] = useState(
     mode === 'edit' && initialProduct ? initialProduct.variant_name : ''
   )
+  const [pricePerKg, setPricePerKg] = useState(
+    mode === 'edit' && initialProduct ? String(initialProduct.price_per_kg_idr) : ''
+  )
   const [isActive, setIsActive] = useState(
     mode === 'edit' && initialProduct ? initialProduct.is_active : true
   )
@@ -45,12 +49,18 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
       alert.error('Validasi', 'Nama produk wajib diisi.')
       return
     }
+    const price = Number(pricePerKg)
+    if (!Number.isFinite(price) || price < 1) {
+      alert.error('Validasi', 'Harga per kg (IDR) wajib diisi dan lebih dari 0.')
+      return
+    }
 
     try {
       if (mode === 'create') {
         await createMutation.mutateAsync({
           name: name.trim(),
           variant_name: variantName.trim(),
+          price_per_kg_idr: Math.floor(price),
           is_active: isActive,
         })
         alert.success('Berhasil', 'Produk berhasil dibuat.')
@@ -59,6 +69,7 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
         await updateMutation.mutateAsync({
           name: name.trim(),
           variant_name: variantName.trim(),
+          price_per_kg_idr: Math.floor(price),
           is_active: isActive,
         })
         alert.success('Berhasil', 'Produk diperbarui.')
@@ -105,6 +116,21 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
               className="border-outline-variant"
               placeholder="Contoh: Original, Pedas"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="inv-price-per-kg">Harga per kg (IDR)</Label>
+            <CurrencyInput
+              id="inv-price-per-kg"
+              value={pricePerKg}
+              onChange={setPricePerKg}
+              disabled={submitting}
+              className="border-outline-variant"
+              placeholder="Mis. 80.000"
+            />
+            <p className="text-on-surface-variant text-xs">
+              Harga tetap per kilogram. Harga total tiap kemasan dihitung otomatis dari harga ini
+              dikali berat bersih kemasan.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Checkbox

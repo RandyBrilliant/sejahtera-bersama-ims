@@ -78,7 +78,10 @@ export type SalesOrderLine = {
   packaging_label: string
   /** Berat bersih per kemasan (kg), untuk menghitung total kg order. */
   net_mass_kg?: string
+  /** Harga tetap per kg (IDR) dari produk induk. */
+  price_per_kg_idr?: number
   quantity: string
+  /** Harga per kemasan hasil resolusi (per kg × berat). */
   unit_price_idr: number
   line_total_idr: number
   created_at: string
@@ -172,7 +175,8 @@ export type PurchaseInOrderUpdateInput = Partial<
 export type SalesOrderLineInput = {
   product_packaging: number
   quantity: string | number
-  unit_price_idr?: number | null
+  /** Harga custom per kg (IDR) untuk order ini; kosong = pakai harga produk. */
+  unit_price_per_kg_idr?: number | null
 }
 
 export type SalesOrderCreateInput = {

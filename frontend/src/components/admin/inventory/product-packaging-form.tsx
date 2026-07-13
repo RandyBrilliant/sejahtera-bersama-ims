@@ -8,7 +8,6 @@ import { alert } from '@/lib/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -28,12 +27,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
   const [netMassKg, setNetMassKg] = useState(
     initial ? String(initial.net_mass_kg) : ''
   )
-  const [basePrice, setBasePrice] = useState(
-    initial ? String(initial.base_price_idr) : ''
-  )
-  const [listPrice, setListPrice] = useState(
-    initial?.list_price_idr != null ? String(initial.list_price_idr) : ''
-  )
   const [sku, setSku] = useState(initial?.sku ?? '')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
@@ -52,17 +45,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
       alert.error('Validasi', 'Berat bersih (kg) harus lebih dari nol.')
       return
     }
-    const base = Number(basePrice)
-    if (!Number.isFinite(base) || base < 1) {
-      alert.error('Validasi', 'Harga pokok (IDR) wajib diisi.')
-      return
-    }
-
-    const listVal = listPrice.trim() ? Number(listPrice) : null
-    if (listPrice.trim() && (!Number.isFinite(listVal) || (listVal ?? 0) < 1)) {
-      alert.error('Validasi', 'Harga jual daftar tidak valid.')
-      return
-    }
 
     try {
       if (mode === 'create') {
@@ -70,8 +52,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
           product: productId,
           label: label.trim(),
           net_mass_kg: kgRaw,
-          base_price_idr: Math.floor(base),
-          list_price_idr: listVal != null && Number.isFinite(listVal) ? Math.floor(listVal) : null,
           sku: sku.trim() || '',
           is_active: isActive,
         })
@@ -81,8 +61,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
         await updateMutation.mutateAsync({
           label: label.trim(),
           net_mass_kg: kgRaw,
-          base_price_idr: Math.floor(base),
-          list_price_idr: listPrice.trim() ? Math.floor(Number(listPrice)) : null,
           sku: sku.trim() || '',
           is_active: isActive,
         })
@@ -104,9 +82,10 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
             {mode === 'create' ? 'Kemasan baru' : 'Edit kemasan'}
           </CardTitle>
           <CardDescription>
-            Satu baris per ukuran (mis. 0,25 kg, 10 kg). Harga dalam Rupiah penuh tanpa desimal.
-            Setara kemasan mengikuti stok utama varian (kg) dibagi berat bersih per kemasan (kg)
-            — ubah massa varian lewat mutasi atau produksi.
+            Satu baris per ukuran (mis. 0,25 kg, 10 kg). Harga total kemasan dihitung otomatis dari
+            harga per kg produk dikali berat bersih — tidak diatur per kemasan. Setara kemasan
+            mengikuti stok utama varian (kg) dibagi berat bersih per kemasan (kg) — ubah massa
+            varian lewat mutasi atau produksi.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
@@ -146,30 +125,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
                 onChange={(e) => setSku(e.target.value)}
                 disabled={submitting}
                 className="border-outline-variant"
-              />
-            </div>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-base">Harga pokok (IDR)</Label>
-              <CurrencyInput
-                id="pkg-base"
-                value={basePrice}
-                onChange={setBasePrice}
-                disabled={submitting}
-                className="border-outline-variant"
-                placeholder="Mis. 15.000"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-list">Harga jual daftar (IDR, opsional)</Label>
-              <CurrencyInput
-                id="pkg-list"
-                value={listPrice}
-                onChange={setListPrice}
-                disabled={submitting}
-                className="border-outline-variant"
-                placeholder="Kosong jika mengikuti kebijakan lain"
               />
             </div>
           </div>
