@@ -11,6 +11,7 @@ import {
   QrCode,
   Settings,
   ShoppingCart,
+  TrendingUp,
   Truck,
   User,
   Users,
@@ -40,6 +41,9 @@ const navItems: NavItem[] = [
   { to: '/admin/absensi', label: 'Presensi', icon: QrCode },
   { to: '/admin/gaji', label: 'Payroll', icon: CircleDollarSign },
 ]
+
+// Owner-only (LEADERSHIP) extra nav entry appended to the default menu.
+const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: TrendingUp }
 
 const warehouseNavItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor gudang', icon: LayoutDashboard, end: true },
@@ -87,13 +91,16 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const isWarehouseStaff = user?.role === 'WAREHOUSE_STAFF'
   const isSalesStaff = user?.role === 'SALES_STAFF'
   const isFinanceStaff = user?.role === 'FINANCE_STAFF'
+  const isOwner = user?.role === 'LEADERSHIP'
   const visibleNavItems = isWarehouseStaff
     ? warehouseNavItems
     : isSalesStaff
       ? salesNavItems
       : isFinanceStaff
         ? financeNavItems
-        : navItems
+        : isOwner
+          ? [...navItems, ownerNavItem]
+          : navItems
 
   return (
     <>

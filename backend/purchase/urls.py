@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     CustomerProductPriceViewSet,
     CustomerViewSet,
+    HppProfitReportView,
     PurchaseInOrderViewSet,
     SalesOrderViewSet,
     SalesRevenueReportView,
@@ -21,5 +22,6 @@ router.register(r"sales-orders", SalesOrderViewSet, basename="sales-orders")
 
 urlpatterns = [
     path("reports/sales-revenue/", SalesRevenueReportView.as_view(), name="sales-revenue-report"),
+    path("reports/hpp/", HppProfitReportView.as_view(), name="hpp-profit-report"),
     path("", include(router.urls)),
 ]

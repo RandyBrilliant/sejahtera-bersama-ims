@@ -3,6 +3,7 @@ export type UserRole =
   | 'WAREHOUSE_STAFF'
   | 'SALES_STAFF'
   | 'FINANCE_STAFF'
+  | 'KUPAS_STAFF'
   | 'LEADERSHIP'
 
 export interface User {
@@ -26,6 +27,7 @@ export const ROLE_DASHBOARD_ROUTE: Record<UserRole, string> = {
   WAREHOUSE_STAFF: '/admin/dashboard',
   SALES_STAFF: '/admin/dashboard',
   FINANCE_STAFF: '/admin/dashboard',
+  KUPAS_STAFF: '/admin/dashboard',
 }
 
 export function getDashboardRouteForRole(role: UserRole): string {

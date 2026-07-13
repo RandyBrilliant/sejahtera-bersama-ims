@@ -12,6 +12,7 @@ class UserRole(models.TextChoices):
     WAREHOUSE_STAFF = "WAREHOUSE_STAFF", _("Staff Gudang")
     SALES_STAFF = "SALES_STAFF", _("Staff Sales")
     FINANCE_STAFF = "FINANCE_STAFF", _("Staff Keuangan")
+    KUPAS_STAFF = "KUPAS_STAFF", _("Staff Kupas")
     LEADERSHIP = "LEADERSHIP", _("Pimpinan")
 
 
@@ -72,6 +73,10 @@ class CustomUser(AbstractUser):
         return self.role == UserRole.SALES_STAFF
 
     @property
+    def is_kupas_staff(self) -> bool:
+        return self.role == UserRole.KUPAS_STAFF
+
+    @property
     def is_leadership(self) -> bool:
         return self.role == UserRole.LEADERSHIP
 
@@ -114,6 +119,7 @@ class EmployeeProfile(models.Model):
             UserRole.WAREHOUSE_STAFF: "WH",
             UserRole.SALES_STAFF: "SAL",
             UserRole.FINANCE_STAFF: "FIN",
+            UserRole.KUPAS_STAFF: "KPS",
             UserRole.LEADERSHIP: "LDR",
         }
         return prefix_map.get(role, "EMP")

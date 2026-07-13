@@ -301,6 +301,61 @@ Example:
 
 ---
 
+## 10b) HPP & profit (P&L) report — owner only
+
+- **GET** `/api/purchase/reports/hpp/?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
+- Auth: **Owner (Leadership) / superuser only** (`IsOwner`). Exposes cost and margin data.
+- Filters **verified** sales orders by **`verified_at`** within the range (inclusive by calendar day, server timezone). Production labor and OPEX are accrued by their own dates within the range.
+
+Costing model (perpetual **moving-average**, material only per order):
+
+- Ingredient cost is captured at purchase verify (`IngredientInventory.avg_cost_idr`).
+- Production batches consume ingredients at moving-average and allocate cost to finished goods by output-mass share (`Product.avg_cost_per_kg_idr`, `ProductionBatch.material_cost_idr`).
+- On sales verify each line snapshots `SalesOrderLine.cogs_material_idr` from the product's moving-average.
+- Labor: kupas (piece-rate) + `WAREHOUSE_STAFF` daily wages. Daily wages on dates with a `ProductionBatch` count as HPP labor; other days are OPEX. Bonuses/advances/late fines excluded.
+- OPEX: `expenses` ledger EXPENSE entries excluding categories `bahan-baku-produksi` and `gaji-upah` (already counted via purchases + payroll).
+
+`revenue − (material + production labor) = gross profit`; `gross − (opex + non-production wages) = net profit`.
+
+Success payload (`code` + `data`):
+
+- `revenue_idr`, `kg_sold`, `verified_order_count`
+- `cogs`: `material_idr`, `labor_kupas_idr`, `labor_daily_production_idr`, `total_idr`
+- `gross_profit_idr`
+- `opex`: `expenses_idr`, `labor_nonproduction_idr`, `total_idr`
+- `net_profit_idr`, `hpp_per_kg_idr`
+- `by_variant`: list of `{ product_id, variant_name, kg, revenue_idr, cogs_material_idr, allocated_labor_idr, hpp_idr, gross_profit_idr }` (labor allocated by kg share)
+
+Example:
+
+```json
+{
+  "code": "success",
+  "data": {
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-31",
+    "verified_order_count": 12,
+    "kg_sold": "540.000",
+    "revenue_idr": 125000000,
+    "cogs": {
+      "material_idr": 70000000,
+      "labor_kupas_idr": 8000000,
+      "labor_daily_production_idr": 6000000,
+      "total_idr": 84000000
+    },
+    "gross_profit_idr": 41000000,
+    "opex": { "expenses_idr": 12000000, "labor_nonproduction_idr": 2000000, "total_idr": 14000000 },
+    "net_profit_idr": 27000000,
+    "hpp_per_kg_idr": 155556,
+    "by_variant": []
+  }
+}
+```
+
+Backfill: `python manage.py backfill_costs [--dry-run]` recomputes ingredient/product moving-average costs, batch material cost, and historical per-line material COGS (historical COGS uses the final seeded product average and is approximate).
+
+---
+
 ## 11) Dependency: PDF generation
 
 Backend uses **ReportLab** (`reportlab` in `requirements.txt`) for invoice PDFs. Ensure dependencies are installed in deployment environments (`pip install -r requirements.txt`).

@@ -7,6 +7,7 @@ export const ALL_USER_ROLES: readonly UserRole[] = [
   'WAREHOUSE_STAFF',
   'SALES_STAFF',
   'FINANCE_STAFF',
+  'KUPAS_STAFF',
 ]
 
 export const USER_ROLE_LABEL: Record<UserRole, string> = {
@@ -15,6 +16,7 @@ export const USER_ROLE_LABEL: Record<UserRole, string> = {
   WAREHOUSE_STAFF: 'Staf gudang',
   SALES_STAFF: 'Staf penjualan',
   FINANCE_STAFF: 'Staf keuangan',
+  KUPAS_STAFF: 'Staf kupas',
 }
 
 /** Pill/badge styling per role (tables, chips). Distinct hues for quick scanning. */
@@ -29,6 +31,8 @@ export const USER_ROLE_PILL_CLASS: Record<UserRole, string> = {
     'border-emerald-500/45 bg-emerald-500/[0.13] text-emerald-950 dark:bg-emerald-500/15 dark:text-emerald-100',
   FINANCE_STAFF:
     'border-teal-500/45 bg-teal-500/[0.13] text-teal-950 dark:bg-teal-500/15 dark:text-teal-100',
+  KUPAS_STAFF:
+    'border-rose-500/45 bg-rose-500/[0.13] text-rose-950 dark:bg-rose-500/15 dark:text-rose-100',
 }
 
 /** Peran yang dapat dibuat/diubah oleh admin biasa (bukan owner). */
@@ -37,6 +41,7 @@ export const STAFF_AND_ADMIN_ROLES: readonly UserRole[] = [
   'WAREHOUSE_STAFF',
   'SALES_STAFF',
   'FINANCE_STAFF',
+  'KUPAS_STAFF',
 ] as const
 
 export const OWNER_ROLE: UserRole = 'LEADERSHIP'

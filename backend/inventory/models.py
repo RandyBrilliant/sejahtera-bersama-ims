@@ -71,6 +71,17 @@ class Product(AuditModel):
         default=0,
         help_text=_("Total bulk stock for this variant (shared across all kemasan)."),
     )
+    avg_cost_per_kg_idr = models.DecimalField(
+        _("average cost per kg (IDR)"),
+        max_digits=14,
+        decimal_places=4,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_(
+            "Perpetual moving-average production cost per kg (material only). "
+            "Updated when finished mass is added by a production batch; used as COGS basis on sale."
+        ),
+    )
     is_active = models.BooleanField(_("active"), default=True, db_index=True)
 
     class Meta:
@@ -203,6 +214,17 @@ class IngredientInventory(AuditModel):
         validators=[MinValueValidator(0)],
         default=0,
     )
+    avg_cost_idr = models.DecimalField(
+        _("average cost (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_(
+            "Perpetual moving-average purchase cost per stock unit (kg/L/pcs). "
+            "Updated on each verified purchase; used to value production consumption."
+        ),
+    )
 
     class Meta:
         verbose_name = _("ingredient inventory")
@@ -245,6 +267,18 @@ class IngredientStockMovement(AuditModel):
         max_digits=12,
         decimal_places=3,
         validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    unit_cost_idr = models.DecimalField(
+        _("unit cost (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        null=True,
+        blank=True,
+        help_text=_(
+            "Cost per unit applied at this movement (audit): purchase price on IN, "
+            "moving-average cost consumed on OUT. Null for legacy/manual rows."
+        ),
     )
     note = models.TextField(_("note"), blank=True)
     movement_at = models.DateTimeField(_("movement at"), db_index=True)
@@ -304,6 +338,18 @@ class ProductStockMovement(AuditModel):
         default=0,
         help_text=_("Additional grams on IN movements only."),
     )
+    unit_cost_per_kg_idr = models.DecimalField(
+        _("unit cost per kg (IDR)"),
+        max_digits=14,
+        decimal_places=4,
+        validators=[MinValueValidator(0)],
+        null=True,
+        blank=True,
+        help_text=_(
+            "Production cost per kg at this movement (audit): batch cost on IN, "
+            "moving-average cost on OUT (sale). Null for legacy/manual rows."
+        ),
+    )
     note = models.TextField(_("note"), blank=True)
     movement_at = models.DateTimeField(_("movement at"), db_index=True)
 
@@ -333,6 +379,17 @@ class ProductionBatch(AuditModel):
     production_date = models.DateField(_("production date"), db_index=True)
     shift_label = models.CharField(_("shift label"), max_length=50, blank=True)
     note = models.TextField(_("note"), blank=True)
+    material_cost_idr = models.DecimalField(
+        _("material cost (IDR)"),
+        max_digits=16,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_(
+            "Total ingredient (material) cost consumed by this batch, valued at "
+            "moving-average ingredient cost when the batch was recorded."
+        ),
+    )
 
     class Meta:
         verbose_name = _("production batch")

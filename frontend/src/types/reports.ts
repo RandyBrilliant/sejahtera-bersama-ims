@@ -94,8 +94,45 @@ export type OperationalCashSummaryPayload = {
   by_category: unknown[]
 }
 
+/** Baris HPP & margin per varian produk (COGS bahan eksak; tenaga kerja dialokasikan per kg). */
+export type HppProfitByVariantRow = {
+  product_id: number
+  variant_name: string
+  kg: string
+  revenue_idr: number
+  cogs_material_idr: number
+  allocated_labor_idr: number
+  hpp_idr: number
+  gross_profit_idr: number
+}
+
+/** Laba rugi pemilik: pendapatan - HPP = laba kotor; - OPEX = laba bersih. */
+export type HppProfitReportPayload = {
+  start_date: string
+  end_date: string
+  verified_order_count: number
+  kg_sold: string
+  revenue_idr: number
+  cogs: {
+    material_idr: number
+    labor_kupas_idr: number
+    labor_daily_production_idr: number
+    total_idr: number
+  }
+  gross_profit_idr: number
+  opex: {
+    expenses_idr: number
+    labor_nonproduction_idr: number
+    total_idr: number
+  }
+  net_profit_idr: number
+  hpp_per_kg_idr: number
+  by_variant: HppProfitByVariantRow[]
+}
+
 type Envelope<T> = { code?: string; data: T }
 
 export type SalesRevenueEnvelope = Envelope<SalesRevenueReportPayload>
+export type HppProfitEnvelope = Envelope<HppProfitReportPayload>
 export type OperationalCashEnvelope = Envelope<OperationalCashSummaryPayload>
 export type OperationalCashFullEnvelope = Envelope<OperationalCashFullReportPayload>

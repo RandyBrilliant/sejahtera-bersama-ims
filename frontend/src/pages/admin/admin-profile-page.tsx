@@ -18,6 +18,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   WAREHOUSE_STAFF: 'Staf gudang',
   SALES_STAFF: 'Staf penjualan',
   FINANCE_STAFF: 'Staf keuangan',
+  KUPAS_STAFF: 'Staf kupas',
 }
 
 function parseAxiosErrors(err: unknown): {

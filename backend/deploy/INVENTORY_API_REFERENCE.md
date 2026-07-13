@@ -522,3 +522,15 @@ Role usage guidance:
 - Keep all numeric stock values as strings when using decimals in JSON.
 - Price uses integer Rupiah. The product's `price_per_kg_idr` is the single fixed price per kg; each packaging's `total_price_idr` is derived (`price_per_kg_idr × net_mass_kg`) and is read-only.
 - `created_by`/`updated_by` are auto-filled by backend from current auth user.
+
+## Costing (internal, for HPP/P&L)
+
+The following fields are maintained by the backend for perpetual moving-average costing and are **not** editable via the API (used by the owner HPP report — see `PURCHASE_API_REFERENCE.md`):
+
+- `IngredientInventory.avg_cost_idr` — updated at purchase verify.
+- `IngredientStockMovement.unit_cost_idr` — per-movement cost audit.
+- `Product.avg_cost_per_kg_idr` — updated when a production batch adds finished mass (cost allocated by output-mass share).
+- `ProductStockMovement.unit_cost_per_kg_idr` — per-movement cost audit.
+- `ProductionBatch.material_cost_idr` — total ingredient cost consumed by the batch.
+
+Run `python manage.py backfill_costs` once to seed these from historical data.

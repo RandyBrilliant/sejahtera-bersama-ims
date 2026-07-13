@@ -20,6 +20,7 @@ const ROLE_BAND_CLASS: Record<UserRole, string> = {
   WAREHOUSE_STAFF: 'bg-sky-500',
   SALES_STAFF: 'bg-emerald-500',
   FINANCE_STAFF: 'bg-teal-500',
+  KUPAS_STAFF: 'bg-rose-500',
 }
 
 /** Angka utama KPI — besar dan mudah dibaca sekilas. */

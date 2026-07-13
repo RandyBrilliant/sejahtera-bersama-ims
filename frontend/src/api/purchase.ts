@@ -1,5 +1,10 @@
 import { api } from '@/lib/api'
-import type { SalesRevenueReportPayload, SalesRevenueEnvelope } from '@/types/reports'
+import type {
+  HppProfitEnvelope,
+  HppProfitReportPayload,
+  SalesRevenueReportPayload,
+  SalesRevenueEnvelope,
+} from '@/types/reports'
 import type {
   Customer,
   CustomerCreateInput,
@@ -275,5 +280,15 @@ export async function fetchSalesRevenueReport(
     '/api/purchase/reports/sales-revenue/',
     { params: { start_date: startDate, end_date: endDate } }
   )
+  return data.data
+}
+
+export async function fetchHppProfitReport(
+  startDate: string,
+  endDate: string
+): Promise<HppProfitReportPayload> {
+  const { data } = await api.get<HppProfitEnvelope>('/api/purchase/reports/hpp/', {
+    params: { start_date: startDate, end_date: endDate },
+  })
   return data.data
 }

@@ -73,6 +73,25 @@ def grams_delta_from_mass_fields(
     return -mass_grams
 
 
+def weighted_moving_average(old_qty, old_avg_unit_cost, add_qty, add_total_cost) -> Decimal:
+    """
+    Perpetual moving-average unit cost after adding ``add_qty`` whose total cost
+    is ``add_total_cost``.
+
+    Works for ingredients (unit = stock unit) and finished goods (unit = gram):
+    ``new_avg = (old_qty * old_avg + add_total_cost) / (old_qty + add_qty)``.
+    Returns the previous average when the resulting quantity is not positive.
+    """
+    old_qty = Decimal(str(old_qty or 0))
+    old_avg = Decimal(str(old_avg_unit_cost or 0))
+    add_qty = Decimal(str(add_qty or 0))
+    add_total_cost = Decimal(str(add_total_cost or 0))
+    new_qty = old_qty + add_qty
+    if new_qty <= 0:
+        return old_avg
+    return (old_qty * old_avg + add_total_cost) / new_qty
+
+
 def product_financial_value_idr(product) -> int:
     """
     Inventory value from the product's fixed price per kg:

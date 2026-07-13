@@ -13,6 +13,7 @@ import { WilayahManagerModal } from '@/components/admin/customers/wilayah-manage
 import { useCustomersQuery, useWilayahQuery } from '@/hooks/use-purchase-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
+import { formatRegionalPhonePreview } from '@/lib/regional-phone'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -114,7 +115,7 @@ export function CustomersTable() {
       {
         accessorKey: 'phone',
         header: 'Telepon',
-        cell: ({ row }) => row.original.phone || '—',
+        cell: ({ row }) => formatRegionalPhonePreview(row.original.phone),
       },
       {
         id: 'wilayah_name',

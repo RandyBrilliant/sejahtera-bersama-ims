@@ -42,7 +42,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
   const [listParams, setListParams] = useState<ProductPackagingListParams>({
     product: productId,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
-    ordering: 'label',
+    ordering: 'net_mass_kg',
   })
 
   const onOrderingChange = useMemo(
@@ -52,7 +52,7 @@ export function ProductPackagingInlineTable({ productId }: Props) {
 
   const { sortHeader } = useTableSorting({
     ordering: listParams.ordering,
-    defaultOrdering: 'label',
+    defaultOrdering: 'net_mass_kg',
     onOrderingChange,
   })
 
@@ -106,7 +106,9 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                 <TableHead className="text-on-surface-variant">
                   {sortHeader('Label', 'label')}
                 </TableHead>
-                <TableHead className="text-on-surface-variant">Berat (kg)</TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Berat (kg)', 'net_mass_kg')}
+                </TableHead>
                 <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
                 <TableHead className="text-on-surface-variant">Harga total</TableHead>
                 <TableHead className="text-on-surface-variant">SKU</TableHead>

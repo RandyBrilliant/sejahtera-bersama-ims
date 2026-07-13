@@ -20,6 +20,7 @@ import {
   downloadSalesReceiptPdf,
   fetchCustomer,
   fetchCustomers,
+  fetchHppProfitReport,
   fetchPurchaseInOrder,
   fetchPurchaseInOrders,
   fetchSalesOrder,
@@ -66,6 +67,22 @@ export const purchaseKeys = {
     [...purchaseKeys.salesOrders(), 'detail', id] as const,
   revenueReport: (startDate: string, endDate: string) =>
     [...purchaseKeys.all, 'revenue-report', startDate, endDate] as const,
+  hppReport: (startDate: string, endDate: string) =>
+    [...purchaseKeys.all, 'hpp-report', startDate, endDate] as const,
+}
+
+/** Laporan HPP & laba (khusus pemilik). */
+export function useHppProfitReportQuery(
+  startDate: string,
+  endDate: string,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: purchaseKeys.hppReport(startDate, endDate),
+    queryFn: () => fetchHppProfitReport(startDate, endDate),
+    enabled,
+    staleTime: 60_000,
+  })
 }
 
 function invalidatePurchaseQueries(qc: ReturnType<typeof useQueryClient>) {

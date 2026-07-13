@@ -40,6 +40,7 @@ from .product_stock import (
     annotate_packaging_derived_remaining,
     grams_delta_from_mass_fields,
     product_financial_value_idr,
+    weighted_moving_average,
 )
 from .serializers import (
     IngredientInventorySerializer,
@@ -162,7 +163,7 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = ProductPackagingFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
-    ordering_fields = ["label"]
+    ordering_fields = ["label", "net_mass_kg"]
     ordering = ["product__variant_name", "net_mass_kg"]
 
     def get_queryset(self):
@@ -602,11 +603,15 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                 updated_by=request.user,
             )
 
+            material_cost = Decimal("0")
             for row in ingredient_usages:
                 inventory = IngredientInventory.objects.select_for_update().get(pk=row["ingredient_inventory"].pk)
                 quantity_used = row["quantity_used"]
                 if inventory.remaining_stock < quantity_used:
                     raise ValueError(f"Stok bahan tidak cukup: {inventory.ingredient.name}")
+
+                unit_cost = Decimal(str(inventory.avg_cost_idr or 0))
+                material_cost += Decimal(str(quantity_used)) * unit_cost
 
                 inventory.remaining_stock = inventory.remaining_stock - quantity_used
                 inventory.updated_by = request.user
@@ -621,6 +626,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     ingredient_inventory=inventory,
                     movement_type=StockMovementType.OUT,
                     quantity=quantity_used,
+                    unit_cost_idr=unit_cost,
                     note=f"Pemakaian produksi batch #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,
@@ -636,12 +642,45 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                 pid = pkg.product_id
                 mass_in_by_pid[pid] = mass_in_by_pid.get(pid, Decimal("0")) + gm
 
+            total_output_g = sum(mass_in_by_pid.values(), Decimal("0"))
+            batch.material_cost_idr = material_cost.quantize(Decimal("0.01"))
+            batch.save(update_fields=["material_cost_idr"])
+
+            # Allocate batch material cost to each product by output-mass share and
+            # update the finished-goods moving-average cost per kg.
+            batch_cost_per_kg_by_pid: dict[int, Decimal] = {}
             for pid in sorted(mass_in_by_pid.keys()):
+                add_mass_g = mass_in_by_pid[pid]
+                product_cost = (
+                    material_cost * (add_mass_g / total_output_g)
+                    if total_output_g > 0
+                    else Decimal("0")
+                )
+                add_mass_kg = add_mass_g / Decimal("1000")
+                batch_cost_per_kg_by_pid[pid] = (
+                    product_cost / add_mass_kg if add_mass_kg > 0 else Decimal("0")
+                )
+
                 prod = Product.objects.select_for_update().get(pk=pid)
-                base = prod.remaining_mass_grams or Decimal("0")
-                prod.remaining_mass_grams = base + mass_in_by_pid[pid]
+                old_mass_g = prod.remaining_mass_grams or Decimal("0")
+                old_avg_per_g = Decimal(str(prod.avg_cost_per_kg_idr or 0)) / Decimal("1000")
+                new_avg_per_g = weighted_moving_average(
+                    old_qty=old_mass_g,
+                    old_avg_unit_cost=old_avg_per_g,
+                    add_qty=add_mass_g,
+                    add_total_cost=product_cost,
+                )
+                prod.remaining_mass_grams = old_mass_g + add_mass_g
+                prod.avg_cost_per_kg_idr = (new_avg_per_g * Decimal("1000")).quantize(Decimal("0.0001"))
                 prod.updated_by = request.user
-                prod.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+                prod.save(
+                    update_fields=[
+                        "remaining_mass_grams",
+                        "avg_cost_per_kg_idr",
+                        "updated_by",
+                        "updated_at",
+                    ]
+                )
 
             for row in packaging_outputs:
                 packaging = ProductPackaging.objects.select_for_update().get(pk=row["product_packaging"].pk)
@@ -663,6 +702,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     movement_type=StockMovementType.IN,
                     mass_grams=mass_main,
                     bonus_mass_grams=mass_bonus,
+                    unit_cost_per_kg_idr=batch_cost_per_kg_by_pid.get(packaging.product_id),
                     note=f"Hasil produksi batch #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,

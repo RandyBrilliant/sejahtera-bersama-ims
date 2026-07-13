@@ -6,6 +6,24 @@ from django.db.models.functions import Coalesce
 
 from .models import EntryKind, OperationalCashEntry
 
+# Expense categories already captured as HPP elsewhere (purchases -> material cost,
+# payroll -> labor). Excluded from the OPEX layer to avoid double-counting.
+EXCLUDED_OPEX_CATEGORY_SLUGS = ("bahan-baku-produksi", "gaji-upah")
+
+
+def opex_total_for_range(start_d, end_d) -> int:
+    """Total operational EXPENSE in range, excluding bahan & gaji categories."""
+    agg = (
+        OperationalCashEntry.objects.filter(
+            occurred_on__gte=start_d,
+            occurred_on__lte=end_d,
+            direction=EntryKind.EXPENSE,
+        )
+        .exclude(category__slug__in=EXCLUDED_OPEX_CATEGORY_SLUGS)
+        .aggregate(total_idr=Coalesce(Sum("amount_idr"), Value(0)))
+    )
+    return int(agg["total_idr"] or 0)
+
 
 def entries_queryset_for_range(start_d, end_d):
     return (

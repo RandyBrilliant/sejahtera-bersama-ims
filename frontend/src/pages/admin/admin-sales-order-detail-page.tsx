@@ -42,6 +42,18 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/** Fixed price per kg for a line; falls back to unit price ÷ berat kemasan. */
+function linePricePerKgIdr(line: {
+  price_per_kg_idr?: number
+  unit_price_idr: number
+  net_mass_kg?: string
+}): number {
+  if (line.price_per_kg_idr != null) return line.price_per_kg_idr
+  const mass = Number(String(line.net_mass_kg ?? '').replace(',', '.'))
+  if (Number.isFinite(mass) && mass > 0) return Math.round(line.unit_price_idr / mass)
+  return 0
+}
+
 const LIST_PATH = '/admin/pesanan/penjualan'
 
 export function AdminSalesOrderDetailPage() {
@@ -332,9 +344,9 @@ export function AdminSalesOrderDetailPage() {
                 <TableHead>Produk</TableHead>
                 <TableHead>Kemasan</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Berat baris (kg)</TableHead>
-                <TableHead className="text-right">Harga</TableHead>
-                <TableHead className="text-right">Jumlah</TableHead>
+                <TableHead className="text-right">Berat (kg)</TableHead>
+                <TableHead className="text-right">Harga (kg)</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -349,7 +361,7 @@ export function AdminSalesOrderDetailPage() {
                     {formatSalesOrderLineMassKg(line)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatIdr(line.unit_price_idr)}
+                    {formatIdr(linePricePerKgIdr(line))}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatIdr(line.line_total_idr)}

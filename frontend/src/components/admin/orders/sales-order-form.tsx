@@ -99,6 +99,12 @@ function fmtStock(v: string): string {
   return n.toLocaleString('id-ID', { maximumFractionDigits: 1 })
 }
 
+function fmtKg(kg: number): string {
+  return Number.isFinite(kg)
+    ? kg.toLocaleString('id-ID', { maximumFractionDigits: 3 })
+    : '0'
+}
+
 function RequiredAsterisk() {
   return (
     <span className="text-destructive" aria-hidden>
@@ -625,6 +631,10 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                     const qtyNum = Number(it.quantity) || 0
                     const isCustom = it.unit_price_per_kg_idr.trim() !== ''
                     const expanded = expandedCustom.has(it.product_packaging) || isCustom
+                    const lineKg = qtyNum * massKgOf(pkg)
+                    const pricePerKg = isCustom
+                      ? Number(it.unit_price_per_kg_idr) || 0
+                      : pkg?.price_per_kg_idr ?? 0
                     return (
                       <li key={it.product_packaging} className="space-y-2 px-4 py-3">
                         <div className="flex items-start justify-between gap-2">
@@ -632,9 +642,12 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                             <p className="text-on-surface truncate text-sm font-medium">
                               {pkg ? `${pkg.product_variant_name} · ${pkg.label}` : `#${it.product_packaging}`}
                             </p>
+                            <p className="text-on-surface text-xs font-medium tabular-nums">
+                              {fmtKg(lineKg)} kg
+                            </p>
                             <p className="text-on-surface-variant text-xs tabular-nums">
-                              {formatIdr(unit)}
-                              {isCustom ? ' · khusus' : ''} / kemasan
+                              {formatIdr(pricePerKg)} / kg
+                              {isCustom ? ' · khusus' : ''}
                             </p>
                           </div>
                           <button

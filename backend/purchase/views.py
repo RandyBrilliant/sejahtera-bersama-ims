@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -27,6 +27,7 @@ from account.permissions import (
     SalesRevenueReportAccess,
 )
 from account.upload_validation import upload_validation_error_response, validate_uploaded_file
+from expenses.reporting import opex_total_for_range
 from inventory.models import (
     IngredientInventory,
     IngredientStockMovement,
@@ -34,6 +35,8 @@ from inventory.models import (
     ProductStockMovement,
     StockMovementType,
 )
+from inventory.product_stock import weighted_moving_average
+from payroll.costing import production_labor_for_range
 
 from .filters import (
     CustomerFilter,
@@ -216,13 +219,20 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
                 .select_related("ingredient")
                 .get(pk=line.ingredient_inventory_id)
             )
+            inv.avg_cost_idr = weighted_moving_average(
+                old_qty=inv.remaining_stock,
+                old_avg_unit_cost=inv.avg_cost_idr,
+                add_qty=line.quantity,
+                add_total_cost=Decimal(str(line.quantity)) * Decimal(str(line.unit_cost_idr)),
+            )
             inv.remaining_stock = inv.remaining_stock + line.quantity
             inv.updated_by = request.user
-            inv.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
+            inv.save(update_fields=["remaining_stock", "avg_cost_idr", "updated_by", "updated_at"])
             IngredientStockMovement.objects.create(
                 ingredient_inventory=inv,
                 movement_type=StockMovementType.IN,
                 quantity=line.quantity,
+                unit_cost_idr=line.unit_cost_idr,
                 note=f"Terima pembelian {order.order_code}",
                 movement_at=now,
                 created_by=request.user,
@@ -333,6 +343,146 @@ class SalesRevenueReportView(APIView):
             "summary": summary,
             "by_customer": by_customer,
             "by_packaging": by_packaging,
+        }
+        return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
+
+
+def _to_int_idr(value) -> int:
+    return int(Decimal(str(value or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+class HppProfitReportView(APIView):
+    """Owner P&L: revenue - HPP (material + production labor) = gross; - OPEX = net."""
+
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        raw_start = (request.query_params.get("start_date") or "").strip()
+        raw_end = (request.query_params.get("end_date") or "").strip()
+        if not raw_start or not raw_end:
+            return Response(
+                {
+                    "detail": "Query param 'start_date' dan 'end_date' wajib diisi (YYYY-MM-DD).",
+                    "code": "validation_error",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            start_d = date.fromisoformat(raw_start)
+            end_d = date.fromisoformat(raw_end)
+        except ValueError:
+            return Response(
+                {"detail": "Format tanggal tidak valid.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if start_d > end_d:
+            return Response(
+                {"detail": "start_date tidak boleh lebih besar dari end_date.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tz = timezone.get_current_timezone()
+        start_dt = timezone.make_aware(datetime.combine(start_d, time.min), tz)
+        end_dt = timezone.make_aware(datetime.combine(end_d, time.max), tz)
+
+        base_qs = SalesOrder.objects.filter(
+            status=OrderStatus.VERIFIED,
+            verified_at__gte=start_dt,
+            verified_at__lte=end_dt,
+        )
+        line_qs = SalesOrderLine.objects.filter(order__in=base_qs).select_related(
+            "product_packaging__product",
+        )
+
+        money_dec = DecimalField(max_digits=24, decimal_places=3)
+        kg_dec = DecimalField(max_digits=20, decimal_places=6)
+        zero_idr = Value(Decimal("0"), output_field=money_dec)
+        zero_kg = Value(Decimal("0"), output_field=kg_dec)
+        line_revenue_expr = ExpressionWrapper(
+            F("quantity") * Cast(F("unit_price_idr"), DecimalField(max_digits=24, decimal_places=0)),
+            output_field=money_dec,
+        )
+        line_kg_expr = ExpressionWrapper(
+            F("quantity") * F("product_packaging__net_mass_kg"),
+            output_field=kg_dec,
+        )
+
+        by_variant_rows = list(
+            line_qs.values(
+                "product_packaging__product_id",
+                "product_packaging__product__variant_name",
+            )
+            .annotate(
+                revenue_idr=Coalesce(Sum(line_revenue_expr), zero_idr),
+                cogs_material_idr=Coalesce(Sum("cogs_material_idr"), Value(0)),
+                kg=Coalesce(Sum(line_kg_expr), zero_kg),
+            )
+            .order_by("-revenue_idr")
+        )
+
+        revenue = sum((Decimal(str(r["revenue_idr"])) for r in by_variant_rows), Decimal("0"))
+        material_cogs = sum(
+            (Decimal(str(r["cogs_material_idr"] or 0)) for r in by_variant_rows), Decimal("0")
+        )
+        kg_sold = sum((Decimal(str(r["kg"])) for r in by_variant_rows), Decimal("0"))
+
+        labor = production_labor_for_range(start_d, end_d)
+        labor_kupas = labor["kupas_idr"]
+        labor_daily_prod = labor["daily_production_idr"]
+        labor_nonprod = labor["daily_nonproduction_idr"]
+        labor_hpp = labor_kupas + labor_daily_prod
+
+        cogs_total = material_cogs + labor_hpp
+        gross_profit = revenue - cogs_total
+
+        opex_expenses = Decimal(str(opex_total_for_range(start_d, end_d)))
+        opex_total = opex_expenses + labor_nonprod
+        net_profit = gross_profit - opex_total
+
+        hpp_per_kg = (cogs_total / kg_sold) if kg_sold > 0 else Decimal("0")
+
+        # Per-variant HPP: material COGS is exact per variant; production labor is
+        # allocated across variants by kg share (period-level, flagged in the UI).
+        by_variant = []
+        for r in by_variant_rows:
+            v_kg = Decimal(str(r["kg"]))
+            v_material = Decimal(str(r["cogs_material_idr"] or 0))
+            allocated_labor = (labor_hpp * v_kg / kg_sold) if kg_sold > 0 else Decimal("0")
+            v_hpp = v_material + allocated_labor
+            by_variant.append(
+                {
+                    "product_id": r["product_packaging__product_id"],
+                    "variant_name": r["product_packaging__product__variant_name"],
+                    "kg": str(v_kg.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)),
+                    "revenue_idr": _to_int_idr(r["revenue_idr"]),
+                    "cogs_material_idr": _to_int_idr(v_material),
+                    "allocated_labor_idr": _to_int_idr(allocated_labor),
+                    "hpp_idr": _to_int_idr(v_hpp),
+                    "gross_profit_idr": _to_int_idr(Decimal(str(r["revenue_idr"])) - v_hpp),
+                }
+            )
+
+        payload = {
+            "start_date": start_d.isoformat(),
+            "end_date": end_d.isoformat(),
+            "verified_order_count": base_qs.count(),
+            "kg_sold": str(kg_sold.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)),
+            "revenue_idr": _to_int_idr(revenue),
+            "cogs": {
+                "material_idr": _to_int_idr(material_cogs),
+                "labor_kupas_idr": _to_int_idr(labor_kupas),
+                "labor_daily_production_idr": _to_int_idr(labor_daily_prod),
+                "total_idr": _to_int_idr(cogs_total),
+            },
+            "gross_profit_idr": _to_int_idr(gross_profit),
+            "opex": {
+                "expenses_idr": _to_int_idr(opex_expenses),
+                "labor_nonproduction_idr": _to_int_idr(labor_nonprod),
+                "total_idr": _to_int_idr(opex_total),
+            },
+            "net_profit_idr": _to_int_idr(net_profit),
+            "hpp_per_kg_idr": _to_int_idr(hpp_per_kg),
+            "by_variant": by_variant,
         }
         return Response(status=status.HTTP_200_OK, data=success_response(data=payload))
 
@@ -509,12 +659,23 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             line_mass = (
                 Decimal(str(line.quantity)) * Decimal(str(packaging.net_mass_kg)) * Decimal("1000")
             )
+            prod = products_locked[packaging.product_id]
+            avg_cost_per_kg = Decimal(str(prod.avg_cost_per_kg_idr or 0))
+            cogs = int(
+                (line_mass * avg_cost_per_kg / Decimal("1000")).quantize(
+                    Decimal("1"), rounding=ROUND_HALF_UP
+                )
+            )
+            line.cogs_material_idr = cogs
+            line.updated_by = request.user
+            line.save(update_fields=["cogs_material_idr", "updated_by", "updated_at"])
             ProductStockMovement.objects.create(
                 product=packaging.product,
                 product_packaging=packaging,
                 movement_type=StockMovementType.OUT,
                 mass_grams=line_mass,
                 bonus_mass_grams=Decimal("0"),
+                unit_cost_per_kg_idr=avg_cost_per_kg,
                 note=f"Pengiriman penjualan {order.order_code}",
                 movement_at=now,
                 created_by=request.user,

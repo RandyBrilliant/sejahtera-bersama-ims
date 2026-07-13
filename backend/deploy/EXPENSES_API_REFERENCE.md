@@ -124,6 +124,12 @@ Idempotent: skips categories whose `slug` already exists.
 
 ---
 
+## 8b) OPEX contribution to the owner P&L
+
+The owner HPP/P&L report (`GET /api/purchase/reports/hpp/`, see `PURCHASE_API_REFERENCE.md`) folds this ledger in as **OPEX** via `expenses.reporting.opex_total_for_range(start, end)`: sum of **EXPENSE** entries in range, **excluding** categories `bahan-baku-produksi` and `gaji-upah` (already counted as HPP through purchases and payroll). Keep those two category slugs stable, or update `EXCLUDED_OPEX_CATEGORY_SLUGS` accordingly.
+
+---
+
 ## 9) Industry notes
 
 - **Single ledger table** with `direction` keeps reporting simple and indexed for range queries.

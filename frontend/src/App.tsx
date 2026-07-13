@@ -170,6 +170,11 @@ const AdminSettingsPage = lazy(() =>
     default: m.AdminSettingsPage,
   }))
 )
+const AdminHppPage = lazy(() =>
+  import('@/pages/admin/admin-hpp-page').then((m) => ({
+    default: m.AdminHppPage,
+  }))
+)
 const AdminAttendanceTabletPage = lazy(() =>
   import('@/pages/admin/admin-attendance-tablet-page').then((m) => ({
     default: m.AdminAttendanceTabletPage,
@@ -480,6 +485,9 @@ export default function App() {
                   <Route path="entri" element={<AdminKasEntriesPage />} />
                 </Route>
                 <Route path="analitik" element={<AdminAnalyticsPage />} />
+              </Route>
+              <Route element={<InAppRoleRoute allowedRoles={['LEADERSHIP']} />}>
+                <Route path="hpp" element={<AdminHppPage />} />
               </Route>
               <Route element={<InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />}>
                 <Route path="staf/baru" element={<AdminStaffNewPage />} />

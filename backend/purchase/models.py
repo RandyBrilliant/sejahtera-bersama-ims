@@ -299,6 +299,16 @@ class SalesOrderLine(AuditModel):
         _("unit price (IDR)"),
         validators=[MinValueValidator(1)],
     )
+    cogs_material_idr = models.PositiveBigIntegerField(
+        _("material COGS (IDR)"),
+        validators=[MinValueValidator(0)],
+        null=True,
+        blank=True,
+        help_text=_(
+            "Snapshot of material cost of goods sold for this line, valued at the "
+            "product's moving-average cost when the order was verified. Null until verified."
+        ),
+    )
 
     class Meta:
         verbose_name = _("sales order line")
