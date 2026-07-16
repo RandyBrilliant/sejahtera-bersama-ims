@@ -18,7 +18,7 @@ touching the drawing code. ReportLab's canvas uses a bottom-left origin, so
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 
 from reportlab.lib.colors import Color, black, red
@@ -59,63 +59,88 @@ class Column:
 
 @dataclass(frozen=True)
 class ReceiptLayout:
-    """All tunable coordinates, in millimetres measured from the top-left."""
+    """All tunable coordinates, in millimetres measured from the top-left.
+
+    Calibrated against the physical Bon/Faktur pad (Jul 2026 test print): the
+    first overlay sat too high (date above ``tgl.``, items on column headers)
+    and too far left (amounts between NAMA BARANG / @ Rp). Nudge
+    :attr:`offset_x` / :attr:`offset_y` after a test print if the tractor
+    alignment on the Epson LQ still drifts a millimetre or two.
+    """
+
+    # Fine-tune after printing on the real pad (mm).
+    # Positive offset_x → right; positive offset_y → down.
+    offset_x: float = 0.0
+    offset_y: float = 0.0
 
     margin_left: float = 8.0
     margin_right: float = 8.0
 
     # Header block (company identity, top-left).
-    company_name_top: float = 8.0
-    brand_top: float = 13.0
-    contact_top: float = 17.5
+    company_name_top: float = 9.0
+    brand_top: float = 14.5
+    contact_top: float = 19.5
     contact_line_height: float = 3.2
 
     # Meta block (top-right): tanggal + kepada yth.
-    date_label_top: float = 8.5
-    date_value_top: float = 8.0
-    date_line_left: float = 92.0
-    date_line_right: float = 128.0
-    date_label_x: float = 131.0
+    date_label_top: float = 15.0
+    date_value_top: float = 14.5
+    date_line_left: float = 95.0
+    date_line_right: float = 132.0
+    date_label_x: float = 134.0
 
-    kepada_label_top: float = 14.0
-    kepada_label_x: float = 90.0
-    kepada_value_x: float = 118.0
-    kepada_cont_x: float = 92.0
-    kepada_line_tops: tuple[float, ...] = (13.5, 18.8, 24.1)
+    kepada_label_top: float = 21.5
+    kepada_label_x: float = 93.0
+    kepada_value_x: float = 122.0
+    kepada_cont_x: float = 95.0
+    kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
 
     # Bon / Faktur number.
-    faktur_label_top: float = 27.5
-    faktur_value_top: float = 27.5
-    faktur_value_x: float = 46.0
+    faktur_label_top: float = 35.0
+    faktur_value_top: float = 35.0
+    faktur_value_x: float = 48.0
 
     # Table.
-    table_top: float = 31.0
-    header_bottom: float = 37.0
-    table_bottom: float = 90.0
-    first_row_baseline_top: float = 42.0
-    row_height: float = 7.0
+    table_top: float = 40.0
+    header_bottom: float = 47.0
+    table_bottom: float = 91.0
+    first_row_baseline_top: float = 53.0
+    row_height: float = 6.0
     row_count: int = 7
 
-    col_qty: Column = field(default_factory=lambda: Column(8.0, 33.0))
-    col_name: Column = field(default_factory=lambda: Column(33.0, 99.0))
-    col_unit: Column = field(default_factory=lambda: Column(99.0, 121.0))
-    col_total: Column = field(default_factory=lambda: Column(121.0, 142.0))
+    # Wider money columns so larger digits still sit inside @ Rp / Jumlah Harga.
+    col_qty: Column = field(default_factory=lambda: Column(10.0, 28.0))
+    col_name: Column = field(default_factory=lambda: Column(28.0, 100.0))
+    col_unit: Column = field(default_factory=lambda: Column(100.0, 124.0))
+    col_total: Column = field(default_factory=lambda: Column(124.0, 146.0))
 
-    cell_padding: float = 1.8
+    cell_padding: float = 1.2
+
+    # Overlay value sizes (pt). Long text shrinks down to font_min via _sized_text.
+    font_date: float = 11.0
+    font_buyer: float = 10.5
+    font_row: float = 10.5
+    font_total: float = 12.0
+    font_faktur: float = 13.0
+    font_min: float = 8.0
 
     # Footer.
-    tanda_terima_top: float = 96.0
-    notice_center_x: float = 66.0
-    notice_top: float = 93.5
+    tanda_terima_top: float = 97.0
+    notice_center_x: float = 68.0
+    notice_top: float = 94.5
     notice_line_height: float = 3.0
-    total_label_top: float = 96.0
-    total_label_x: float = 104.0
-    total_currency_x: float = 121.0
-    total_value_top: float = 96.0
+    total_label_top: float = 97.0
+    total_label_x: float = 110.0
+    total_currency_x: float = 128.0
+    total_value_top: float = 97.0
+
+    def x(self, left_mm: float) -> float:
+        """Convert a left-based millimetre value to canvas units."""
+        return (left_mm + self.offset_x) * mm
 
     def y(self, top_mm: float) -> float:
         """Convert a top-based millimetre value to canvas (bottom-left) units."""
-        return (PAGE_HEIGHT_MM - top_mm) * mm
+        return (PAGE_HEIGHT_MM - (top_mm + self.offset_y)) * mm
 
     @property
     def columns(self) -> tuple[Column, ...]:
@@ -149,6 +174,16 @@ def _packaging_display(packaging) -> str:
     return variant or label or "-"
 
 
+def _price_per_kg_idr(line) -> int:
+    """Effective harga per kg for a sales line (unit package price ÷ net mass)."""
+    packaging = line.product_packaging
+    net = Decimal(str(packaging.net_mass_kg)) if packaging is not None else Decimal("0")
+    if net <= 0:
+        return int(line.unit_price_idr)
+    per_kg = Decimal(int(line.unit_price_idr)) / net
+    return int(per_kg.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def _fit_text(pdf: canvas.Canvas, text: str, font: str, size: float, max_width: float) -> str:
     """Truncate ``text`` (adding an ellipsis) so it fits within ``max_width`` mm."""
     limit = max_width * mm
@@ -159,6 +194,24 @@ def _fit_text(pdf: canvas.Canvas, text: str, font: str, size: float, max_width: 
     while trimmed and pdf.stringWidth(trimmed + ellipsis, font, size) > limit:
         trimmed = trimmed[:-1]
     return (trimmed + ellipsis) if trimmed else ""
+
+
+def _sized_text(
+    pdf: canvas.Canvas,
+    text: str,
+    font: str,
+    preferred: float,
+    max_width: float,
+    min_size: float,
+) -> tuple[str, float]:
+    """Pick the largest font ≤ ``preferred`` that fits ``max_width`` mm; else truncate."""
+    size = preferred
+    limit = max_width * mm
+    while size > min_size and pdf.stringWidth(text, font, size) > limit:
+        size -= 0.5
+    if pdf.stringWidth(text, font, size) <= limit:
+        return text, size
+    return _fit_text(pdf, text, font, size, max_width), size
 
 
 def _receipt_date(order) -> str:
@@ -182,65 +235,65 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
 
     pdf.setFillColor(black)
     pdf.setFont(FONT_BOLD, 13)
-    pdf.drawString(left * mm, layout.y(layout.company_name_top), COMPANY_NAME)
+    pdf.drawString(layout.x(left), layout.y(layout.company_name_top), COMPANY_NAME)
     pdf.setFont(FONT_BOLD, 10)
-    pdf.drawString((left + 8) * mm, layout.y(layout.brand_top), COMPANY_BRAND)
+    pdf.drawString(layout.x(left + 8), layout.y(layout.brand_top), COMPANY_BRAND)
     pdf.setFont(FONT, 6.5)
     for index, line in enumerate(COMPANY_CONTACT):
         top = layout.contact_top + index * layout.contact_line_height
-        pdf.drawString((left + 6) * mm, layout.y(top), line)
+        pdf.drawString(layout.x(left + 6), layout.y(top), line)
 
     # Meta labels (tanggal + kepada yth.) with their fill-in rules.
     pdf.setLineWidth(0.4)
     pdf.line(
-        layout.date_line_left * mm,
+        layout.x(layout.date_line_left),
         layout.y(layout.date_label_top + 0.8),
-        layout.date_line_right * mm,
+        layout.x(layout.date_line_right),
         layout.y(layout.date_label_top + 0.8),
     )
     pdf.setFont(FONT, 8)
-    pdf.drawString(layout.date_label_x * mm, layout.y(layout.date_label_top), "tgl.")
+    pdf.drawString(layout.x(layout.date_label_x), layout.y(layout.date_label_top), "tgl.")
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.kepada_label_x * mm, layout.y(layout.kepada_label_top), "KEPADA YTH. :")
+    pdf.drawString(layout.x(layout.kepada_label_x), layout.y(layout.kepada_label_top), "KEPADA YTH. :")
     pdf.setLineWidth(0.4)
-    right_edge = (PAGE_WIDTH_MM - layout.margin_right) * mm
+    right_edge = layout.x(PAGE_WIDTH_MM - layout.margin_right)
     for index, top in enumerate(layout.kepada_line_tops):
         line_start = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
-        pdf.line(line_start * mm, layout.y(top + 0.8), right_edge, layout.y(top + 0.8))
+        pdf.line(layout.x(line_start), layout.y(top + 0.8), right_edge, layout.y(top + 0.8))
 
     # Bon / Faktur label.
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(left * mm, layout.y(layout.faktur_label_top), "BON / FAKTUR No.")
+    pdf.drawString(layout.x(left), layout.y(layout.faktur_label_top), "BON / FAKTUR No.")
 
     # Table outline + column separators.
     right = PAGE_WIDTH_MM - layout.margin_right
     top_y = layout.y(layout.table_top)
     bottom_y = layout.y(layout.table_bottom)
     pdf.setLineWidth(0.6)
-    pdf.rect(left * mm, bottom_y, (right - left) * mm, (top_y - bottom_y), stroke=1, fill=0)
+    pdf.rect(layout.x(left), bottom_y, (right - left) * mm, (top_y - bottom_y), stroke=1, fill=0)
     pdf.setLineWidth(0.4)
-    pdf.line(left * mm, layout.y(layout.header_bottom), right * mm, layout.y(layout.header_bottom))
+    pdf.line(layout.x(left), layout.y(layout.header_bottom), layout.x(right), layout.y(layout.header_bottom))
     for column in layout.columns[:-1]:
-        pdf.line(column.right * mm, top_y, column.right * mm, bottom_y)
+        pdf.line(layout.x(column.right), top_y, layout.x(column.right), bottom_y)
 
     # Column headers.
     header_baseline = layout.y((layout.table_top + layout.header_bottom) / 2 + 1.2)
     pdf.setFont(FONT_BOLD, 7.5)
-    pdf.drawCentredString(layout.col_qty.center * mm, header_baseline, "Banyaknya")
-    pdf.drawCentredString(layout.col_name.center * mm, header_baseline, "NAMA BARANG")
-    pdf.drawCentredString(layout.col_unit.center * mm, header_baseline, "@ Rp")
-    pdf.drawCentredString(layout.col_total.center * mm, header_baseline, "Jumlah Harga")
+    pdf.drawCentredString(layout.x(layout.col_qty.center), header_baseline, "Banyaknya")
+    pdf.drawCentredString(layout.x(layout.col_name.center), header_baseline, "NAMA BARANG")
+    pdf.drawCentredString(layout.x(layout.col_unit.center), header_baseline, "@ Rp/kg")
+    pdf.drawCentredString(layout.x(layout.col_total.center), header_baseline, "Jumlah Harga")
 
     # Footer labels.
     pdf.setFont(FONT, 7.5)
-    pdf.drawString(left * mm, layout.y(layout.tanda_terima_top), "TANDA TERIMA")
+    pdf.drawString(layout.x(left), layout.y(layout.tanda_terima_top), "TANDA TERIMA")
     pdf.setFont(FONT, 5.5)
     for index, line in enumerate(RETURN_NOTICE):
         top = layout.notice_top + index * layout.notice_line_height
-        pdf.drawCentredString(layout.notice_center_x * mm, layout.y(top), line)
+        pdf.drawCentredString(layout.x(layout.notice_center_x), layout.y(top), line)
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.total_label_x * mm, layout.y(layout.total_label_top), "Jumlah")
-    pdf.drawString(layout.total_currency_x * mm, layout.y(layout.total_label_top), "Rp.")
+    pdf.drawString(layout.x(layout.total_label_x), layout.y(layout.total_label_top), "Jumlah")
+    pdf.drawString(layout.x(layout.total_currency_x), layout.y(layout.total_label_top), "Rp.")
 
 
 def _draw_values(
@@ -259,67 +312,110 @@ def _draw_values(
     """
     # Date.
     pdf.setFillColor(black)
-    pdf.setFont(FONT_BOLD, 8.5)
     date_text = _receipt_date(order)
     if date_text:
+        date_width = layout.date_line_right - layout.date_line_left
+        text, size = _sized_text(
+            pdf, date_text, FONT_BOLD, layout.font_date, date_width, layout.font_min
+        )
+        pdf.setFont(FONT_BOLD, size)
         pdf.drawCentredString(
-            (layout.date_line_left + layout.date_line_right) / 2 * mm,
+            layout.x((layout.date_line_left + layout.date_line_right) / 2),
             layout.y(layout.date_value_top),
-            date_text,
+            text,
         )
 
     # Kepada Yth. — buyer name on the first line (after the label), then address.
-    pdf.setFont(FONT, 8)
     buyer_entries: list[tuple[str, float]] = []
     if order.customer_id:
         buyer_entries.append((order.customer.name.strip(), layout.kepada_value_x))
     max_address = len(layout.kepada_line_tops) - len(buyer_entries)
     buyer_entries += [(line, layout.kepada_cont_x) for line in _address_lines(order.customer, max_address)]
-    for (text, x_mm), top in zip(buyer_entries, layout.kepada_line_tops):
+    for (raw, x_mm), top in zip(buyer_entries, layout.kepada_line_tops):
         width = PAGE_WIDTH_MM - layout.margin_right - x_mm
-        pdf.drawString(x_mm * mm, layout.y(top), _fit_text(pdf, text, FONT, 8, width))
+        text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, width, layout.font_min)
+        pdf.setFont(FONT, size)
+        pdf.drawString(layout.x(x_mm), layout.y(top), text)
 
     # Bon / Faktur number (already pre-printed in red on the pad).
     if include_faktur_number:
         faktur = (order.invoice_number or order.order_code or "").strip()
         if faktur:
             pdf.setFillColor(red)
-            pdf.setFont(FONT_BOLD, 11)
-            pdf.drawString(layout.faktur_value_x * mm, layout.y(layout.faktur_value_top), faktur)
+            pdf.setFont(FONT_BOLD, layout.font_faktur)
+            pdf.drawString(layout.x(layout.faktur_value_x), layout.y(layout.faktur_value_top), faktur)
             pdf.setFillColor(black)
 
-    # Item rows.
-    pdf.setFont(FONT, 8)
+    # Item rows — size each cell to its column so amounts fill @ Rp / Jumlah Harga.
     name_width = (layout.col_name.right - layout.col_name.left) - 2 * layout.cell_padding
+    qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * layout.cell_padding
+    unit_width = (layout.col_unit.right - layout.col_unit.left) - 2 * layout.cell_padding
+    total_width = (layout.col_total.right - layout.col_total.left) - 2 * layout.cell_padding
     for index, line in enumerate(lines):
         baseline = layout.y(layout.first_row_baseline_top + index * layout.row_height)
-        pdf.drawCentredString(
-            layout.col_qty.center * mm,
-            baseline,
+
+        qty_text, qty_size = _sized_text(
+            pdf,
             _format_quantity(line.quantity),
+            FONT,
+            layout.font_row,
+            qty_width,
+            layout.font_min,
         )
-        pdf.drawString(
-            (layout.col_name.left + layout.cell_padding) * mm,
-            baseline,
-            _fit_text(pdf, _packaging_display(line.product_packaging), FONT, 8, name_width),
+        pdf.setFont(FONT, qty_size)
+        pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
+
+        name_text, name_size = _sized_text(
+            pdf,
+            _packaging_display(line.product_packaging),
+            FONT,
+            layout.font_row,
+            name_width,
+            layout.font_min,
         )
+        pdf.setFont(FONT, name_size)
+        pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
+
+        unit_text, unit_size = _sized_text(
+            pdf,
+            _format_thousands(_price_per_kg_idr(line)),
+            FONT,
+            layout.font_row,
+            unit_width,
+            layout.font_min,
+        )
+        pdf.setFont(FONT, unit_size)
         pdf.drawRightString(
-            (layout.col_unit.right - layout.cell_padding) * mm,
+            layout.x(layout.col_unit.right - layout.cell_padding),
             baseline,
-            _format_thousands(int(line.unit_price_idr)),
+            unit_text,
         )
-        pdf.drawRightString(
-            (layout.col_total.right - layout.cell_padding) * mm,
-            baseline,
+
+        line_total_text, line_total_size = _sized_text(
+            pdf,
             _format_thousands(int(line.line_total_idr)),
+            FONT,
+            layout.font_row,
+            total_width,
+            layout.font_min,
+        )
+        pdf.setFont(FONT, line_total_size)
+        pdf.drawRightString(
+            layout.x(layout.col_total.right - layout.cell_padding),
+            baseline,
+            line_total_text,
         )
 
     # Grand total.
-    pdf.setFont(FONT_BOLD, 9)
+    grand = _format_thousands(int(order.total_idr))
+    grand_text, grand_size = _sized_text(
+        pdf, grand, FONT_BOLD, layout.font_total, total_width, layout.font_min
+    )
+    pdf.setFont(FONT_BOLD, grand_size)
     pdf.drawRightString(
-        (layout.col_total.right - layout.cell_padding) * mm,
+        layout.x(layout.col_total.right - layout.cell_padding),
         layout.y(layout.total_value_top),
-        _format_thousands(int(order.total_idr)),
+        grand_text,
     )
 
 
