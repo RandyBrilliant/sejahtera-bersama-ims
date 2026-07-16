@@ -267,3 +267,68 @@ export type InventoryRangeRecapPayload = {
   ingredient_usage: InventoryRangeIngredientUsageRow[]
   packaging_output: InventoryRangePackagingOutputRow[]
 }
+
+/** Batch produksi harian (`/api/inventory/production-batches/`). */
+export type ProductionIngredientUsage = {
+  id: number
+  ingredient_inventory: number
+  ingredient_name: string
+  unit: StockUnit | string
+  quantity_used: string
+}
+
+export type ProductionPackagingOutput = {
+  id: number
+  product_packaging: number
+  product_variant_name: string
+  packaging_label: string
+  quantity_produced: string
+  bonus_quantity: string
+  total_quantity_in: string
+}
+
+export type ProductionBatch = {
+  id: number
+  production_date: string
+  shift_label: string
+  note: string
+  ingredient_usages: ProductionIngredientUsage[]
+  packaging_outputs: ProductionPackagingOutput[]
+  total_ingredient_used: string
+  total_product_packages: string
+  total_bonus_packages: string
+  created_at: string
+  updated_at: string
+  created_by: AuditUserMini | null
+  updated_by: AuditUserMini | null
+}
+
+export type ProductionBatchesListParams = {
+  page?: number
+  page_size?: number
+  search?: string
+  ordering?: string
+  production_date?: string
+  production_date_from?: string
+  production_date_to?: string
+  shift_label?: string
+}
+
+export type ProductionIngredientUsageInput = {
+  ingredient_inventory: number
+  quantity_used: string | number
+}
+
+export type ProductionPackagingOutputInput = {
+  product_packaging: number
+  quantity_produced: string | number
+  bonus_quantity?: string | number
+}
+
+export type ProductionBatchCreateInput = {
+  production_date: string
+  shift_label?: string
+  note?: string
+  ingredient_usages_input: ProductionIngredientUsageInput[]
+  packaging_outputs_input: ProductionPackagingOutputInput[]
+}

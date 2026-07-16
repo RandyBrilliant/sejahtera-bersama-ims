@@ -25,7 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function bootstrapSession() {
       try {
         const me = await getMe()
-        if (mounted) setUser(me)
+        if (!mounted) return
+        if (me.role === 'KUPAS_STAFF') {
+          try {
+            await logoutApi()
+          } catch {
+            // ignore — session must not stay active for kupas staff
+          }
+          clearClientSessionState()
+          setUser(null)
+          return
+        }
+        setUser(me)
       } catch {
         if (mounted) setUser(null)
       } finally {
@@ -40,6 +51,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const loggedInUser = await loginApi({ username, password })
+    if (loggedInUser.role === 'KUPAS_STAFF') {
+      try {
+        await logoutApi()
+      } catch {
+        // ignore
+      }
+      clearClientSessionState()
+      setUser(null)
+      const err = new Error(
+        'Akun staf kupas tidak dapat masuk ke sistem. Hubungi administrator.'
+      ) as Error & { response?: { data?: { detail?: string } } }
+      err.response = {
+        data: {
+          detail: 'Akun staf kupas tidak dapat masuk ke sistem. Hubungi administrator.',
+        },
+      }
+      throw err
+    }
     setUser(loggedInUser)
     alert.success('Login berhasil', `Selamat datang, ${loggedInUser.full_name || loggedInUser.username}`)
     return getDashboardRouteForRole(loggedInUser.role)

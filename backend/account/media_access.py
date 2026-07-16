@@ -85,8 +85,12 @@ def user_can_access_media_path(user, relative_path: str) -> bool:
     if normalized.startswith("media/"):
         normalized = normalized[len("media/") :]
 
+    # Bukti transfer — only finance / admin / owner via session auth.
+    # Other roles that can view an order receive short-lived signed URLs instead.
     if normalized.startswith("purchase/payment_proofs/"):
-        return True
+        if user_is_owner(user):
+            return True
+        return has_role(user, UserRole.ADMIN, UserRole.FINANCE_STAFF)
 
     if normalized.startswith("expenses/attachments/"):
         if user_is_owner(user):

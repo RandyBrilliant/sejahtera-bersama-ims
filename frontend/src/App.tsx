@@ -150,6 +150,21 @@ const AdminProductMovementNewPage = lazy(() =>
     default: m.AdminProductMovementNewPage,
   }))
 )
+const AdminProductionBatchesPage = lazy(() =>
+  import('@/pages/admin/admin-production-batches-page').then((m) => ({
+    default: m.AdminProductionBatchesPage,
+  }))
+)
+const AdminProductionBatchNewPage = lazy(() =>
+  import('@/pages/admin/admin-production-batch-new-page').then((m) => ({
+    default: m.AdminProductionBatchNewPage,
+  }))
+)
+const AdminProductionBatchDetailPage = lazy(() =>
+  import('@/pages/admin/admin-production-batch-detail-page').then((m) => ({
+    default: m.AdminProductionBatchDetailPage,
+  }))
+)
 const AdminWarehouseLayout = lazy(() =>
   import('@/pages/admin/admin-warehouse-layout').then((m) => ({
     default: m.AdminWarehouseLayout,
@@ -357,6 +372,9 @@ export default function App() {
                     element={<AdminIngredientInventoryEditPage />}
                   />
                   <Route path="stok-bahan" element={<AdminIngredientInventoryPage />} />
+                  <Route path="produksi/baru" element={<AdminProductionBatchNewPage />} />
+                  <Route path="produksi/:batchId" element={<AdminProductionBatchDetailPage />} />
+                  <Route path="produksi" element={<AdminProductionBatchesPage />} />
                   <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
                   <Route path="mutasi-bahan" element={<AdminIngredientMovementsPage />} />
                   <Route path="mutasi-produk/baru" element={<AdminProductMovementNewPage />} />

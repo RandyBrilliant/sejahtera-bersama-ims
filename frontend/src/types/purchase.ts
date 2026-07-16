@@ -193,3 +193,44 @@ export type SalesOrderCreateInput = {
 export type SalesOrderUpdateInput = Partial<
   Omit<SalesOrderCreateInput, 'lines'> & { lines?: SalesOrderLineInput[] }
 >
+
+/** Harga khusus pelanggan per kemasan (`/api/purchase/customer-product-prices/`). */
+export type CustomerProductPrice = {
+  id: number
+  customer: number
+  customer_name: string
+  product_packaging: number
+  packaging_label: string
+  variant_name: string
+  /** Harga jual per kemasan (bukan per kg). */
+  selling_price_idr: number
+  note: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  created_by: AuditUserMini | null
+  updated_by: AuditUserMini | null
+}
+
+export type CustomerProductPricesListParams = {
+  page?: number
+  page_size?: number
+  ordering?: string
+  customer?: number
+  product_packaging?: number
+  is_active?: boolean
+}
+
+export type CustomerProductPriceCreateInput = {
+  customer: number
+  product_packaging: number
+  selling_price_idr: number
+  note?: string
+  is_active?: boolean
+}
+
+export type CustomerProductPriceUpdateInput = Partial<
+  Omit<CustomerProductPriceCreateInput, 'customer'>
+> & {
+  customer?: number
+}

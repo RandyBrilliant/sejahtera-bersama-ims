@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { type ReactNode } from 'react'
 
 import { useAuth } from '@/hooks/use-auth'
-import type { UserRole } from '@/types/auth'
+import { getDashboardRouteForRole, type UserRole } from '@/types/auth'
 
 type InAppRoleRouteProps = {
   allowedRoles: readonly UserRole[]
@@ -21,7 +21,9 @@ export function InAppRoleRoute({ allowedRoles, children }: InAppRoleRouteProps) 
     )
   }
   if (!user) return <Navigate to="/login" replace />
-  if (!allowedRoles.includes(user.role)) return <Navigate to="/admin/dashboard" replace />
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to={getDashboardRouteForRole(user.role)} replace />
+  }
   if (children) return <>{children}</>
   return <Outlet />
 }

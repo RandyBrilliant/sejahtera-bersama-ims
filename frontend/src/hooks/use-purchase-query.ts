@@ -9,16 +9,19 @@ import {
   cancelPurchaseInOrder,
   cancelSalesOrder,
   createCustomer,
+  createCustomerProductPrice,
   createPurchaseInOrder,
   createSalesOrder,
   createWilayah,
   deleteCustomer,
+  deleteCustomerProductPrice,
   deletePurchaseInOrder,
   deleteSalesOrder,
   deleteWilayah,
   downloadSalesInvoicePdf,
   downloadSalesReceiptPdf,
   fetchCustomer,
+  fetchCustomerProductPrices,
   fetchCustomers,
   fetchHppProfitReport,
   fetchPurchaseInOrder,
@@ -27,6 +30,7 @@ import {
   fetchSalesOrders,
   fetchWilayah,
   updateCustomer,
+  updateCustomerProductPrice,
   updatePurchaseInOrder,
   updateSalesOrder,
   uploadPurchaseInPaymentProof,
@@ -37,6 +41,9 @@ import {
 } from '@/api/purchase'
 import type { SalesReceiptMode } from '@/api/purchase'
 import type {
+  CustomerProductPriceCreateInput,
+  CustomerProductPricesListParams,
+  CustomerProductPriceUpdateInput,
   CustomerUpdateInput,
   CustomersListParams,
   PurchaseInOrderCreateInput,
@@ -65,6 +72,9 @@ export const purchaseKeys = {
     [...purchaseKeys.salesOrders(), 'list', params] as const,
   salesOrderDetail: (id: number) =>
     [...purchaseKeys.salesOrders(), 'detail', id] as const,
+  customerProductPrices: () => [...purchaseKeys.all, 'customer-product-prices'] as const,
+  customerProductPriceList: (params: CustomerProductPricesListParams) =>
+    [...purchaseKeys.customerProductPrices(), 'list', params] as const,
   revenueReport: (startDate: string, endDate: string) =>
     [...purchaseKeys.all, 'revenue-report', startDate, endDate] as const,
   hppReport: (startDate: string, endDate: string) =>
@@ -370,5 +380,42 @@ export function useSalesReceiptPdfMutation() {
   return useMutation({
     mutationFn: ({ orderId, mode }: { orderId: number; mode: SalesReceiptMode }) =>
       downloadSalesReceiptPdf(orderId, mode),
+  })
+}
+
+function invalidateCustomerProductPriceQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: purchaseKeys.customerProductPrices() })
+}
+
+export function useCustomerProductPricesQuery(params: CustomerProductPricesListParams) {
+  return useQuery({
+    queryKey: purchaseKeys.customerProductPriceList(params),
+    queryFn: () => fetchCustomerProductPrices(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreateCustomerProductPriceMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CustomerProductPriceCreateInput) => createCustomerProductPrice(input),
+    onSuccess: () => invalidateCustomerProductPriceQueries(qc),
+  })
+}
+
+export function useUpdateCustomerProductPriceMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: CustomerProductPriceUpdateInput }) =>
+      updateCustomerProductPrice(id, body),
+    onSuccess: () => invalidateCustomerProductPriceQueries(qc),
+  })
+}
+
+export function useDeleteCustomerProductPriceMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => deleteCustomerProductPrice(id),
+    onSuccess: () => invalidateCustomerProductPriceQueries(qc),
   })
 }

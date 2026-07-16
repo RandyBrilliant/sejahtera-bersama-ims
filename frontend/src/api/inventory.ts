@@ -24,6 +24,9 @@ import type {
   ProductStockMovementListParams,
   ProductsListParams,
   ProductUpdateInput,
+  ProductionBatch,
+  ProductionBatchCreateInput,
+  ProductionBatchesListParams,
 } from '@/types/inventory'
 
 type SummaryEnvelope = { code?: string; data: InventorySummaryPayload }
@@ -285,6 +288,44 @@ export async function createProductStockMovement(
 ): Promise<ProductStockMovement> {
   const { data } = await api.post<ProductStockMovement>(
     '/api/inventory/product-stock-movements/',
+    body
+  )
+  return data
+}
+
+function buildProductionBatchesQuery(params: ProductionBatchesListParams): string {
+  const search = new URLSearchParams()
+  if (params.page != null) search.set('page', String(params.page))
+  if (params.page_size != null) search.set('page_size', String(params.page_size))
+  if (params.search) search.set('search', params.search)
+  if (params.ordering) search.set('ordering', params.ordering)
+  if (params.production_date) search.set('production_date', params.production_date)
+  if (params.production_date_from) search.set('production_date_from', params.production_date_from)
+  if (params.production_date_to) search.set('production_date_to', params.production_date_to)
+  if (params.shift_label) search.set('shift_label', params.shift_label)
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export async function fetchProductionBatches(
+  params: ProductionBatchesListParams
+): Promise<Paginated<ProductionBatch>> {
+  const { data } = await api.get<Paginated<ProductionBatch>>(
+    `/api/inventory/production-batches/${buildProductionBatchesQuery(params)}`
+  )
+  return data
+}
+
+export async function fetchProductionBatch(id: number): Promise<ProductionBatch> {
+  const { data } = await api.get<ProductionBatch>(`/api/inventory/production-batches/${id}/`)
+  return data
+}
+
+export async function createProductionBatch(
+  body: ProductionBatchCreateInput
+): Promise<ProductionBatch> {
+  const { data } = await api.post<ProductionBatch>(
+    '/api/inventory/production-batches/',
     body
   )
   return data

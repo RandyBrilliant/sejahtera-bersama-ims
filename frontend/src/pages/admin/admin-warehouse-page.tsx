@@ -15,6 +15,10 @@ export function AdminWarehousePage() {
             <span className="text-on-surface font-medium">Stok bahan</span> — saldo dan ambang minimum.
           </li>
           <li>
+            <span className="text-on-surface font-medium">Produksi</span> — batch harian (bahan →
+            kemasan).
+          </li>
+          <li>
             <span className="text-on-surface font-medium">Mutasi bahan / mutasi produk</span> — riwayat
             masuk-keluar yang memperbarui stok.
           </li>

@@ -97,6 +97,14 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
     allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
   },
   {
+    id: 'production-batch-new',
+    label: 'Catat produksi',
+    description: 'Batch bahan → kemasan',
+    to: '/admin/gudang/produksi/baru',
+    icon: ClipboardList,
+    allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
+  },
+  {
     id: 'analytics',
     label: 'Analitik',
     description: 'Laporan & rentang tanggal',

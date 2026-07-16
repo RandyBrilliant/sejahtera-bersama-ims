@@ -20,6 +20,10 @@ import type {
   SalesOrderCreateInput,
   SalesOrdersListParams,
   SalesOrderUpdateInput,
+  CustomerProductPrice,
+  CustomerProductPriceCreateInput,
+  CustomerProductPricesListParams,
+  CustomerProductPriceUpdateInput,
 } from '@/types/purchase'
 
 function buildPurchaseInQuery(params: PurchaseInOrdersListParams): string {
@@ -291,4 +295,52 @@ export async function fetchHppProfitReport(
     params: { start_date: startDate, end_date: endDate },
   })
   return data.data
+}
+
+function buildCustomerProductPricesQuery(params: CustomerProductPricesListParams): string {
+  const search = new URLSearchParams()
+  if (params.page != null) search.set('page', String(params.page))
+  if (params.page_size != null) search.set('page_size', String(params.page_size))
+  if (params.ordering) search.set('ordering', params.ordering)
+  if (params.customer != null) search.set('customer', String(params.customer))
+  if (params.product_packaging != null) {
+    search.set('product_packaging', String(params.product_packaging))
+  }
+  if (params.is_active !== undefined) search.set('is_active', String(params.is_active))
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export async function fetchCustomerProductPrices(
+  params: CustomerProductPricesListParams
+): Promise<Paginated<CustomerProductPrice>> {
+  const { data } = await api.get<Paginated<CustomerProductPrice>>(
+    `/api/purchase/customer-product-prices/${buildCustomerProductPricesQuery(params)}`
+  )
+  return data
+}
+
+export async function createCustomerProductPrice(
+  body: CustomerProductPriceCreateInput
+): Promise<CustomerProductPrice> {
+  const { data } = await api.post<CustomerProductPrice>(
+    '/api/purchase/customer-product-prices/',
+    body
+  )
+  return data
+}
+
+export async function updateCustomerProductPrice(
+  id: number,
+  body: CustomerProductPriceUpdateInput
+): Promise<CustomerProductPrice> {
+  const { data } = await api.patch<CustomerProductPrice>(
+    `/api/purchase/customer-product-prices/${id}/`,
+    body
+  )
+  return data
+}
+
+export async function deleteCustomerProductPrice(id: number): Promise<void> {
+  await api.delete(`/api/purchase/customer-product-prices/${id}/`)
 }

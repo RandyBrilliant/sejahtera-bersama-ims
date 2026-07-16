@@ -11,6 +11,7 @@ import {
   createProduct,
   createProductPackaging,
   createProductStockMovement,
+  createProductionBatch,
   deleteIngredient,
   deleteProduct,
   deleteProductPackaging,
@@ -25,6 +26,8 @@ import {
   fetchProductPackagingList,
   fetchProducts,
   fetchProductStockMovements,
+  fetchProductionBatch,
+  fetchProductionBatches,
   updateIngredient,
   updateIngredientInventory,
   updateProduct,
@@ -46,6 +49,8 @@ import type {
   ProductStockMovementListParams,
   ProductsListParams,
   ProductUpdateInput,
+  ProductionBatchCreateInput,
+  ProductionBatchesListParams,
 } from '@/types/inventory'
 
 export const inventoryKeys = {
@@ -74,6 +79,11 @@ export const inventoryKeys = {
   productMovements: () => [...inventoryKeys.all, 'product-movements'] as const,
   productMovementList: (params: ProductStockMovementListParams) =>
     [...inventoryKeys.productMovements(), 'list', params] as const,
+  productionBatches: () => [...inventoryKeys.all, 'production-batches'] as const,
+  productionBatchList: (params: ProductionBatchesListParams) =>
+    [...inventoryKeys.productionBatches(), 'list', params] as const,
+  productionBatchDetail: (id: number) =>
+    [...inventoryKeys.productionBatches(), 'detail', id] as const,
 }
 
 export function useInventorySummaryQuery() {
@@ -303,6 +313,30 @@ export function useCreateProductStockMovementMutation() {
   return useMutation({
     mutationFn: (input: ProductStockMovementCreateInput) =>
       createProductStockMovement(input),
+    onSuccess: () => invalidateAllInventory(qc),
+  })
+}
+
+export function useProductionBatchesQuery(params: ProductionBatchesListParams) {
+  return useQuery({
+    queryKey: inventoryKeys.productionBatchList(params),
+    queryFn: () => fetchProductionBatches(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useProductionBatchQuery(id: number | null, enabled = true) {
+  return useQuery({
+    queryKey: inventoryKeys.productionBatchDetail(id ?? 0),
+    queryFn: () => fetchProductionBatch(id!),
+    enabled: enabled && id != null && id > 0,
+  })
+}
+
+export function useCreateProductionBatchMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ProductionBatchCreateInput) => createProductionBatch(input),
     onSuccess: () => invalidateAllInventory(qc),
   })
 }

@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { CustomerForm } from '@/components/admin/customers/customer-form'
 import { CustomerMetadataAside } from '@/components/admin/customers/customer-metadata-aside'
+import { CustomerSpecialPricesTable } from '@/components/admin/customers/customer-special-prices-table'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useCustomerQuery } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
@@ -76,6 +77,11 @@ export function AdminCustomerEditPage() {
         />
         <CustomerMetadataAside customer={customer} />
       </div>
+
+      <CustomerSpecialPricesTable
+        customerId={customer.id}
+        canWrite={user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'}
+      />
 
       {canDelete ? (
         <CustomerDeleteModal

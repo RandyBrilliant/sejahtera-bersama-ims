@@ -15,9 +15,15 @@ function getErrorMessage(error: unknown): string {
     typeof (error as { response?: unknown }).response === 'object'
   ) {
     const response = (error as {
-      response?: { data?: { detail?: string; message?: string } }
+      response?: { data?: { detail?: string; message?: string }; status?: number }
     }).response
+    if (response?.status === 403 && response?.data?.detail) {
+      return response.data.detail
+    }
     return response?.data?.detail || response?.data?.message || 'Username atau password salah.'
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
   }
   return 'Username atau password salah.'
 }

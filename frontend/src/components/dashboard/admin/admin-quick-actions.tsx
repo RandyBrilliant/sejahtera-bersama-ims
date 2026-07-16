@@ -25,6 +25,8 @@ export function AdminQuickActionsDropdown({
   const { user } = useAuth()
   const items = user ? quickActionsForRole(user.role) : []
 
+  if (items.length === 0) return null
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>

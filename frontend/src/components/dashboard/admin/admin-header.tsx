@@ -39,6 +39,8 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
 
   const displayName = user?.full_name?.trim() || user?.username || 'Pengguna'
   const initials = user ? initialsFromUser(user.full_name, user.username) : '?'
+  const canOpenSettings =
+    user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
 
   return (
     <>
@@ -106,15 +108,17 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
               ) : null}
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-outline-variant" />
-            <DropdownMenuItem
-              className="cursor-pointer gap-2"
-              onSelect={() => {
-                navigate('/admin/pengaturan')
-              }}
-            >
-              <Settings className="size-4" />
-              Pengaturan
-            </DropdownMenuItem>
+            {canOpenSettings ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2"
+                onSelect={() => {
+                  navigate('/admin/pengaturan')
+                }}
+              >
+                <Settings className="size-4" />
+                Pengaturan
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               className="cursor-pointer gap-2"
               onSelect={() => {

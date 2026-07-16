@@ -26,6 +26,21 @@ from .user_payload import build_user_payload
 
 User = get_user_model()
 
+KUPAS_LOGIN_DENIED_DETAIL = (
+    "Akun staf kupas tidak dapat masuk ke sistem. Hubungi administrator."
+)
+
+
+def _is_kupas_staff_user(user) -> bool:
+    return bool(user) and getattr(user, "role", None) == UserRole.KUPAS_STAFF
+
+
+def _kupas_login_denied_response():
+    return Response(
+        error_response(detail=KUPAS_LOGIN_DENIED_DETAIL, code=ApiCode.PERMISSION_DENIED),
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
 
 def _cookie_settings():
     s = getattr(django_settings, "SIMPLE_JWT", {}) or {}
@@ -134,6 +149,9 @@ class CookieTokenObtainPairView(APIView):
 
         data = serializer.validated_data
         user = serializer.user
+        if _is_kupas_staff_user(user):
+            return _kupas_login_denied_response()
+
         access = data["access"]
         refresh = data["refresh"]
 
@@ -178,6 +196,20 @@ class CookieTokenRefreshView(APIView):
                 ),
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        try:
+            peek_token = RefreshToken(refresh_raw)
+            user_id = peek_token.get(jwt_api_settings.USER_ID_CLAIM)
+            refresh_user = User.objects.filter(pk=user_id).first()
+        except (InvalidToken, TokenError, KeyError, TypeError, ValueError):
+            refresh_user = None
+
+        if _is_kupas_staff_user(refresh_user):
+            _blacklist_refresh_token(refresh_raw)
+            response = _kupas_login_denied_response()
+            _delete_cookie(response, cookie_settings["access_key"], cookie_settings)
+            _delete_cookie(response, cookie_settings["refresh_key"], cookie_settings)
+            return response
 
         serializer_class = import_string(jwt_api_settings.TOKEN_REFRESH_SERIALIZER)
         serializer = serializer_class(data={"refresh": refresh_raw}, context={"request": request})

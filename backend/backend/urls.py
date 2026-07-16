@@ -14,7 +14,6 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
@@ -34,7 +33,5 @@ urlpatterns = [
     path("api/payroll/", include("payroll.urls")),
 ]
 
-if settings.DEBUG and settings.MEDIA_ROOT:
-    from django.conf.urls.static import static
-
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Never mount MEDIA via django.views.static.serve — payment proofs and expense
+# attachments must go through ProtectedMediaServeView (auth or signed URL).
