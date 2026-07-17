@@ -1,6 +1,6 @@
 """Generate simple PDF invoices for sales orders (ReportLab)."""
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -76,18 +76,37 @@ def build_sales_order_invoice_pdf(order) -> BytesIO:
     story.append(Spacer(1, 8 * mm))
 
     lines = list(order.lines.select_related("product_packaging__product").all())
-    table_data = [["Deskripsi", "Qty", "Harga satuan", "Jumlah"]]
+    table_data = [["Deskripsi", "Qty", "Harga / kg", "Jumlah"]]
     for line in lines:
         pp = line.product_packaging
         variant = pp.product.variant_name if pp.product_id else ""
         mass_bit = _packaging_net_mass_label(pp)
         desc = f"{variant} — {pp.label} ({mass_bit})" if variant else f"{pp.label} ({mass_bit})"
         line_total = int(line.quantity * line.unit_price_idr)
+        net = Decimal(str(pp.net_mass_kg)) if pp is not None else Decimal("0")
+        if net > 0:
+            per_kg = int(
+                (Decimal(int(line.unit_price_idr)) / net).quantize(
+                    Decimal("1"), rounding=ROUND_HALF_UP
+                )
+            )
+        else:
+            per_kg = int(line.unit_price_idr)
+        catalog = int(pp.product.price_per_kg_idr or 0) if pp.product_id else 0
+        catalog_pkg = (
+            int((Decimal(catalog) * net).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if catalog >= 1 and net > 0
+            else None
+        )
+        price_label = _format_idr(per_kg)
+        if catalog_pkg is not None and int(line.unit_price_idr) != catalog_pkg:
+            price_label = f"{price_label} *"
+            desc = f"{desc} (harga khusus)"
         table_data.append(
             [
-                Paragraph(desc[:120], small),
+                Paragraph(desc[:140], small),
                 str(line.quantity),
-                _format_idr(int(line.unit_price_idr)),
+                price_label,
                 _format_idr(line_total),
             ]
         )

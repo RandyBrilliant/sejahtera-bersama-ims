@@ -44,6 +44,10 @@ RETURN_NOTICE = (
 FONT = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
 
+# Epson LQ glyphs print wider than Helvetica PDF metrics. Inflate measured
+# widths so _sized_text / _fit_text shrink or truncate before ink hits a rule.
+PRINT_WIDTH_FACTOR = 1.18
+
 
 @dataclass(frozen=True)
 class Column:
@@ -61,11 +65,11 @@ class Column:
 class ReceiptLayout:
     """All tunable coordinates, in millimetres measured from the top-left.
 
-    Calibrated against the physical Bon/Faktur pad (Jul 2026 test print): the
-    first overlay sat too high (date above ``tgl.``, items on column headers)
-    and too far left (amounts between NAMA BARANG / @ Rp). Nudge
-    :attr:`offset_x` / :attr:`offset_y` after a test print if the tractor
-    alignment on the Epson LQ still drifts a millimetre or two.
+    Calibrated against the physical Bon/Faktur pad (Jul 2026 test prints):
+    early overlays sat too high / too far left; a later print still let the
+    grand total cross the @ Rp · Jumlah Harga rule because ``col_total``
+    extended past the table edge and Helvetica widths under-estimated LQ ink.
+    Nudge :attr:`offset_x` / :attr:`offset_y` if tractor alignment drifts.
     """
 
     # Fine-tune after printing on the real pad (mm).
@@ -108,21 +112,22 @@ class ReceiptLayout:
     row_height: float = 6.0
     row_count: int = 7
 
-    # Wider money columns so larger digits still sit inside @ Rp / Jumlah Harga.
-    col_qty: Column = field(default_factory=lambda: Column(10.0, 28.0))
-    col_name: Column = field(default_factory=lambda: Column(28.0, 100.0))
-    col_unit: Column = field(default_factory=lambda: Column(100.0, 124.0))
-    col_total: Column = field(default_factory=lambda: Column(124.0, 146.0))
+    # Columns stay inside the table (right edge = 150 − margin_right = 142).
+    # Nama slightly narrower so long labels leave a gap before @ Rp.
+    col_qty: Column = field(default_factory=lambda: Column(10.0, 27.0))
+    col_name: Column = field(default_factory=lambda: Column(27.0, 96.0))
+    col_unit: Column = field(default_factory=lambda: Column(96.0, 118.0))
+    col_total: Column = field(default_factory=lambda: Column(118.0, 141.0))
 
-    cell_padding: float = 1.2
+    cell_padding: float = 1.6
 
     # Overlay value sizes (pt). Long text shrinks down to font_min via _sized_text.
-    font_date: float = 11.0
-    font_buyer: float = 10.5
-    font_row: float = 10.5
-    font_total: float = 12.0
-    font_faktur: float = 13.0
-    font_min: float = 8.0
+    font_date: float = 10.0
+    font_buyer: float = 9.5
+    font_row: float = 9.5
+    font_total: float = 10.5
+    font_faktur: float = 12.0
+    font_min: float = 7.0
 
     # Footer.
     tanda_terima_top: float = 97.0
@@ -130,8 +135,8 @@ class ReceiptLayout:
     notice_top: float = 94.5
     notice_line_height: float = 3.0
     total_label_top: float = 97.0
-    total_label_x: float = 110.0
-    total_currency_x: float = 128.0
+    total_label_x: float = 108.0
+    total_currency_x: float = 124.0
     total_value_top: float = 97.0
 
     def x(self, left_mm: float) -> float:
@@ -184,14 +189,42 @@ def _price_per_kg_idr(line) -> int:
     return int(per_kg.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def _catalog_package_price_idr(line) -> int | None:
+    """Product default package total (harga/kg × net mass), or None if unset."""
+    packaging = line.product_packaging
+    if packaging is None or not packaging.product_id:
+        return None
+    catalog_per_kg = int(packaging.product.price_per_kg_idr or 0)
+    if catalog_per_kg < 1:
+        return None
+    net = Decimal(str(packaging.net_mass_kg))
+    if net <= 0:
+        return None
+    total = Decimal(catalog_per_kg) * net
+    return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _is_custom_line_price(line) -> bool:
+    """True when charged package price differs from product catalog default."""
+    catalog = _catalog_package_price_idr(line)
+    if catalog is None:
+        return False
+    return int(line.unit_price_idr) != catalog
+
+
+def _printed_width(pdf: canvas.Canvas, text: str, font: str, size: float) -> float:
+    """Estimated ink width in points, inflated for Epson LQ vs Helvetica metrics."""
+    return pdf.stringWidth(text, font, size) * PRINT_WIDTH_FACTOR
+
+
 def _fit_text(pdf: canvas.Canvas, text: str, font: str, size: float, max_width: float) -> str:
     """Truncate ``text`` (adding an ellipsis) so it fits within ``max_width`` mm."""
     limit = max_width * mm
-    if pdf.stringWidth(text, font, size) <= limit:
+    if _printed_width(pdf, text, font, size) <= limit:
         return text
     ellipsis = "…"
     trimmed = text
-    while trimmed and pdf.stringWidth(trimmed + ellipsis, font, size) > limit:
+    while trimmed and _printed_width(pdf, trimmed + ellipsis, font, size) > limit:
         trimmed = trimmed[:-1]
     return (trimmed + ellipsis) if trimmed else ""
 
@@ -207,9 +240,9 @@ def _sized_text(
     """Pick the largest font ≤ ``preferred`` that fits ``max_width`` mm; else truncate."""
     size = preferred
     limit = max_width * mm
-    while size > min_size and pdf.stringWidth(text, font, size) > limit:
+    while size > min_size and _printed_width(pdf, text, font, size) > limit:
         size -= 0.5
-    if pdf.stringWidth(text, font, size) <= limit:
+    if _printed_width(pdf, text, font, size) <= limit:
         return text, size
     return _fit_text(pdf, text, font, size, max_width), size
 
@@ -325,17 +358,19 @@ def _draw_values(
             text,
         )
 
-    # Kepada Yth. — buyer name on the first line (after the label), then address.
-    buyer_entries: list[tuple[str, float]] = []
+    # Kepada Yth. — name on the first line (after the label); alamat on the
+    # lines below, left-aligned under the name (not under the label).
+    name_x = layout.kepada_value_x
+    buyer_lines: list[str] = []
     if order.customer_id:
-        buyer_entries.append((order.customer.name.strip(), layout.kepada_value_x))
-    max_address = len(layout.kepada_line_tops) - len(buyer_entries)
-    buyer_entries += [(line, layout.kepada_cont_x) for line in _address_lines(order.customer, max_address)]
-    for (raw, x_mm), top in zip(buyer_entries, layout.kepada_line_tops):
-        width = PAGE_WIDTH_MM - layout.margin_right - x_mm
-        text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, width, layout.font_min)
+        buyer_lines.append(order.customer.name.strip())
+    max_address = len(layout.kepada_line_tops) - len(buyer_lines)
+    buyer_lines += _address_lines(order.customer, max_address)
+    buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
+    for raw, top in zip(buyer_lines, layout.kepada_line_tops):
+        text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
         pdf.setFont(FONT, size)
-        pdf.drawString(layout.x(x_mm), layout.y(top), text)
+        pdf.drawString(layout.x(name_x), layout.y(top), text)
 
     # Bon / Faktur number (already pre-printed in red on the pad).
     if include_faktur_number:
@@ -376,9 +411,12 @@ def _draw_values(
         pdf.setFont(FONT, name_size)
         pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
 
+        unit_raw = _format_thousands(_price_per_kg_idr(line))
+        if _is_custom_line_price(line):
+            unit_raw = f"{unit_raw}*"
         unit_text, unit_size = _sized_text(
             pdf,
-            _format_thousands(_price_per_kg_idr(line)),
+            unit_raw,
             FONT,
             layout.font_row,
             unit_width,
@@ -417,6 +455,14 @@ def _draw_values(
         layout.y(layout.total_value_top),
         grand_text,
     )
+
+    if any(_is_custom_line_price(line) for line in lines):
+        pdf.setFont(FONT, 5.5)
+        pdf.drawString(
+            layout.x(layout.margin_left),
+            layout.y(layout.table_bottom + 2.0),
+            "* harga khusus",
+        )
 
 
 def build_sales_order_receipt_pdf(

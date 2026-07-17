@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -34,6 +35,7 @@ import {
   formatSalesOrderLineMassKg,
   salesOrderLinesTotalMassKg,
 } from '@/lib/format-number-id'
+import type { SalesOrderLine } from '@/types/purchase'
 
 function fmtDt(iso: string | null | undefined) {
   if (!iso) return '—'
@@ -42,16 +44,28 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-/** Fixed price per kg for a line; falls back to unit price ÷ berat kemasan. */
-function linePricePerKgIdr(line: {
-  price_per_kg_idr?: number
-  unit_price_idr: number
-  net_mass_kg?: string
-}): number {
-  if (line.price_per_kg_idr != null) return line.price_per_kg_idr
+/** Effective harga/kg charged on this line (from resolved package price ÷ net mass). */
+function effectivePricePerKgIdr(line: Pick<SalesOrderLine, 'unit_price_idr' | 'net_mass_kg'>): number {
   const mass = Number(String(line.net_mass_kg ?? '').replace(',', '.'))
-  if (Number.isFinite(mass) && mass > 0) return Math.round(line.unit_price_idr / mass)
-  return 0
+  if (Number.isFinite(mass) && mass > 0) {
+    return Math.round(line.unit_price_idr / mass)
+  }
+  return line.unit_price_idr
+}
+
+/** Catalog default package total from product harga/kg × net mass. */
+function catalogPackagePriceIdr(line: Pick<SalesOrderLine, 'price_per_kg_idr' | 'net_mass_kg'>): number | null {
+  if (line.price_per_kg_idr == null || line.price_per_kg_idr < 1) return null
+  const mass = Number(String(line.net_mass_kg ?? '').replace(',', '.'))
+  if (!Number.isFinite(mass) || mass <= 0) return null
+  return Math.round(line.price_per_kg_idr * mass)
+}
+
+/** True when charged package price differs from product catalog default. */
+function isCustomLinePrice(line: SalesOrderLine): boolean {
+  const catalog = catalogPackagePriceIdr(line)
+  if (catalog == null) return false
+  return line.unit_price_idr !== catalog
 }
 
 const LIST_PATH = '/admin/pesanan/penjualan'
@@ -350,24 +364,35 @@ export function AdminSalesOrderDetailPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {order.lines.map((line) => (
-                <TableRow key={line.id} className="border-outline-variant">
-                  <TableCell>{line.product_variant_name}</TableCell>
-                  <TableCell>{line.packaging_label}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatDecimalId(line.quantity)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatSalesOrderLineMassKg(line)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatIdr(linePricePerKgIdr(line))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatIdr(line.line_total_idr)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {order.lines.map((line) => {
+                const custom = isCustomLinePrice(line)
+                const perKg = effectivePricePerKgIdr(line)
+                return (
+                  <TableRow key={line.id} className="border-outline-variant">
+                    <TableCell>{line.product_variant_name}</TableCell>
+                    <TableCell>{line.packaging_label}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDecimalId(line.quantity)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatSalesOrderLineMassKg(line)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="tabular-nums">{formatIdr(perKg)}</span>
+                        {custom ? (
+                          <Badge variant="secondary" className="text-[10px] font-semibold">
+                            Harga khusus
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatIdr(line.line_total_idr)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
