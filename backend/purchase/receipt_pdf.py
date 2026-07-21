@@ -101,6 +101,8 @@ class ReceiptLayout:
     kepada_label_x: float = 93.0
     kepada_value_x: float = 122.0
     kepada_cont_x: float = 95.0
+    full_kepada_value_x: float = 112.0
+    full_kepada_cont_x: float = 112.0
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
     preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
 
@@ -142,13 +144,10 @@ class ReceiptLayout:
     notice_line_height: float = 3.0
     total_label_top: float = 97.0
     total_label_x: float = 108.0
-    total_currency_x: float = 124.0
+    total_currency_x: float = 119.5
     total_value_top: float = 97.0
-    full_total_value_left: float = 126.0
-    full_total_value_right: float = 141.0
-    full_total_value_top: float = 98.0
     full_font_total: float = 9.0
-    preprinted_total_value_right: float = 139.0
+    preprinted_total_value_right: float = 140.5
     preprinted_total_value_top: float = 98.0
 
     def x(self, left_mm: float) -> float:
@@ -303,7 +302,7 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
     pdf.setLineWidth(0.4)
     right_edge = layout.x(PAGE_WIDTH_MM - layout.margin_right)
     for index, top in enumerate(layout.kepada_line_tops):
-        line_start = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
+        line_start = layout.full_kepada_value_x if index == 0 else layout.full_kepada_cont_x
         pdf.line(layout.x(line_start), layout.y(top + 0.8), right_edge, layout.y(top + 0.8))
 
     # Bon / Faktur label.
@@ -383,17 +382,20 @@ def _draw_values(
 
     # Kepada Yth. — name on the first line (after the label); alamat on the
     # lines below, left-aligned under the name (not under the label).
-    name_x = layout.kepada_value_x
     buyer_lines: list[str] = []
     if order.customer_id:
         buyer_lines.append(order.customer.name.strip())
     max_address = len(layout.kepada_line_tops) - len(buyer_lines)
     buyer_lines += _address_lines(order.customer, max_address)
-    buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
     kepada_tops = (
         layout.kepada_line_tops if include_faktur_number else layout.preprinted_kepada_line_tops
     )
-    for raw, top in zip(buyer_lines, kepada_tops):
+    for index, (raw, top) in enumerate(zip(buyer_lines, kepada_tops)):
+        if include_faktur_number:
+            name_x = layout.full_kepada_value_x if index == 0 else layout.full_kepada_cont_x
+        else:
+            name_x = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
+        buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
         text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
         pdf.setFont(FONT, size)
         pdf.drawString(layout.x(name_x), layout.y(top), text)
@@ -470,22 +472,16 @@ def _draw_values(
             line_total_text,
         )
 
-    # Grand total.
+    # Grand total — align with the Jumlah Harga column and footer labels.
     grand = _format_thousands(int(order.total_idr))
-    grand_width = total_width
     total_right = layout.col_total.right - layout.cell_padding
     total_top = layout.total_value_top
-    total_font = layout.font_total
-    if include_faktur_number:
-        grand_width = layout.full_total_value_right - layout.full_total_value_left
-        total_right = layout.full_total_value_right
-        total_top = layout.full_total_value_top
-        total_font = layout.full_font_total
-    else:
+    total_font = layout.full_font_total if include_faktur_number else layout.font_total
+    if not include_faktur_number:
         total_right = layout.preprinted_total_value_right
         total_top = layout.preprinted_total_value_top
     grand_text, grand_size = _sized_text(
-        pdf, grand, FONT_BOLD, total_font, grand_width, layout.font_min
+        pdf, grand, FONT_BOLD, total_font, total_width, layout.font_min
     )
     pdf.setFont(FONT_BOLD, grand_size)
     pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
