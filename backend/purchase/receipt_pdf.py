@@ -92,17 +92,23 @@ class ReceiptLayout:
     date_line_left: float = 95.0
     date_line_right: float = 132.0
     date_label_x: float = 134.0
+    date_value_x: float = 98.0
+    preprinted_date_line_left: float = 97.0
+    preprinted_date_line_right: float = 128.0
+    preprinted_date_value_top: float = 15.2
 
     kepada_label_top: float = 21.5
     kepada_label_x: float = 93.0
     kepada_value_x: float = 122.0
     kepada_cont_x: float = 95.0
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
+    preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
 
     # Bon / Faktur number.
     faktur_label_top: float = 35.0
     faktur_value_top: float = 35.0
     faktur_value_x: float = 48.0
+    full_font_faktur: float = 9.5
 
     # Table.
     table_top: float = 40.0
@@ -138,6 +144,12 @@ class ReceiptLayout:
     total_label_x: float = 108.0
     total_currency_x: float = 124.0
     total_value_top: float = 97.0
+    full_total_value_left: float = 126.0
+    full_total_value_right: float = 141.0
+    full_total_value_top: float = 98.0
+    full_font_total: float = 9.0
+    preprinted_total_value_right: float = 139.0
+    preprinted_total_value_top: float = 98.0
 
     def x(self, left_mm: float) -> float:
         """Convert a left-based millimetre value to canvas units."""
@@ -347,16 +359,27 @@ def _draw_values(
     pdf.setFillColor(black)
     date_text = _receipt_date(order)
     if date_text:
-        date_width = layout.date_line_right - layout.date_line_left
+        if include_faktur_number:
+            date_left = layout.date_line_left
+            date_right = layout.date_line_right
+            date_top = layout.date_value_top
+        else:
+            date_left = layout.preprinted_date_line_left
+            date_right = layout.preprinted_date_line_right
+            date_top = layout.preprinted_date_value_top
+        date_width = date_right - date_left
         text, size = _sized_text(
             pdf, date_text, FONT_BOLD, layout.font_date, date_width, layout.font_min
         )
         pdf.setFont(FONT_BOLD, size)
-        pdf.drawCentredString(
-            layout.x((layout.date_line_left + layout.date_line_right) / 2),
-            layout.y(layout.date_value_top),
-            text,
-        )
+        if include_faktur_number:
+            pdf.drawString(layout.x(layout.date_value_x), layout.y(date_top), text)
+        else:
+            pdf.drawCentredString(
+                layout.x((date_left + date_right) / 2),
+                layout.y(date_top),
+                text,
+            )
 
     # Kepada Yth. — name on the first line (after the label); alamat on the
     # lines below, left-aligned under the name (not under the label).
@@ -367,7 +390,10 @@ def _draw_values(
     max_address = len(layout.kepada_line_tops) - len(buyer_lines)
     buyer_lines += _address_lines(order.customer, max_address)
     buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-    for raw, top in zip(buyer_lines, layout.kepada_line_tops):
+    kepada_tops = (
+        layout.kepada_line_tops if include_faktur_number else layout.preprinted_kepada_line_tops
+    )
+    for raw, top in zip(buyer_lines, kepada_tops):
         text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
         pdf.setFont(FONT, size)
         pdf.drawString(layout.x(name_x), layout.y(top), text)
@@ -377,7 +403,7 @@ def _draw_values(
         faktur = (order.invoice_number or order.order_code or "").strip()
         if faktur:
             pdf.setFillColor(red)
-            pdf.setFont(FONT_BOLD, layout.font_faktur)
+            pdf.setFont(FONT_BOLD, layout.full_font_faktur)
             pdf.drawString(layout.x(layout.faktur_value_x), layout.y(layout.faktur_value_top), faktur)
             pdf.setFillColor(black)
 
@@ -446,15 +472,23 @@ def _draw_values(
 
     # Grand total.
     grand = _format_thousands(int(order.total_idr))
+    grand_width = total_width
+    total_right = layout.col_total.right - layout.cell_padding
+    total_top = layout.total_value_top
+    total_font = layout.font_total
+    if include_faktur_number:
+        grand_width = layout.full_total_value_right - layout.full_total_value_left
+        total_right = layout.full_total_value_right
+        total_top = layout.full_total_value_top
+        total_font = layout.full_font_total
+    else:
+        total_right = layout.preprinted_total_value_right
+        total_top = layout.preprinted_total_value_top
     grand_text, grand_size = _sized_text(
-        pdf, grand, FONT_BOLD, layout.font_total, total_width, layout.font_min
+        pdf, grand, FONT_BOLD, total_font, grand_width, layout.font_min
     )
     pdf.setFont(FONT_BOLD, grand_size)
-    pdf.drawRightString(
-        layout.x(layout.col_total.right - layout.cell_padding),
-        layout.y(layout.total_value_top),
-        grand_text,
-    )
+    pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
 
     if any(_is_custom_line_price(line) for line in lines):
         pdf.setFont(FONT, 5.5)
