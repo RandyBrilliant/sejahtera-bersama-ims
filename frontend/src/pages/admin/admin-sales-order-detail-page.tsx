@@ -156,7 +156,7 @@ export function AdminSalesOrderDetailPage() {
       } else {
         const link = document.createElement('a')
         link.href = url
-        link.download = `${order.order_code}-nota-${mode}.pdf`
+        link.download = `${order?.order_code ?? id}-nota-${mode}.pdf`
         link.rel = 'noopener'
         document.body.appendChild(link)
         link.click()
