@@ -200,6 +200,11 @@ const AdminAttendanceScanPage = lazy(() =>
     default: m.AdminAttendanceScanPage,
   }))
 )
+const PublicAttendanceKioskPage = lazy(() =>
+  import('@/pages/public-attendance-kiosk-page').then((m) => ({
+    default: m.PublicAttendanceKioskPage,
+  }))
+)
 const AdminAttendanceSettingsPage = lazy(() =>
   import('@/pages/admin/admin-attendance-settings-page').then((m) => ({
     default: m.AdminAttendanceSettingsPage,
@@ -322,6 +327,7 @@ export default function App() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/absensi" element={<PublicAttendanceKioskPage />} />
             <Route
               path="/admin/absensi/scan"
               element={

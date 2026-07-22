@@ -43,3 +43,15 @@ class AuthPublicRateThrottle(SimpleRateThrottle):
             "scope": self.scope,
             "ident": self.get_ident(request),
         }
+
+
+class AttendanceKioskRateThrottle(SimpleRateThrottle):
+    """Public attendance kiosk scan endpoints (per IP)."""
+
+    scope = "attendance_kiosk"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }

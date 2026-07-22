@@ -138,10 +138,6 @@ class ProductPackaging(AuditModel):
                 fields=["product", "label"],
                 name="uq_product_packaging_label_per_product",
             ),
-            models.UniqueConstraint(
-                fields=["product", "net_mass_kg"],
-                name="uq_product_packaging_mass_per_product",
-            ),
         ]
         indexes = [
             models.Index(fields=["product", "is_active"]),

@@ -461,10 +461,11 @@ def _draw_values(
             date_right = layout.preprinted_date_line_right
             date_top = layout.preprinted_date_value_top
         date_width = date_right - date_left
+        date_font = FONT if include_faktur_number else FONT_BOLD
         text, size = _sized_text(
-            pdf, date_text, FONT_BOLD, layout.font_date, date_width, layout.font_min
+            pdf, date_text, date_font, layout.font_date, date_width, layout.font_min
         )
-        pdf.setFont(FONT_BOLD, size)
+        pdf.setFont(date_font, size)
         if include_faktur_number:
             pdf.drawString(layout.x(layout.date_value_x), layout.y(date_top), text)
         else:
@@ -511,7 +512,7 @@ def _draw_values(
         faktur = (order.invoice_number or order.order_code or "").strip()
         if faktur:
             pdf.setFillColor(black)
-            pdf.setFont(FONT_BOLD, layout.full_font_faktur)
+            pdf.setFont(FONT, layout.full_font_faktur)
             pdf.drawString(
                 layout.x(layout.full_faktur_value_x),
                 layout.y(layout.full_faktur_value_top),

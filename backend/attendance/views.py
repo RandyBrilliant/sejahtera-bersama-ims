@@ -1,13 +1,17 @@
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import ApiCode, error_response, success_response
+from account.throttles import AttendanceKioskRateThrottle
 from attendance.models import AttendanceDailyCheckIn, StaffAttendanceBadge
 from attendance.permissions import (
+    AttendanceKioskAccess,
     AttendanceReportAccess,
     AttendanceSettingsAccess,
     AttendanceVerifierAccess,
@@ -22,6 +26,7 @@ from attendance.services import (
     build_tablet_preview,
     confirm_check_in,
     confirm_check_out,
+    get_or_create_kiosk_verifier,
     reissue_badge,
     resolve_employee_from_badge_token,
     revoke_badge,
@@ -30,6 +35,74 @@ from attendance.services import (
 from attendance.utils_lateness import get_attendance_settings
 from attendance.utils_parse import parse_badge_token
 from attendance.utils_zone import jakarta_today_date
+
+
+def _invalid_badge_token_response():
+    return Response(
+        error_response(
+            detail="Kode kartu tidak dikenali.",
+            code=ApiCode.VALIDATION_ERROR,
+            errors={"raw": ["Pastikan QR berisi UUID kartu staf yang valid."]},
+        ),
+        status=400,
+    )
+
+
+def _preview_for_raw(raw: str):
+    token = parse_badge_token(raw)
+    if token is None:
+        return None, _invalid_badge_token_response()
+    try:
+        badge = resolve_employee_from_badge_token(token)
+    except AttendanceError as e:
+        return None, Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
+    return build_tablet_preview(badge, jakarta_today_date()), None
+
+
+def _confirm_for_raw(raw: str, intent: str, verifier_id: int):
+    token = parse_badge_token(raw)
+    if token is None:
+        return None, _invalid_badge_token_response()
+    try:
+        if intent == "check_in":
+            row, created = confirm_check_in(token, verifier_id)
+            return Response(
+                success_response(
+                    data={
+                        "intent": "check_in",
+                        "created": created,
+                        "employee_id": row.employee_id,
+                        "work_date": str(row.work_date),
+                        "checked_in_at": row.checked_in_at.isoformat(),
+                        "is_late": row.is_late,
+                        "minutes_late": row.minutes_late,
+                        "already_checked_in_today": not created,
+                        "verified_by_id": row.verified_by_id,
+                        "timezone": settings.TIME_ZONE,
+                    },
+                    detail="Presensi masuk dicatat.",
+                ),
+                status=200,
+            ), None
+        row, created = confirm_check_out(token, verifier_id)
+        return Response(
+            success_response(
+                data={
+                    "intent": "check_out",
+                    "created": created,
+                    "employee_id": row.employee_id,
+                    "work_date": str(row.work_date),
+                    "checked_in_at": row.checked_in_at.isoformat(),
+                    "checked_out_at": row.checked_out_at.isoformat() if row.checked_out_at else None,
+                    "verified_out_by_id": row.verified_out_by_id,
+                    "timezone": settings.TIME_ZONE,
+                },
+                detail="Presensi pulang dicatat.",
+            ),
+            status=200,
+        ), None
+    except AttendanceError as e:
+        return None, Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
 
 
 class StaffBadgeTokenAdminView(APIView):
@@ -132,23 +205,9 @@ class AdminAttendancePreviewView(APIView):
     def post(self, request):
         ser = RawScanSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        token = parse_badge_token(ser.validated_data["raw"])
-        if token is None:
-            return Response(
-                error_response(
-                    detail="Kode kartu tidak dikenali.",
-                    code=ApiCode.VALIDATION_ERROR,
-                    errors={"raw": ["Pastikan QR berisi UUID kartu staf yang valid."]},
-                ),
-                status=400,
-            )
-
-        try:
-            badge = resolve_employee_from_badge_token(token)
-        except AttendanceError as e:
-            return Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
-
-        data = build_tablet_preview(badge, jakarta_today_date())
+        data, err = _preview_for_raw(ser.validated_data["raw"])
+        if err is not None:
+            return err
         return Response(success_response(data=data), status=200)
 
 
@@ -158,60 +217,53 @@ class AdminAttendanceConfirmView(APIView):
     def post(self, request):
         ser = TabletConfirmSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        token = parse_badge_token(ser.validated_data["raw"])
-        intent = ser.validated_data["intent"]
-        if token is None:
-            return Response(
-                error_response(
-                    detail="Kode kartu tidak dikenali.",
-                    code=ApiCode.VALIDATION_ERROR,
-                    errors={"raw": ["Pastikan QR berisi UUID kartu staf yang valid."]},
-                ),
-                status=400,
-            )
+        ok, err = _confirm_for_raw(
+            ser.validated_data["raw"],
+            ser.validated_data["intent"],
+            request.user.pk,
+        )
+        if err is not None:
+            return err
+        return ok
 
-        try:
-            if intent == "check_in":
-                row, created = confirm_check_in(token, request.user.pk)
-                return Response(
-                    success_response(
-                        data={
-                            "intent": "check_in",
-                            "created": created,
-                            "employee_id": row.employee_id,
-                            "work_date": str(row.work_date),
-                            "checked_in_at": row.checked_in_at.isoformat(),
-                            "is_late": row.is_late,
-                            "minutes_late": row.minutes_late,
-                            "already_checked_in_today": not created,
-                            "verified_by_id": row.verified_by_id,
-                            "timezone": settings.TIME_ZONE,
-                        },
-                        detail="Presensi masuk dicatat.",
-                    ),
-                    status=200,
-                )
-            row, created = confirm_check_out(token, request.user.pk)
-            return Response(
-                success_response(
-                    data={
-                        "intent": "check_out",
-                        "created": created,
-                        "employee_id": row.employee_id,
-                        "work_date": str(row.work_date),
-                        "checked_in_at": row.checked_in_at.isoformat(),
-                        "checked_out_at": row.checked_out_at.isoformat()
-                        if row.checked_out_at
-                        else None,
-                        "verified_out_by_id": row.verified_out_by_id,
-                        "timezone": settings.TIME_ZONE,
-                    },
-                    detail="Presensi pulang dicatat.",
-                ),
-                status=200,
-            )
-        except AttendanceError as e:
-            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PublicAttendancePreviewView(APIView):
+    """Public kiosk: resolve staff badge without login."""
+
+    authentication_classes = ()
+    permission_classes = [AttendanceKioskAccess]
+    throttle_classes = [AttendanceKioskRateThrottle]
+
+    def post(self, request):
+        ser = RawScanSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data, err = _preview_for_raw(ser.validated_data["raw"])
+        if err is not None:
+            return err
+        return Response(success_response(data=data), status=200)
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PublicAttendanceConfirmView(APIView):
+    """Public kiosk: check-in / check-out without login (verifier = system kiosk user)."""
+
+    authentication_classes = ()
+    permission_classes = [AttendanceKioskAccess]
+    throttle_classes = [AttendanceKioskRateThrottle]
+
+    def post(self, request):
+        ser = TabletConfirmSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        verifier = get_or_create_kiosk_verifier()
+        ok, err = _confirm_for_raw(
+            ser.validated_data["raw"],
+            ser.validated_data["intent"],
+            verifier.pk,
+        )
+        if err is not None:
+            return err
+        return ok
 
 
 class AttendanceSettingsView(APIView):

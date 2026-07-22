@@ -16,11 +16,34 @@ from attendance.utils_zone import jakarta_today_date
 
 User = get_user_model()
 
+KIOSK_VERIFIER_USERNAME = "__attendance_kiosk__"
+
 
 class AttendanceError(Exception):
     def __init__(self, detail: str) -> None:
         self.detail = detail
         super().__init__(detail)
+
+
+def get_or_create_kiosk_verifier() -> User:
+    """
+    Synthetic verifier for the public camera kiosk (no human login).
+    Unusable password; used only as verified_by / verified_out_by.
+    """
+    user, created = User.objects.get_or_create(
+        username=KIOSK_VERIFIER_USERNAME,
+        defaults={
+            "full_name": "Kiosk Presensi",
+            "role": "ADMIN",
+            "is_active": True,
+            "is_staff": False,
+            "is_superuser": False,
+        },
+    )
+    if created:
+        user.set_unusable_password()
+        user.save(update_fields=["password"])
+    return user
 
 
 def _fmt_local_time(dt: datetime) -> str:

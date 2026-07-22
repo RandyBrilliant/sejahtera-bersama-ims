@@ -1,3 +1,5 @@
+import axios from 'axios'
+
 import { api } from '@/lib/api'
 import type {
   AttendanceConfirmResponse,
@@ -52,6 +54,40 @@ export async function confirmAttendanceScan(
   const { data } = await api.post<Envelope<AttendanceConfirmResponse>>(
     '/api/attendance/admin/check-ins/confirm/',
     { raw, intent }
+  )
+  return { payload: data.data, detail: data.detail }
+}
+
+/** Public kiosk (no login). Uses a separate client so 401 never redirects to /login. */
+function kioskHeaders(): Record<string, string> | undefined {
+  const key = (import.meta.env.VITE_ATTENDANCE_KIOSK_KEY as string | undefined)?.trim()
+  if (!key) return undefined
+  return { 'X-Attendance-Kiosk-Key': key }
+}
+
+const kioskApi = axios.create({
+  baseURL: import.meta.env.VITE_API_URL as string,
+})
+
+export async function previewPublicAttendanceScan(
+  raw: string
+): Promise<AttendancePreviewResponse> {
+  const { data } = await kioskApi.post<Envelope<AttendancePreviewResponse>>(
+    '/api/attendance/kiosk/check-ins/preview/',
+    { raw },
+    { headers: kioskHeaders() }
+  )
+  return data.data
+}
+
+export async function confirmPublicAttendanceScan(
+  raw: string,
+  intent: Extract<AttendanceIntent, 'check_in' | 'check_out'>
+): Promise<{ payload: AttendanceConfirmResponse; detail?: string }> {
+  const { data } = await kioskApi.post<Envelope<AttendanceConfirmResponse>>(
+    '/api/attendance/kiosk/check-ins/confirm/',
+    { raw, intent },
+    { headers: kioskHeaders() }
   )
   return { payload: data.data, detail: data.detail }
 }

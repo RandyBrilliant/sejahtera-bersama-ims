@@ -171,6 +171,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_FILE_BYTES
 JWT_MOBILE_CLIENT_SECRET = (_env("JWT_MOBILE_CLIENT_SECRET", "") or "").strip()
 JWT_MOBILE_REFRESH_DAYS = int(_env("JWT_MOBILE_REFRESH_DAYS", "365"))
 
+# Optional shared secret for public attendance kiosk APIs (header: X-Attendance-Kiosk-Key).
+# When empty, kiosk endpoints are open (badge UUID still required to check in).
+ATTENDANCE_KIOSK_SECRET = (_env("ATTENDANCE_KIOSK_SECRET", "") or "").strip()
+
 CORS_ALLOWED_ORIGINS = _env_csv("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -223,6 +227,7 @@ REST_FRAMEWORK = {
         "user": _env("DRF_THROTTLE_USER", "120/min"),
         "auth": _env("DRF_THROTTLE_AUTH", "10/min"),
         "auth_public": _env("DRF_THROTTLE_AUTH_PUBLIC", "5/min"),
+        "attendance_kiosk": _env("DRF_THROTTLE_ATTENDANCE_KIOSK", "60/min"),
     },
 }
 

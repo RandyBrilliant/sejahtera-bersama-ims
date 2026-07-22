@@ -94,7 +94,9 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_queryset(self):
-        qs = User.objects.select_related("employee_profile")
+        qs = User.objects.select_related("employee_profile").exclude(
+            username="__attendance_kiosk__"
+        )
         return qs if user_is_owner(self.request.user) else qs.exclude(role=UserRole.LEADERSHIP)
 
     def _guard_owner_role_change(self, role):

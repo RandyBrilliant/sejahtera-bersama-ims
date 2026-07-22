@@ -36,6 +36,16 @@ urlpatterns = [
         name="admin-check-ins-confirm",
     ),
     path(
+        "kiosk/check-ins/preview/",
+        views.PublicAttendancePreviewView.as_view(),
+        name="kiosk-check-ins-preview",
+    ),
+    path(
+        "kiosk/check-ins/confirm/",
+        views.PublicAttendanceConfirmView.as_view(),
+        name="kiosk-check-ins-confirm",
+    ),
+    path(
         "settings/",
         views.AttendanceSettingsView.as_view(),
         name="attendance-settings",
