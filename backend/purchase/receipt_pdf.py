@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 
-from reportlab.lib.colors import Color, black, red
+from reportlab.lib.colors import Color, black
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
@@ -89,8 +89,9 @@ class ReceiptLayout:
 
     # Meta block clears the company headline (~8 + 61 mm) with a small gap.
     # "tgl." right edge aligns with "KEPADA YTH. :" so the label sits near the value.
-    date_label_top: float = 15.0
-    date_value_top: float = 14.5
+    # Full mode tanggal sits at the same height as "UD. SEJAHTERA BERSAMA".
+    date_label_top: float = 9.0
+    date_value_top: float = 9.0
     date_label_x: float = 78.0
     full_date_label_right_x: float = 99.0
     date_value_x: float = 100.0
@@ -101,7 +102,7 @@ class ReceiptLayout:
     preprinted_date_line_right: float = 128.0
     preprinted_date_value_top: float = 15.2
 
-    kepada_label_top: float = 21.5
+    kepada_label_top: float = 15.5
     kepada_label_x: float = 78.0
     kepada_value_x: float = 122.0
     kepada_cont_x: float = 95.0
@@ -109,17 +110,19 @@ class ReceiptLayout:
     full_kepada_value_x: float = 100.0
     full_kepada_cont_x: float = 100.0
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
-    full_kepada_line_tops: tuple[float, ...] = (20.5, 24.8, 29.1, 33.4)
+    # Full mode: name + up to 3 address lines (shifted up with tanggal).
+    full_kepada_line_tops: tuple[float, ...] = (15.0, 19.3, 23.6, 27.9)
     preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
 
-    # Bon / Faktur number — full mode sits on the 3rd KEPADA YTH line.
+    # Bon / Faktur number — full mode on the 4th KEPADA line (below WA/HP).
     faktur_label_top: float = 37.5
     faktur_value_top: float = 37.5
     faktur_value_x: float = 48.0
-    full_faktur_label_top: float = 29.0
-    full_faktur_value_top: float = 29.0
-    full_faktur_value_x: float = 37.0
-    full_font_faktur: float = 9.5
+    full_faktur_label_top: float = 27.9
+    full_faktur_value_top: float = 27.9
+    # Just after "BON / FAKTUR No." (~8 + 26 mm label width).
+    full_faktur_value_x: float = 36.0
+    full_font_faktur: float = 9.0
 
     # Table (preprinted pad calibration).
     table_top: float = 40.0
@@ -128,11 +131,11 @@ class ReceiptLayout:
     first_row_baseline_top: float = 53.0
     row_height: float = 6.0
     row_count: int = 7
-    # Full mode: shorter table to leave room for a taller TANDA TERIMA block.
-    full_table_top: float = 36.0
-    full_header_bottom: float = 43.0
-    full_table_bottom: float = 78.0
-    full_first_row_baseline_top: float = 48.5
+    # Full mode: taller table — compact notice box sits in the footer.
+    full_table_top: float = 32.5
+    full_header_bottom: float = 39.5
+    full_table_bottom: float = 90.0
+    full_first_row_baseline_top: float = 45.0
 
     # Columns stay inside the table (right edge = 150 − margin_right = 142).
     # Nama slightly narrower so long labels leave a gap before @ Rp.
@@ -155,17 +158,20 @@ class ReceiptLayout:
     tanda_terima_top: float = 97.0
     notice_center_x: float = 68.0
     notice_top: float = 94.5
-    notice_line_height: float = 3.0
+    notice_line_height: float = 2.8
     total_label_top: float = 97.0
     total_label_x: float = 108.0
     total_currency_x: float = 119.5
     total_value_top: float = 97.0
-    full_tanda_terima_top: float = 90.0
-    full_notice_top: float = 80.5
-    full_total_label_top: float = 85.0
+    full_tanda_terima_top: float = 93.0
+    full_notice_top: float = 93.0
+    full_notice_box_top: float = 91.0
+    full_notice_box_bottom: float = 97.5
+    full_notice_box_half_width: float = 26.0
+    full_notice_box_radius: float = 0.8
+    full_total_label_top: float = 99.0
     full_total_currency_x: float = 119.5
-    full_total_value_top: float = 85.0
-    full_font_total: float = 9.0
+    full_total_value_top: float = 99.0
     preprinted_total_value_right: float = 140.5
     preprinted_total_value_top: float = 98.0
 
@@ -398,10 +404,27 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
     # Footer labels.
     pdf.setFont(FONT, 7.5)
     pdf.drawString(layout.x(left), layout.y(layout.full_tanda_terima_top), "TANDA TERIMA")
+
+    # Return notice in a rounded box, with margin below the table.
+    notice_left = layout.notice_center_x - layout.full_notice_box_half_width
+    notice_right = layout.notice_center_x + layout.full_notice_box_half_width
+    notice_bottom_y = layout.y(layout.full_notice_box_bottom)
+    notice_top_y = layout.y(layout.full_notice_box_top)
+    pdf.setLineWidth(0.4)
+    pdf.roundRect(
+        layout.x(notice_left),
+        notice_bottom_y,
+        (notice_right - notice_left) * mm,
+        (notice_top_y - notice_bottom_y),
+        layout.full_notice_box_radius * mm,
+        stroke=1,
+        fill=0,
+    )
     pdf.setFont(FONT, 5.5)
     for index, line in enumerate(RETURN_NOTICE):
         top = layout.full_notice_top + index * layout.notice_line_height
         pdf.drawCentredString(layout.x(layout.notice_center_x), layout.y(top), line)
+
     pdf.setFont(FONT_BOLD, 8)
     pdf.drawString(layout.x(layout.total_label_x), layout.y(layout.full_total_label_top), "Jumlah")
     pdf.drawString(
@@ -483,18 +506,17 @@ def _draw_values(
             pdf.setFont(FONT, size)
             pdf.drawString(layout.x(name_x), layout.y(top), text)
 
-    # Bon / Faktur number (already pre-printed in red on the pad).
+    # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
         faktur = (order.invoice_number or order.order_code or "").strip()
         if faktur:
-            pdf.setFillColor(red)
+            pdf.setFillColor(black)
             pdf.setFont(FONT_BOLD, layout.full_font_faktur)
             pdf.drawString(
                 layout.x(layout.full_faktur_value_x),
                 layout.y(layout.full_faktur_value_top),
                 faktur,
             )
-            pdf.setFillColor(black)
 
     # Item rows — size each cell to its column so amounts fill @ Rp / Jumlah Harga.
     name_width = (layout.col_name.right - layout.col_name.left) - 2 * layout.cell_padding
@@ -566,24 +588,17 @@ def _draw_values(
     grand = _format_thousands(int(order.total_idr))
     total_right = layout.col_total.right - layout.cell_padding
     total_top = layout.full_total_value_top if include_faktur_number else layout.total_value_top
-    total_font = layout.full_font_total if include_faktur_number else layout.font_total
+    # Full mode: same face/size as table row values.
+    total_font_face = FONT if include_faktur_number else FONT_BOLD
+    total_font = layout.font_row if include_faktur_number else layout.font_total
     if not include_faktur_number:
         total_right = layout.preprinted_total_value_right
         total_top = layout.preprinted_total_value_top
     grand_text, grand_size = _sized_text(
-        pdf, grand, FONT_BOLD, total_font, total_width, layout.font_min
+        pdf, grand, total_font_face, total_font, total_width, layout.font_min
     )
-    pdf.setFont(FONT_BOLD, grand_size)
+    pdf.setFont(total_font_face, grand_size)
     pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
-
-    if any(_is_custom_line_price(line) for line in lines):
-        table_bottom = layout.full_table_bottom if include_faktur_number else layout.table_bottom
-        pdf.setFont(FONT, 5.5)
-        pdf.drawString(
-            layout.x(layout.margin_left),
-            layout.y(table_bottom + 2.0),
-            "* harga khusus",
-        )
 
 
 def build_sales_order_receipt_pdf(
