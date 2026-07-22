@@ -142,17 +142,26 @@ export function AdminSalesOrderDetailPage() {
   }
 
   async function handlePrintReceipt(mode: SalesReceiptMode) {
-    // Open the tab synchronously so the popup blocker allows it, then load the PDF.
-    const printWindow = window.open('', '_blank')
+    // Open synchronously first so the popup blocker allows the tab.
+    const printWindow = window.open('about:blank', '_blank')
     try {
       const blob = await receiptMut.mutateAsync({ orderId: id, mode })
-      const url = URL.createObjectURL(blob)
+      const pdfBlob =
+        blob.type === 'application/pdf'
+          ? blob
+          : new Blob([blob], { type: 'application/pdf' })
+      const url = URL.createObjectURL(pdfBlob)
       if (printWindow) {
-        printWindow.location.href = url
+        printWindow.location.replace(url)
       } else {
-        window.open(url, '_blank')
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${order.order_code}-nota-${mode}.pdf`
+        link.rel = 'noopener'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
       }
-      // Revoke later so the new tab has time to load the blob.
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (err) {
       printWindow?.close()

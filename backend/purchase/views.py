@@ -595,7 +595,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         filename = f"{order.order_code}-nota-{mode}.pdf"
         return FileResponse(
             pdf_buffer,
-            as_attachment=False,
+            as_attachment=True,
             filename=filename,
             content_type="application/pdf",
         )

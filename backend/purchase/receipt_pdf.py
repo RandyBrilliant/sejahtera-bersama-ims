@@ -86,30 +86,35 @@ class ReceiptLayout:
     contact_top: float = 19.5
     contact_line_height: float = 3.2
 
-    # Meta block (top-right): tanggal + kepada yth.
+    # Meta block clears the company headline (~8 + 61 mm) with a small gap.
+    # Labels share a left edge; both input underlines share start/end (same length).
     date_label_top: float = 15.0
     date_value_top: float = 14.5
-    date_line_left: float = 95.0
-    date_line_right: float = 132.0
-    date_label_x: float = 134.0
-    date_value_x: float = 98.0
+    date_label_x: float = 78.0
+    date_value_x: float = 100.0
+    date_line_left: float = 100.0
+    date_line_right: float = 142.0
+    # Preprinted pad still has the date line then "tgl." on the right.
     preprinted_date_line_left: float = 97.0
     preprinted_date_line_right: float = 128.0
     preprinted_date_value_top: float = 15.2
 
     kepada_label_top: float = 21.5
-    kepada_label_x: float = 93.0
+    kepada_label_x: float = 78.0
     kepada_value_x: float = 122.0
     kepada_cont_x: float = 95.0
-    full_kepada_value_x: float = 112.0
-    full_kepada_cont_x: float = 112.0
+    # Aligned with the tanggal underline (after "KEPADA YTH. :").
+    full_kepada_value_x: float = 100.0
+    full_kepada_cont_x: float = 100.0
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
+    full_kepada_line_tops: tuple[float, ...] = (20.5, 24.8, 29.1, 33.4)
     preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
 
     # Bon / Faktur number.
-    faktur_label_top: float = 35.0
-    faktur_value_top: float = 35.0
+    faktur_label_top: float = 37.5
+    faktur_value_top: float = 37.5
     faktur_value_x: float = 48.0
+    full_faktur_value_x: float = 37.0
     full_font_faktur: float = 9.5
 
     # Table.
@@ -273,6 +278,44 @@ def _address_lines(customer, max_lines: int) -> list[str]:
     return parts[:max_lines]
 
 
+def _wrap_text(
+    pdf: canvas.Canvas,
+    text: str,
+    font: str,
+    size: float,
+    max_width: float,
+) -> list[str]:
+    """Word-wrap ``text`` to ``max_width`` mm at a fixed font size (no shrink/truncate)."""
+    text = (text or "").strip()
+    if not text:
+        return []
+    limit = max_width * mm
+    if _printed_width(pdf, text, font, size) <= limit:
+        return [text]
+
+    words = text.split()
+    if not words:
+        return [text]
+
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip() if current else word
+        if _printed_width(pdf, candidate, font, size) <= limit:
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+            current = word
+        else:
+            # Single token wider than the line — keep it whole (no truncate).
+            lines.append(word)
+            current = ""
+    if current:
+        lines.append(current)
+    return lines
+
+
 def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
     """Draw the static parts of the form (header, labels, grid)."""
     left = layout.margin_left
@@ -288,6 +331,7 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
         pdf.drawString(layout.x(left + 6), layout.y(top), line)
 
     # Meta labels (tanggal + kepada yth.) with their fill-in rules.
+    # Full mode: "tgl. ________" (label first). Preprinted pad keeps date then "tgl.".
     pdf.setLineWidth(0.4)
     pdf.line(
         layout.x(layout.date_line_left),
@@ -295,13 +339,13 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
         layout.x(layout.date_line_right),
         layout.y(layout.date_label_top + 0.8),
     )
-    pdf.setFont(FONT, 8)
+    pdf.setFont(FONT, layout.font_buyer)
     pdf.drawString(layout.x(layout.date_label_x), layout.y(layout.date_label_top), "tgl.")
     pdf.setFont(FONT_BOLD, 8)
     pdf.drawString(layout.x(layout.kepada_label_x), layout.y(layout.kepada_label_top), "KEPADA YTH. :")
     pdf.setLineWidth(0.4)
     right_edge = layout.x(PAGE_WIDTH_MM - layout.margin_right)
-    for index, top in enumerate(layout.kepada_line_tops):
+    for index, top in enumerate(layout.full_kepada_line_tops):
         line_start = layout.full_kepada_value_x if index == 0 else layout.full_kepada_cont_x
         pdf.line(layout.x(line_start), layout.y(top + 0.8), right_edge, layout.y(top + 0.8))
 
@@ -382,23 +426,35 @@ def _draw_values(
 
     # Kepada Yth. — name on the first line (after the label); alamat on the
     # lines below, left-aligned under the name (not under the label).
-    buyer_lines: list[str] = []
-    if order.customer_id:
-        buyer_lines.append(order.customer.name.strip())
-    max_address = len(layout.kepada_line_tops) - len(buyer_lines)
-    buyer_lines += _address_lines(order.customer, max_address)
     kepada_tops = (
-        layout.kepada_line_tops if include_faktur_number else layout.preprinted_kepada_line_tops
+        layout.full_kepada_line_tops if include_faktur_number else layout.preprinted_kepada_line_tops
     )
-    for index, (raw, top) in enumerate(zip(buyer_lines, kepada_tops)):
-        if include_faktur_number:
-            name_x = layout.full_kepada_value_x if index == 0 else layout.full_kepada_cont_x
-        else:
-            name_x = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
+
+    if include_faktur_number:
+        # Full mode: use left whitespace, fixed font, wrap instead of shrink/truncate.
+        name_x = layout.full_kepada_value_x
         buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-        text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
-        pdf.setFont(FONT, size)
-        pdf.drawString(layout.x(name_x), layout.y(top), text)
+        wrapped: list[str] = []
+        if order.customer_id:
+            wrapped.extend(
+                _wrap_text(pdf, order.customer.name.strip(), FONT, layout.font_buyer, buyer_width)
+            )
+        for part in _address_lines(order.customer, max_lines=8):
+            wrapped.extend(_wrap_text(pdf, part, FONT, layout.font_buyer, buyer_width))
+        pdf.setFont(FONT, layout.font_buyer)
+        for raw, top in zip(wrapped, kepada_tops):
+            pdf.drawString(layout.x(name_x), layout.y(top), raw)
+    else:
+        buyer_parts: list[str] = []
+        if order.customer_id:
+            buyer_parts.append(order.customer.name.strip())
+        buyer_parts += _address_lines(order.customer, max(0, len(kepada_tops) - len(buyer_parts)))
+        for index, (raw, top) in enumerate(zip(buyer_parts, kepada_tops)):
+            name_x = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
+            buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
+            text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
+            pdf.setFont(FONT, size)
+            pdf.drawString(layout.x(name_x), layout.y(top), text)
 
     # Bon / Faktur number (already pre-printed in red on the pad).
     if include_faktur_number:
@@ -406,7 +462,11 @@ def _draw_values(
         if faktur:
             pdf.setFillColor(red)
             pdf.setFont(FONT_BOLD, layout.full_font_faktur)
-            pdf.drawString(layout.x(layout.faktur_value_x), layout.y(layout.faktur_value_top), faktur)
+            pdf.drawString(
+                layout.x(layout.full_faktur_value_x),
+                layout.y(layout.faktur_value_top),
+                faktur,
+            )
             pdf.setFillColor(black)
 
     # Item rows — size each cell to its column so amounts fill @ Rp / Jumlah Harga.
