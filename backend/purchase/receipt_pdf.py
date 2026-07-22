@@ -85,12 +85,14 @@ class ReceiptLayout:
     brand_top: float = 14.5
     contact_top: float = 19.5
     contact_line_height: float = 3.2
+    full_contact_font: float = 7.5
 
     # Meta block clears the company headline (~8 + 61 mm) with a small gap.
-    # Labels share a left edge; both input underlines share start/end (same length).
+    # "tgl." right edge aligns with "KEPADA YTH. :" so the label sits near the value.
     date_label_top: float = 15.0
     date_value_top: float = 14.5
     date_label_x: float = 78.0
+    full_date_label_right_x: float = 99.0
     date_value_x: float = 100.0
     date_line_left: float = 100.0
     date_line_right: float = 142.0
@@ -110,20 +112,27 @@ class ReceiptLayout:
     full_kepada_line_tops: tuple[float, ...] = (20.5, 24.8, 29.1, 33.4)
     preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
 
-    # Bon / Faktur number.
+    # Bon / Faktur number — full mode sits on the 3rd KEPADA YTH line.
     faktur_label_top: float = 37.5
     faktur_value_top: float = 37.5
     faktur_value_x: float = 48.0
+    full_faktur_label_top: float = 29.0
+    full_faktur_value_top: float = 29.0
     full_faktur_value_x: float = 37.0
     full_font_faktur: float = 9.5
 
-    # Table.
+    # Table (preprinted pad calibration).
     table_top: float = 40.0
     header_bottom: float = 47.0
     table_bottom: float = 91.0
     first_row_baseline_top: float = 53.0
     row_height: float = 6.0
     row_count: int = 7
+    # Full mode: shorter table to leave room for a taller TANDA TERIMA block.
+    full_table_top: float = 36.0
+    full_header_bottom: float = 43.0
+    full_table_bottom: float = 78.0
+    full_first_row_baseline_top: float = 48.5
 
     # Columns stay inside the table (right edge = 150 − margin_right = 142).
     # Nama slightly narrower so long labels leave a gap before @ Rp.
@@ -151,6 +160,11 @@ class ReceiptLayout:
     total_label_x: float = 108.0
     total_currency_x: float = 119.5
     total_value_top: float = 97.0
+    full_tanda_terima_top: float = 90.0
+    full_notice_top: float = 80.5
+    full_total_label_top: float = 85.0
+    full_total_currency_x: float = 119.5
+    full_total_value_top: float = 85.0
     full_font_total: float = 9.0
     preprinted_total_value_right: float = 140.5
     preprinted_total_value_top: float = 98.0
@@ -325,13 +339,13 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
     pdf.drawString(layout.x(left), layout.y(layout.company_name_top), COMPANY_NAME)
     pdf.setFont(FONT_BOLD, 10)
     pdf.drawString(layout.x(left + 8), layout.y(layout.brand_top), COMPANY_BRAND)
-    pdf.setFont(FONT, 6.5)
+    pdf.setFont(FONT, layout.full_contact_font)
     for index, line in enumerate(COMPANY_CONTACT):
         top = layout.contact_top + index * layout.contact_line_height
         pdf.drawString(layout.x(left + 6), layout.y(top), line)
 
     # Meta labels (tanggal + kepada yth.) with their fill-in rules.
-    # Full mode: "tgl. ________" (label first). Preprinted pad keeps date then "tgl.".
+    # Full mode: "tgl." right-aligned with KEPADA YTH, then the date on the line.
     pdf.setLineWidth(0.4)
     pdf.line(
         layout.x(layout.date_line_left),
@@ -340,7 +354,11 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
         layout.y(layout.date_label_top + 0.8),
     )
     pdf.setFont(FONT, layout.font_buyer)
-    pdf.drawString(layout.x(layout.date_label_x), layout.y(layout.date_label_top), "tgl.")
+    pdf.drawRightString(
+        layout.x(layout.full_date_label_right_x),
+        layout.y(layout.date_label_top),
+        "tgl.",
+    )
     pdf.setFont(FONT_BOLD, 8)
     pdf.drawString(layout.x(layout.kepada_label_x), layout.y(layout.kepada_label_top), "KEPADA YTH. :")
     pdf.setLineWidth(0.4)
@@ -351,21 +369,26 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
 
     # Bon / Faktur label.
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.x(left), layout.y(layout.faktur_label_top), "BON / FAKTUR No.")
+    pdf.drawString(layout.x(left), layout.y(layout.full_faktur_label_top), "BON / FAKTUR No.")
 
     # Table outline + column separators.
     right = PAGE_WIDTH_MM - layout.margin_right
-    top_y = layout.y(layout.table_top)
-    bottom_y = layout.y(layout.table_bottom)
+    top_y = layout.y(layout.full_table_top)
+    bottom_y = layout.y(layout.full_table_bottom)
     pdf.setLineWidth(0.6)
     pdf.rect(layout.x(left), bottom_y, (right - left) * mm, (top_y - bottom_y), stroke=1, fill=0)
     pdf.setLineWidth(0.4)
-    pdf.line(layout.x(left), layout.y(layout.header_bottom), layout.x(right), layout.y(layout.header_bottom))
+    pdf.line(
+        layout.x(left),
+        layout.y(layout.full_header_bottom),
+        layout.x(right),
+        layout.y(layout.full_header_bottom),
+    )
     for column in layout.columns[:-1]:
         pdf.line(layout.x(column.right), top_y, layout.x(column.right), bottom_y)
 
     # Column headers.
-    header_baseline = layout.y((layout.table_top + layout.header_bottom) / 2 + 1.2)
+    header_baseline = layout.y((layout.full_table_top + layout.full_header_bottom) / 2 + 1.2)
     pdf.setFont(FONT_BOLD, 7.5)
     pdf.drawCentredString(layout.x(layout.col_qty.center), header_baseline, "Banyaknya")
     pdf.drawCentredString(layout.x(layout.col_name.center), header_baseline, "NAMA BARANG")
@@ -374,14 +397,18 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
 
     # Footer labels.
     pdf.setFont(FONT, 7.5)
-    pdf.drawString(layout.x(left), layout.y(layout.tanda_terima_top), "TANDA TERIMA")
+    pdf.drawString(layout.x(left), layout.y(layout.full_tanda_terima_top), "TANDA TERIMA")
     pdf.setFont(FONT, 5.5)
     for index, line in enumerate(RETURN_NOTICE):
-        top = layout.notice_top + index * layout.notice_line_height
+        top = layout.full_notice_top + index * layout.notice_line_height
         pdf.drawCentredString(layout.x(layout.notice_center_x), layout.y(top), line)
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.x(layout.total_label_x), layout.y(layout.total_label_top), "Jumlah")
-    pdf.drawString(layout.x(layout.total_currency_x), layout.y(layout.total_label_top), "Rp.")
+    pdf.drawString(layout.x(layout.total_label_x), layout.y(layout.full_total_label_top), "Jumlah")
+    pdf.drawString(
+        layout.x(layout.full_total_currency_x),
+        layout.y(layout.full_total_label_top),
+        "Rp.",
+    )
 
 
 def _draw_values(
@@ -464,7 +491,7 @@ def _draw_values(
             pdf.setFont(FONT_BOLD, layout.full_font_faktur)
             pdf.drawString(
                 layout.x(layout.full_faktur_value_x),
-                layout.y(layout.faktur_value_top),
+                layout.y(layout.full_faktur_value_top),
                 faktur,
             )
             pdf.setFillColor(black)
@@ -474,8 +501,11 @@ def _draw_values(
     qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * layout.cell_padding
     unit_width = (layout.col_unit.right - layout.col_unit.left) - 2 * layout.cell_padding
     total_width = (layout.col_total.right - layout.col_total.left) - 2 * layout.cell_padding
+    first_row_top = (
+        layout.full_first_row_baseline_top if include_faktur_number else layout.first_row_baseline_top
+    )
     for index, line in enumerate(lines):
-        baseline = layout.y(layout.first_row_baseline_top + index * layout.row_height)
+        baseline = layout.y(first_row_top + index * layout.row_height)
 
         qty_text, qty_size = _sized_text(
             pdf,
@@ -535,7 +565,7 @@ def _draw_values(
     # Grand total — align with the Jumlah Harga column and footer labels.
     grand = _format_thousands(int(order.total_idr))
     total_right = layout.col_total.right - layout.cell_padding
-    total_top = layout.total_value_top
+    total_top = layout.full_total_value_top if include_faktur_number else layout.total_value_top
     total_font = layout.full_font_total if include_faktur_number else layout.font_total
     if not include_faktur_number:
         total_right = layout.preprinted_total_value_right
@@ -547,10 +577,11 @@ def _draw_values(
     pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
 
     if any(_is_custom_line_price(line) for line in lines):
+        table_bottom = layout.full_table_bottom if include_faktur_number else layout.table_bottom
         pdf.setFont(FONT, 5.5)
         pdf.drawString(
             layout.x(layout.margin_left),
-            layout.y(layout.table_bottom + 2.0),
+            layout.y(table_bottom + 2.0),
             "* harga khusus",
         )
 
