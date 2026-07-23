@@ -163,7 +163,7 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = ProductPackagingFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
-    ordering_fields = ["label", "net_mass_kg"]
+    ordering_fields = ["label", "packaging_type", "net_mass_kg"]
     ordering = ["product__variant_name", "net_mass_kg"]
 
     def get_queryset(self):

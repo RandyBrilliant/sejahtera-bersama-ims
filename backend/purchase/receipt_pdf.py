@@ -37,8 +37,8 @@ COMPANY_CONTACT = (
     "HP. 0821 6374 6399",
 )
 RETURN_NOTICE = (
-    "Barang² yang sudah dibeli",
-    "tidak dapat dikembalikan/ditukar",
+    "BARANG² YANG SUDAH DIBELI",
+    "TIDAK DAPAT DIKEMBALIKAN/DITUKAR",
 )
 
 FONT = "Helvetica"
@@ -98,21 +98,24 @@ class ReceiptLayout:
     date_line_left: float = 100.0
     date_line_right: float = 142.0
     # Preprinted pad still has the date line then "tgl." on the right.
-    preprinted_date_line_left: float = 97.0
-    preprinted_date_line_right: float = 128.0
-    preprinted_date_value_top: float = 15.2
+    # Wider band so ``KAMIS - DD-MM-YYYY`` fits; value sits just above the rule.
+    preprinted_date_line_left: float = 88.0
+    preprinted_date_line_right: float = 132.0
+    preprinted_date_value_top: float = 12.6
 
     kepada_label_top: float = 15.5
     kepada_label_x: float = 78.0
-    kepada_value_x: float = 122.0
-    kepada_cont_x: float = 95.0
+    # After "KEPADA YTH. :" — wide enough that name/alamat wrap to a few lines, not each word.
+    kepada_value_x: float = 100.0
+    kepada_cont_x: float = 100.0
     # Aligned with the tanggal underline (after "KEPADA YTH. :").
     full_kepada_value_x: float = 100.0
     full_kepada_cont_x: float = 100.0
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
     # Full mode: name + up to 3 address lines (shifted up with tanggal).
     full_kepada_line_tops: tuple[float, ...] = (15.0, 19.3, 23.6, 27.9)
-    preprinted_kepada_line_tops: tuple[float, ...] = (19.8, 25.6, 31.4)
+    # Preprinted: name a bit higher; address lines follow under it.
+    preprinted_kepada_line_tops: tuple[float, ...] = (17.6, 24.0, 30.4)
 
     # Bon / Faktur number — full mode on the 4th KEPADA line (below WA/HP).
     faktur_label_top: float = 37.5
@@ -131,16 +134,17 @@ class ReceiptLayout:
     first_row_baseline_top: float = 53.0
     row_height: float = 6.0
     row_count: int = 7
-    # Full mode: taller table — compact notice box sits in the footer.
+    # Full mode: item table + small totals box under @ Rp/kg + Jumlah Harga only.
     full_table_top: float = 32.5
     full_header_bottom: float = 39.5
     full_table_bottom: float = 90.0
+    full_totals_bottom: float = 97.5
     full_first_row_baseline_top: float = 45.0
 
     # Columns stay inside the table (right edge = 150 − margin_right = 142).
-    # Nama slightly narrower so long labels leave a gap before @ Rp.
-    col_qty: Column = field(default_factory=lambda: Column(10.0, 27.0))
-    col_name: Column = field(default_factory=lambda: Column(27.0, 96.0))
+    # Qty wider for ``4 BAL X 10 KG``; nama still leaves a gap before @ Rp.
+    col_qty: Column = field(default_factory=lambda: Column(10.0, 38.0))
+    col_name: Column = field(default_factory=lambda: Column(38.0, 96.0))
     col_unit: Column = field(default_factory=lambda: Column(96.0, 118.0))
     col_total: Column = field(default_factory=lambda: Column(118.0, 141.0))
 
@@ -154,11 +158,14 @@ class ReceiptLayout:
     font_faktur: float = 12.0
     font_min: float = 7.0
 
-    # Footer.
+    # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0
-    notice_center_x: float = 68.0
+    # Center of the gap between TANDA TERIMA and the totals box (~28…96).
+    notice_center_x: float = 62.0
     notice_top: float = 94.5
     notice_line_height: float = 2.8
+    # Inner horizontal padding of the return-notice rounded box (mm each side).
+    full_notice_box_pad_x: float = 1.2
     total_label_top: float = 97.0
     total_label_x: float = 108.0
     total_currency_x: float = 119.5
@@ -167,13 +174,12 @@ class ReceiptLayout:
     full_notice_top: float = 93.0
     full_notice_box_top: float = 91.0
     full_notice_box_bottom: float = 97.5
-    full_notice_box_half_width: float = 26.0
     full_notice_box_radius: float = 0.8
-    full_total_label_top: float = 99.0
-    full_total_currency_x: float = 119.5
-    full_total_value_top: float = 99.0
-    preprinted_total_value_right: float = 140.5
-    preprinted_total_value_top: float = 98.0
+    full_total_label_top: float = 93.8
+    full_total_value_top: float = 93.8
+    # Preprinted pad: grand total a bit higher and further right under Jumlah Harga.
+    preprinted_total_value_right: float = 143.0
+    preprinted_total_value_top: float = 95.5
 
     def x(self, left_mm: float) -> float:
         """Convert a left-based millimetre value to canvas units."""
@@ -205,14 +211,54 @@ def _format_quantity(quantity: Decimal) -> str:
     return text or "0"
 
 
-def _packaging_display(packaging) -> str:
-    """Human label for a packaging line, e.g. 'Original — 250 gram'."""
+def _caps(text: str) -> str:
+    """Uppercase for receipt print (dot-matrix nota style)."""
+    return (text or "").upper()
+
+
+def _packaging_jenis(packaging) -> str:
+    """Packaging type code (BAL / KTK), default BAL."""
+    if packaging is None:
+        return "BAL"
+    return (getattr(packaging, "packaging_type", None) or "BAL").strip().upper() or "BAL"
+
+
+def _variant_name(packaging) -> str:
+    """Product variant name for nama barang, e.g. 'Original'."""
+    if packaging is None:
+        return "-"
     product = packaging.product if packaging.product_id else None
     variant = (product.variant_name if product else "").strip()
+    if variant:
+        return variant
     label = (packaging.label or "").strip()
-    if variant and label:
-        return f"{variant} — {label}"
-    return variant or label or "-"
+    return label or "-"
+
+
+def _line_qty_display(line) -> str:
+    """Banyaknya: ``4 BAL X 10 KG`` (qty + jenis + net mass per kemasan)."""
+    qty = _format_quantity(line.quantity)
+    packaging = line.product_packaging
+    jenis = _packaging_jenis(packaging)
+    if packaging is None:
+        return f"{qty} {jenis}"
+    net = Decimal(str(packaging.net_mass_kg or 0))
+    if net <= 0:
+        return f"{qty} {jenis}"
+    return f"{qty} {jenis} X {_format_quantity(net)} KG"
+
+
+def _line_name_display(line) -> str:
+    """Nama barang: ``ORIGINAL (40 KG) - BAL`` (variant, total kg, jenis)."""
+    packaging = line.product_packaging
+    variant = _variant_name(packaging)
+    jenis = _packaging_jenis(packaging)
+    if packaging is None:
+        return f"{variant} - {jenis}"
+    qty = Decimal(str(line.quantity))
+    net = Decimal(str(packaging.net_mass_kg or 0))
+    total_kg = _format_quantity(qty * net) if net > 0 else "0"
+    return f"{variant} ({total_kg} KG) - {jenis}"
 
 
 def _price_per_kg_idr(line) -> int:
@@ -223,29 +269,6 @@ def _price_per_kg_idr(line) -> int:
         return int(line.unit_price_idr)
     per_kg = Decimal(int(line.unit_price_idr)) / net
     return int(per_kg.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def _catalog_package_price_idr(line) -> int | None:
-    """Product default package total (harga/kg × net mass), or None if unset."""
-    packaging = line.product_packaging
-    if packaging is None or not packaging.product_id:
-        return None
-    catalog_per_kg = int(packaging.product.price_per_kg_idr or 0)
-    if catalog_per_kg < 1:
-        return None
-    net = Decimal(str(packaging.net_mass_kg))
-    if net <= 0:
-        return None
-    total = Decimal(catalog_per_kg) * net
-    return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def _is_custom_line_price(line) -> bool:
-    """True when charged package price differs from product catalog default."""
-    catalog = _catalog_package_price_idr(line)
-    if catalog is None:
-        return False
-    return int(line.unit_price_idr) != catalog
 
 
 def _printed_width(pdf: canvas.Canvas, text: str, font: str, size: float) -> float:
@@ -283,11 +306,26 @@ def _sized_text(
     return _fit_text(pdf, text, font, size, max_width), size
 
 
+_DAY_NAME_ID = (
+    "SENIN",
+    "SELASA",
+    "RABU",
+    "KAMIS",
+    "JUMAT",
+    "SABTU",
+    "MINGGU",
+)
+
+
 def _receipt_date(order) -> str:
+    """Tanggal nota: ``KAMIS - 23-07-2026`` (hari + tanggal)."""
     value = order.invoice_date
     if value is None and order.created_at is not None:
         value = order.created_at.date()
-    return value.strftime("%d-%m-%Y") if value else ""
+    if not value:
+        return ""
+    day_name = _DAY_NAME_ID[value.weekday()]
+    return f"{day_name} - {value.strftime('%d-%m-%Y')}"
 
 
 def _address_lines(customer, max_lines: int) -> list[str]:
@@ -359,11 +397,11 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
         layout.x(layout.date_line_right),
         layout.y(layout.date_label_top + 0.8),
     )
-    pdf.setFont(FONT, layout.font_buyer)
+    pdf.setFont(FONT_BOLD, 8)
     pdf.drawRightString(
         layout.x(layout.full_date_label_right_x),
         layout.y(layout.date_label_top),
-        "tgl.",
+        "TGL.",
     )
     pdf.setFont(FONT_BOLD, 8)
     pdf.drawString(layout.x(layout.kepada_label_x), layout.y(layout.kepada_label_top), "KEPADA YTH. :")
@@ -375,12 +413,13 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
 
     # Bon / Faktur label.
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.x(left), layout.y(layout.full_faktur_label_top), "BON / FAKTUR No.")
+    pdf.drawString(layout.x(left), layout.y(layout.full_faktur_label_top), "BON / FAKTUR NO.")
 
-    # Table outline + column separators.
+    # Main item table.
     right = PAGE_WIDTH_MM - layout.margin_right
     top_y = layout.y(layout.full_table_top)
     bottom_y = layout.y(layout.full_table_bottom)
+    totals_bottom_y = layout.y(layout.full_totals_bottom)
     pdf.setLineWidth(0.6)
     pdf.rect(layout.x(left), bottom_y, (right - left) * mm, (top_y - bottom_y), stroke=1, fill=0)
     pdf.setLineWidth(0.4)
@@ -393,21 +432,50 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
     for column in layout.columns[:-1]:
         pdf.line(layout.x(column.right), top_y, layout.x(column.right), bottom_y)
 
+    # Totals box — only under @ Rp/kg + Jumlah Harga (attached below the table).
+    totals_left = layout.col_unit.left
+    pdf.setLineWidth(0.6)
+    pdf.rect(
+        layout.x(totals_left),
+        totals_bottom_y,
+        (right - totals_left) * mm,
+        (bottom_y - totals_bottom_y),
+        stroke=1,
+        fill=0,
+    )
+    pdf.setLineWidth(0.4)
+    pdf.line(
+        layout.x(layout.col_unit.right),
+        bottom_y,
+        layout.x(layout.col_unit.right),
+        totals_bottom_y,
+    )
+
     # Column headers.
     header_baseline = layout.y((layout.full_table_top + layout.full_header_bottom) / 2 + 1.2)
     pdf.setFont(FONT_BOLD, 7.5)
-    pdf.drawCentredString(layout.x(layout.col_qty.center), header_baseline, "Banyaknya")
+    pdf.drawCentredString(layout.x(layout.col_qty.center), header_baseline, "BANYAKNYA")
     pdf.drawCentredString(layout.x(layout.col_name.center), header_baseline, "NAMA BARANG")
-    pdf.drawCentredString(layout.x(layout.col_unit.center), header_baseline, "@ Rp/kg")
-    pdf.drawCentredString(layout.x(layout.col_total.center), header_baseline, "Jumlah Harga")
+    pdf.drawCentredString(layout.x(layout.col_unit.center), header_baseline, "@ RP/KG")
+    pdf.drawCentredString(layout.x(layout.col_total.center), header_baseline, "JUMLAH HARGA")
 
-    # Footer labels.
+    # Footer labels (outside the table, same as before).
     pdf.setFont(FONT, 7.5)
     pdf.drawString(layout.x(left), layout.y(layout.full_tanda_terima_top), "TANDA TERIMA")
 
-    # Return notice in a rounded box, with margin below the table.
-    notice_left = layout.notice_center_x - layout.full_notice_box_half_width
-    notice_right = layout.notice_center_x + layout.full_notice_box_half_width
+    # Return-notice box: centered in the gap, snug left/right padding around text.
+    notice_font_size = 5.5
+    pdf.setFont(FONT, notice_font_size)
+    notice_text_width_mm = max(
+        (_printed_width(pdf, line, FONT, notice_font_size) / mm) for line in RETURN_NOTICE
+    )
+    notice_half_width = (notice_text_width_mm / 2.0) + layout.full_notice_box_pad_x
+    # Keep clear of TANDA TERIMA on the left and the totals box on the right.
+    min_center = left + 22.0 + notice_half_width
+    max_center = layout.col_unit.left - 1.5 - notice_half_width
+    notice_center = min(max(layout.notice_center_x, min_center), max_center)
+    notice_left = notice_center - notice_half_width
+    notice_right = notice_center + notice_half_width
     notice_bottom_y = layout.y(layout.full_notice_box_bottom)
     notice_top_y = layout.y(layout.full_notice_box_top)
     pdf.setLineWidth(0.4)
@@ -420,17 +488,21 @@ def _draw_template(pdf: canvas.Canvas, layout: ReceiptLayout) -> None:
         stroke=1,
         fill=0,
     )
-    pdf.setFont(FONT, 5.5)
     for index, line in enumerate(RETURN_NOTICE):
         top = layout.full_notice_top + index * layout.notice_line_height
-        pdf.drawCentredString(layout.x(layout.notice_center_x), layout.y(top), line)
+        pdf.drawCentredString(layout.x(notice_center), layout.y(top), line)
 
+    # Totals labels inside the attached box.
     pdf.setFont(FONT_BOLD, 8)
-    pdf.drawString(layout.x(layout.total_label_x), layout.y(layout.full_total_label_top), "Jumlah")
-    pdf.drawString(
-        layout.x(layout.full_total_currency_x),
+    pdf.drawCentredString(
+        layout.x(layout.col_unit.center),
         layout.y(layout.full_total_label_top),
-        "Rp.",
+        "JUMLAH",
+    )
+    pdf.drawString(
+        layout.x(layout.col_total.left + layout.cell_padding),
+        layout.y(layout.full_total_label_top),
+        "RP.",
     )
 
 
@@ -450,7 +522,7 @@ def _draw_values(
     """
     # Date.
     pdf.setFillColor(black)
-    date_text = _receipt_date(order)
+    date_text = _caps(_receipt_date(order))
     if date_text:
         if include_faktur_number:
             date_left = layout.date_line_left
@@ -475,41 +547,40 @@ def _draw_values(
                 text,
             )
 
-    # Kepada Yth. — name on the first line (after the label); alamat on the
-    # lines below, left-aligned under the name (not under the label).
-    kepada_tops = (
-        layout.full_kepada_line_tops if include_faktur_number else layout.preprinted_kepada_line_tops
-    )
-
+    # Kepada Yth. — name then alamat; wrap at fixed size, never shrink/truncate.
     if include_faktur_number:
-        # Full mode: use left whitespace, fixed font, wrap instead of shrink/truncate.
         name_x = layout.full_kepada_value_x
-        buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-        wrapped: list[str] = []
-        if order.customer_id:
-            wrapped.extend(
-                _wrap_text(pdf, order.customer.name.strip(), FONT, layout.font_buyer, buyer_width)
-            )
-        for part in _address_lines(order.customer, max_lines=8):
-            wrapped.extend(_wrap_text(pdf, part, FONT, layout.font_buyer, buyer_width))
-        pdf.setFont(FONT, layout.font_buyer)
-        for raw, top in zip(wrapped, kepada_tops):
-            pdf.drawString(layout.x(name_x), layout.y(top), raw)
+        kepada_tops = layout.full_kepada_line_tops
     else:
-        buyer_parts: list[str] = []
-        if order.customer_id:
-            buyer_parts.append(order.customer.name.strip())
-        buyer_parts += _address_lines(order.customer, max(0, len(kepada_tops) - len(buyer_parts)))
-        for index, (raw, top) in enumerate(zip(buyer_parts, kepada_tops)):
-            name_x = layout.kepada_value_x if index == 0 else layout.kepada_cont_x
-            buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-            text, size = _sized_text(pdf, raw, FONT, layout.font_buyer, buyer_width, layout.font_min)
-            pdf.setFont(FONT, size)
-            pdf.drawString(layout.x(name_x), layout.y(top), text)
+        name_x = layout.kepada_value_x
+        kepada_tops = layout.preprinted_kepada_line_tops
+
+    buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
+    wrapped: list[str] = []
+    if order.customer_id:
+        wrapped.extend(
+            _wrap_text(
+                pdf,
+                _caps(order.customer.name.strip()),
+                FONT,
+                layout.font_buyer,
+                buyer_width,
+            )
+        )
+    # Join address segments so wrapping fills each line (not one word per line).
+    address = " ".join(_address_lines(order.customer, max_lines=8))
+    if address:
+        wrapped.extend(
+            _wrap_text(pdf, _caps(address), FONT, layout.font_buyer, buyer_width)
+        )
+
+    pdf.setFont(FONT, layout.font_buyer)
+    for raw, top in zip(wrapped, kepada_tops):
+        pdf.drawString(layout.x(name_x), layout.y(top), raw)
 
     # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
-        faktur = (order.invoice_number or order.order_code or "").strip()
+        faktur = _caps((order.invoice_number or order.order_code or "").strip())
         if faktur:
             pdf.setFillColor(black)
             pdf.setFont(FONT, layout.full_font_faktur)
@@ -530,20 +601,15 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
-        qty_text, qty_size = _sized_text(
-            pdf,
-            _format_quantity(line.quantity),
-            FONT,
-            layout.font_row,
-            qty_width,
-            layout.font_min,
-        )
-        pdf.setFont(FONT, qty_size)
+        qty_raw = _caps(_line_qty_display(line))
+        # Keep banyaknya at the same row font size as other cells (no shrink).
+        qty_text = _fit_text(pdf, qty_raw, FONT, layout.font_row, qty_width)
+        pdf.setFont(FONT, layout.font_row)
         pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
 
         name_text, name_size = _sized_text(
             pdf,
-            _packaging_display(line.product_packaging),
+            _caps(_line_name_display(line)),
             FONT,
             layout.font_row,
             name_width,
@@ -552,23 +618,24 @@ def _draw_values(
         pdf.setFont(FONT, name_size)
         pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
 
-        unit_raw = _format_thousands(_price_per_kg_idr(line))
-        if _is_custom_line_price(line):
-            unit_raw = f"{unit_raw}*"
         unit_text, unit_size = _sized_text(
             pdf,
-            unit_raw,
+            _format_thousands(_price_per_kg_idr(line)),
             FONT,
             layout.font_row,
             unit_width,
             layout.font_min,
         )
         pdf.setFont(FONT, unit_size)
-        pdf.drawRightString(
-            layout.x(layout.col_unit.right - layout.cell_padding),
-            baseline,
-            unit_text,
-        )
+        if include_faktur_number:
+            pdf.drawRightString(
+                layout.x(layout.col_unit.right - layout.cell_padding),
+                baseline,
+                unit_text,
+            )
+        else:
+            # Preprinted pad: sit nearer the middle of the @ Rp column.
+            pdf.drawCentredString(layout.x(layout.col_unit.center), baseline, unit_text)
 
         line_total_text, line_total_size = _sized_text(
             pdf,
@@ -585,21 +652,31 @@ def _draw_values(
             line_total_text,
         )
 
-    # Grand total — align with the Jumlah Harga column and footer labels.
+    # Grand total — full mode sits in the Jumlah Harga totals cell (right of JUMLAH).
     grand = _format_thousands(int(order.total_idr))
-    total_right = layout.col_total.right - layout.cell_padding
-    total_top = layout.full_total_value_top if include_faktur_number else layout.total_value_top
-    # Full mode: same face/size as table row values.
-    total_font_face = FONT if include_faktur_number else FONT_BOLD
-    total_font = layout.font_row if include_faktur_number else layout.font_total
-    if not include_faktur_number:
+    if include_faktur_number:
+        # Leave room for the "RP." label on the left of the totals cell.
+        rp_label_width = 8.0
+        amount_left = layout.col_total.left + layout.cell_padding + rp_label_width
+        amount_right = layout.col_total.right - layout.cell_padding
+        amount_width = max(4.0, amount_right - amount_left)
+        grand_text, grand_size = _sized_text(
+            pdf, grand, FONT, layout.font_row, amount_width, layout.font_min
+        )
+        pdf.setFont(FONT, grand_size)
+        pdf.drawRightString(
+            layout.x(amount_right),
+            layout.y(layout.full_total_value_top),
+            grand_text,
+        )
+    else:
         total_right = layout.preprinted_total_value_right
         total_top = layout.preprinted_total_value_top
-    grand_text, grand_size = _sized_text(
-        pdf, grand, total_font_face, total_font, total_width, layout.font_min
-    )
-    pdf.setFont(total_font_face, grand_size)
-    pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
+        grand_text, grand_size = _sized_text(
+            pdf, grand, FONT_BOLD, layout.font_total, total_width, layout.font_min
+        )
+        pdf.setFont(FONT_BOLD, grand_size)
+        pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
 
 
 def build_sales_order_receipt_pdf(

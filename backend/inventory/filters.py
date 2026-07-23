@@ -38,6 +38,7 @@ class ProductPackagingFilter(filters.FilterSet):
         fields = {
             "product": ["exact"],
             "is_active": ["exact"],
+            "packaging_type": ["exact"],
             "label": ["exact", "icontains"],
             "sku": ["exact", "icontains"],
             "created_by": ["exact"],

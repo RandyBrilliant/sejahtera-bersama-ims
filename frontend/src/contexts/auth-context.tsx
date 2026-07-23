@@ -9,6 +9,7 @@ import {
 import { getMe, login as loginApi, logout as logoutApi } from '@/api/auth'
 import { AuthContext, type AuthContextValue } from '@/contexts/auth-context-object'
 import { alert } from '@/lib/alert'
+import { isPublicAppPath } from '@/lib/api'
 import { queryClient } from '@/lib/query-client'
 import { getDashboardRouteForRole, type User } from '@/types/auth'
 
@@ -22,6 +23,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+
+    // Public kiosk pages must not call /me — a 401 would bounce guests to /login.
+    if (typeof window !== 'undefined' && isPublicAppPath(window.location.pathname)) {
+      setIsLoading(false)
+      return () => {
+        mounted = false
+      }
+    }
+
     async function bootstrapSession() {
       try {
         const me = await getMe()

@@ -20,6 +20,9 @@ export type Product = {
   updated_by: AuditUserMini | null
 }
 
+/** `PackagingType` di backend (inventory.models) — jenis kemasan luar. */
+export type PackagingType = 'BAL' | 'KTK'
+
 export type ProductPackaging = {
   id: number
   product: number
@@ -28,6 +31,8 @@ export type ProductPackaging = {
   /** Harga tetap per kg (IDR) dari produk induk. */
   price_per_kg_idr: number
   label: string
+  /** Jenis kemasan luar: BAL (bal) atau KTK (kotak). Default BAL. */
+  packaging_type: PackagingType
   /** Berat bersih per kemasan (kg). */
   net_mass_kg: string
   remaining_stock: string
@@ -64,6 +69,7 @@ export type ProductPackagingListParams = {
   ordering?: string
   product?: number
   is_active?: boolean
+  packaging_type?: PackagingType
 }
 
 export type ProductCreateInput = {
@@ -78,6 +84,7 @@ export type ProductUpdateInput = Partial<ProductCreateInput>
 export type ProductPackagingCreateInput = {
   product: number
   label: string
+  packaging_type?: PackagingType
   net_mass_kg: string | number
   sku?: string
   is_active?: boolean

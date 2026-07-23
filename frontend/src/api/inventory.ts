@@ -51,6 +51,7 @@ function buildPackagingQuery(params: ProductPackagingListParams): string {
   if (params.ordering) search.set('ordering', params.ordering)
   if (params.product != null) search.set('product', String(params.product))
   if (params.is_active !== undefined) search.set('is_active', String(params.is_active))
+  if (params.packaging_type) search.set('packaging_type', params.packaging_type)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }

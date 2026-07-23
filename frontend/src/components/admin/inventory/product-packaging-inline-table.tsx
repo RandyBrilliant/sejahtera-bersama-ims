@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/constants/table-pagination'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
@@ -107,6 +108,9 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                   {sortHeader('Label', 'label')}
                 </TableHead>
                 <TableHead className="text-on-surface-variant">
+                  {sortHeader('Jenis', 'packaging_type')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
                   {sortHeader('Berat (kg)', 'net_mass_kg')}
                 </TableHead>
                 <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
@@ -120,6 +124,9 @@ export function ProductPackagingInlineTable({ productId }: Props) {
               {rows.map((row) => (
                 <TableRow key={row.id} className="border-outline-variant">
                   <TableCell className="font-medium">{row.label}</TableCell>
+                  <TableCell>
+                    {PACKAGING_TYPE_LABEL[row.packaging_type] ?? row.packaging_type}
+                  </TableCell>
                   <TableCell className="tabular-nums">{fmtKg(row.net_mass_kg)}</TableCell>
                   <TableCell className="tabular-nums">{fmtStock(row.remaining_stock)}</TableCell>
                   <TableCell className="tabular-nums">{formatIdr(row.total_price_idr)}</TableCell>

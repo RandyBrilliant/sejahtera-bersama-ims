@@ -27,12 +27,13 @@ class ProductPackagingAdmin(admin.ModelAdmin):
         "id",
         "product",
         "label",
+        "packaging_type",
         "net_mass_kg",
         "variant_product_mass_g",
         "total_price_idr",
         "is_active",
     )
-    list_filter = ("is_active", "created_at", "updated_at")
+    list_filter = ("is_active", "packaging_type", "created_at", "updated_at")
     search_fields = ("product__name", "product__variant_name", "label", "sku")
 
     @admin.display(description="Stok utama varian (g)", ordering="product__remaining_mass_grams")

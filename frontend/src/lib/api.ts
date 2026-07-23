@@ -18,7 +18,8 @@ if (!baseURL) {
  * looked “logged in” from the last `/me` bootstrap.
  *
  * **Interceptor:** On 401 (except login/refresh endpoints), we refresh once, retry the request,
- * then redirect to `/login` if refresh fails or the retry still returns 401.
+ * then redirect to `/login` if refresh fails or the retry still returns 401 — unless the user is
+ * already on a public route (e.g. attendance kiosk).
  */
 export const api = axios.create({
   baseURL,
@@ -29,9 +30,18 @@ type RequestWithAuthRetry = InternalAxiosRequestConfig & { _authRetry?: boolean 
 
 const LOGIN_ROUTE = '/login'
 
+/** Routes that must work without a session (no hard redirect to login). */
+const PUBLIC_PATH_PREFIXES = ['/login', '/absensi'] as const
+
+export function isPublicAppPath(pathname: string): boolean {
+  return PUBLIC_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
-  if (window.location.pathname === LOGIN_ROUTE) return
+  if (isPublicAppPath(window.location.pathname)) return
   queryClient.clear()
   window.location.replace(LOGIN_ROUTE)
 }
