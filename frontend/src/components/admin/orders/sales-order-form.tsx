@@ -40,6 +40,7 @@ import {
   useWilayahQuery,
 } from '@/hooks/use-purchase-query'
 import { canEditOrderLines } from '@/constants/order-status'
+import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import type { ProductPackaging } from '@/types/inventory'
 import type { SalesOrder, SalesOrderLineInput } from '@/types/purchase'
 
@@ -498,6 +499,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       </span>
                       <span className="text-on-surface truncate font-medium">{p.label}</span>
                       <span className="text-on-surface-variant text-xs">
+                        {PACKAGING_TYPE_LABEL[p.packaging_type] ?? p.packaging_type}
+                        {' · '}
                         {fmtKgLabel(p.net_mass_kg)}
                       </span>
                       <span className="text-primary mt-1 font-semibold tabular-nums">
@@ -640,7 +643,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-on-surface truncate text-sm font-medium">
-                              {pkg ? `${pkg.product_variant_name} · ${pkg.label}` : `#${it.product_packaging}`}
+                              {pkg
+                                ? `${pkg.product_variant_name} · ${pkg.label} · ${PACKAGING_TYPE_LABEL[pkg.packaging_type] ?? pkg.packaging_type}`
+                                : `#${it.product_packaging}`}
                             </p>
                             <p className="text-on-surface text-xs font-medium tabular-nums">
                               {fmtKg(lineKg)} kg

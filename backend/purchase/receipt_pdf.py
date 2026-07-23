@@ -25,6 +25,8 @@ from reportlab.lib.colors import Color, black
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
+from inventory.models import PackagingType
+
 # Fixed page geometry for the pad.
 PAGE_WIDTH_MM = 150.0
 PAGE_HEIGHT_MM = 105.0
@@ -142,11 +144,11 @@ class ReceiptLayout:
     full_first_row_baseline_top: float = 45.0
 
     # Columns stay inside the table (right edge = 150 − margin_right = 142).
-    # Qty wider for ``4 BAL X 10 KG``; nama still leaves a gap before @ Rp.
-    col_qty: Column = field(default_factory=lambda: Column(10.0, 38.0))
-    col_name: Column = field(default_factory=lambda: Column(38.0, 96.0))
+    # Qty wide enough for ``5 KTK X 20 KG`` without ellipsis at row font size.
+    col_qty: Column = field(default_factory=lambda: Column(8.0, 42.0))
+    col_name: Column = field(default_factory=lambda: Column(42.0, 96.0))
     col_unit: Column = field(default_factory=lambda: Column(96.0, 118.0))
-    col_total: Column = field(default_factory=lambda: Column(118.0, 141.0))
+    col_total: Column = field(default_factory=lambda: Column(118.0, 142.0))
 
     cell_padding: float = 1.6
 
@@ -156,7 +158,8 @@ class ReceiptLayout:
     font_row: float = 9.5
     font_total: float = 10.5
     font_faktur: float = 12.0
-    font_min: float = 7.0
+    # Shrink before ellipsis when cell text is too wide (banyaknya, totals, etc.).
+    font_min: float = 5.5
 
     # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0
@@ -217,10 +220,18 @@ def _caps(text: str) -> str:
 
 
 def _packaging_jenis(packaging) -> str:
-    """Packaging type code (BAL / KTK), default BAL."""
+    """Packaging type code from the kemasan master (KTK / BAL)."""
     if packaging is None:
-        return "BAL"
-    return (getattr(packaging, "packaging_type", None) or "BAL").strip().upper() or "BAL"
+        return PackagingType.BAL
+    # Prefer the in-memory field; refresh if missing so we never silently default.
+    value = getattr(packaging, "packaging_type", None)
+    if not value and getattr(packaging, "pk", None):
+        packaging.refresh_from_db(fields=["packaging_type"])
+        value = packaging.packaging_type
+    cleaned = str(value or "").strip().upper()
+    if cleaned in {PackagingType.KOTAK, PackagingType.BAL}:
+        return cleaned
+    return PackagingType.BAL
 
 
 def _variant_name(packaging) -> str:
@@ -601,10 +612,15 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
-        qty_raw = _caps(_line_qty_display(line))
-        # Keep banyaknya at the same row font size as other cells (no shrink).
-        qty_text = _fit_text(pdf, qty_raw, FONT, layout.font_row, qty_width)
-        pdf.setFont(FONT, layout.font_row)
+        qty_text, qty_size = _sized_text(
+            pdf,
+            _caps(_line_qty_display(line)),
+            FONT,
+            layout.font_row,
+            qty_width,
+            layout.font_min,
+        )
+        pdf.setFont(FONT, qty_size)
         pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
 
         name_text, name_size = _sized_text(
@@ -655,11 +671,12 @@ def _draw_values(
     # Grand total — full mode sits in the Jumlah Harga totals cell (right of JUMLAH).
     grand = _format_thousands(int(order.total_idr))
     if include_faktur_number:
-        # Leave room for the "RP." label on the left of the totals cell.
-        rp_label_width = 8.0
-        amount_left = layout.col_total.left + layout.cell_padding + rp_label_width
+        # Amount uses the full Jumlah Harga cell; "RP." stays on the left.
         amount_right = layout.col_total.right - layout.cell_padding
-        amount_width = max(4.0, amount_right - amount_left)
+        amount_width = max(
+            6.0,
+            (layout.col_total.right - layout.col_total.left) - 2 * layout.cell_padding - 7.0,
+        )
         grand_text, grand_size = _sized_text(
             pdf, grand, FONT, layout.font_row, amount_width, layout.font_min
         )
@@ -700,7 +717,14 @@ def build_sales_order_receipt_pdf(
         raise ValueError(f"Unknown receipt mode: {mode!r}")
 
     layout = layout or DEFAULT_LAYOUT
-    lines = list(order.lines.select_related("product_packaging__product").all())
+    lines = list(
+        order.lines.select_related("product_packaging", "product_packaging__product").all()
+    )
+    # Ensure jenis kemasan is loaded from DB for every line (not a stale default).
+    for line in lines:
+        pkg = line.product_packaging
+        if pkg is not None and pkg.pk:
+            pkg.refresh_from_db(fields=["packaging_type", "net_mass_kg", "label"])
 
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=PAGE_SIZE)
