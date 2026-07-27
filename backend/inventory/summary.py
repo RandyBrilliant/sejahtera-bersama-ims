@@ -31,9 +31,10 @@ def build_inventory_summary_payload() -> dict:
 
     inventory_value_total = sum(
         product_financial_value_idr(p)
-        for p in Product.objects.prefetch_related("packaging_variants").only(
+        for p in Product.objects.only(
             "id",
             "remaining_mass_grams",
+            "price_per_kg_idr",
         )
     )
 

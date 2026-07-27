@@ -100,16 +100,16 @@ class ReceiptLayout:
     date_line_left: float = 100.0
     date_line_right: float = 142.0
     # Preprinted pad still has the date line then "tgl." on the right.
-    # Wider band so ``KAMIS - DD-MM-YYYY`` fits; value sits just above the rule.
-    preprinted_date_line_left: float = 88.0
-    preprinted_date_line_right: float = 132.0
+    # Left-align hari+tanggal so it clears the "tgl." label on the right.
+    preprinted_date_line_left: float = 86.0
+    preprinted_date_line_right: float = 128.0
     preprinted_date_value_top: float = 12.6
 
     kepada_label_top: float = 15.5
     kepada_label_x: float = 78.0
-    # After "KEPADA YTH. :" — wide enough that name/alamat wrap to a few lines, not each word.
-    kepada_value_x: float = 100.0
-    kepada_cont_x: float = 100.0
+    # After "KEPADA YTH. :" — sit clear of the pre-printed label (was overlapping at 100).
+    kepada_value_x: float = 108.0
+    kepada_cont_x: float = 108.0
     # Aligned with the tanggal underline (after "KEPADA YTH. :").
     full_kepada_value_x: float = 100.0
     full_kepada_cont_x: float = 100.0
@@ -151,11 +151,18 @@ class ReceiptLayout:
     col_total: Column = field(default_factory=lambda: Column(118.0, 142.0))
 
     cell_padding: float = 1.6
+    # Preprinted pad: qty/name sit nearer the left rule (centered qty crowded the divider).
+    preprinted_qty_pad: float = 1.0
+    # Nama barang starts a touch left of the PDF column so it lines up with pad text.
+    preprinted_name_left: float = 40.5
+    preprinted_name_pad: float = 0.3
 
     # Overlay value sizes (pt). Long text shrinks down to font_min via _sized_text.
     font_date: float = 10.0
     font_buyer: float = 9.5
     font_row: float = 9.5
+    # Banyaknya prefers a touch smaller so ``1 BAL X 2 KG`` stays inside the cell.
+    font_qty: float = 8.0
     font_total: float = 10.5
     font_faktur: float = 12.0
     # Shrink before ellipsis when cell text is too wide (banyaknya, totals, etc.).
@@ -180,9 +187,9 @@ class ReceiptLayout:
     full_notice_box_radius: float = 0.8
     full_total_label_top: float = 93.8
     full_total_value_top: float = 93.8
-    # Preprinted pad: grand total a bit higher and further right under Jumlah Harga.
+    # Preprinted pad: grand total under Jumlah Harga; nudge up to share Jumlah baseline.
     preprinted_total_value_right: float = 143.0
-    preprinted_total_value_top: float = 95.5
+    preprinted_total_value_top: float = 94.6
 
     def x(self, left_mm: float) -> float:
         """Convert a left-based millimetre value to canvas units."""
@@ -328,14 +335,14 @@ _DAY_NAME_ID = (
 
 
 def _receipt_date(order) -> str:
-    """Tanggal nota: ``KAMIS - 23-07-2026`` (hari + tanggal)."""
+    """Tanggal nota: ``KAMIS 23-07-2026`` (hari + tanggal, no hyphen)."""
     value = order.invoice_date
     if value is None and order.created_at is not None:
         value = order.created_at.date()
     if not value:
         return ""
     day_name = _DAY_NAME_ID[value.weekday()]
-    return f"{day_name} - {value.strftime('%d-%m-%Y')}"
+    return f"{day_name} {value.strftime('%d-%m-%Y')}"
 
 
 def _address_lines(customer, max_lines: int) -> list[str]:
@@ -551,11 +558,8 @@ def _draw_values(
         if include_faktur_number:
             pdf.drawString(layout.x(layout.date_value_x), layout.y(date_top), text)
         else:
-            pdf.drawCentredString(
-                layout.x((date_left + date_right) / 2),
-                layout.y(date_top),
-                text,
-            )
+            # Left-align on the date line so hari clears the "tgl." label on the right.
+            pdf.drawString(layout.x(date_left), layout.y(date_top), text)
 
     # Kepada Yth. — name then alamat; wrap at fixed size, never shrink/truncate.
     if include_faktur_number:
@@ -601,8 +605,13 @@ def _draw_values(
             )
 
     # Item rows — size each cell to its column so amounts fill @ Rp / Jumlah Harga.
-    name_width = (layout.col_name.right - layout.col_name.left) - 2 * layout.cell_padding
-    qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * layout.cell_padding
+    qty_pad = layout.cell_padding if include_faktur_number else layout.preprinted_qty_pad
+    name_left = (
+        layout.col_name.left if include_faktur_number else layout.preprinted_name_left
+    )
+    name_pad = layout.cell_padding if include_faktur_number else layout.preprinted_name_pad
+    name_width = (layout.col_name.right - name_left) - 2 * name_pad
+    qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * qty_pad
     unit_width = (layout.col_unit.right - layout.col_unit.left) - 2 * layout.cell_padding
     total_width = (layout.col_total.right - layout.col_total.left) - 2 * layout.cell_padding
     first_row_top = (
@@ -611,16 +620,21 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
+        qty_preferred = layout.font_row if include_faktur_number else layout.font_qty
         qty_text, qty_size = _sized_text(
             pdf,
             _caps(_line_qty_display(line)),
             FONT,
-            layout.font_row,
+            qty_preferred,
             qty_width,
             layout.font_min,
         )
         pdf.setFont(FONT, qty_size)
-        pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
+        if include_faktur_number:
+            pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
+        else:
+            # Left-align so values sit inside Banyaknya (not against the right rule).
+            pdf.drawString(layout.x(layout.col_qty.left + qty_pad), baseline, qty_text)
 
         name_text, name_size = _sized_text(
             pdf,
@@ -631,7 +645,7 @@ def _draw_values(
             layout.font_min,
         )
         pdf.setFont(FONT, name_size)
-        pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
+        pdf.drawString(layout.x(name_left + name_pad), baseline, name_text)
 
         unit_text, unit_size = _sized_text(
             pdf,
@@ -719,11 +733,6 @@ def build_sales_order_receipt_pdf(
     lines = list(
         order.lines.select_related("product_packaging", "product_packaging__product").all()
     )
-    # Ensure jenis kemasan is loaded from DB for every line (not a stale default).
-    for line in lines:
-        pkg = line.product_packaging
-        if pkg is not None and pkg.pk:
-            pkg.refresh_from_db(fields=["packaging_type", "net_mass_kg", "label"])
 
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=PAGE_SIZE)

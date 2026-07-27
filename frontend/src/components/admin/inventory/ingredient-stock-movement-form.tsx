@@ -48,6 +48,7 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
   const [ingredientInventoryId, setIngredientInventoryId] = useState<number | ''>('')
   const [movementType, setMovementType] = useState<StockMovementType>('IN')
   const [quantity, setQuantity] = useState('')
+  const [unitCost, setUnitCost] = useState('')
   const [note, setNote] = useState('')
   const [movementAtLocal, setMovementAtLocal] = useState(defaultMovementDatetimeLocal)
 
@@ -68,11 +69,16 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
       alert.error('Validasi', 'Kuantitas wajib diisi.')
       return
     }
+    if (movementType === 'IN' && !unitCost.trim()) {
+      alert.error('Validasi', 'Harga satuan wajib diisi untuk mutasi masuk.')
+      return
+    }
     try {
       await mutation.mutateAsync({
         ingredient_inventory: ingredientInventoryId as number,
         movement_type: movementType,
         quantity: quantity.trim(),
+        unit_cost_idr: movementType === 'IN' ? unitCost.trim() : undefined,
         note: note.trim() || undefined,
         movement_at: datetimeLocalValueToIso(movementAtLocal),
       })
@@ -168,6 +174,27 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
               placeholder="0"
             />
           </div>
+
+          {movementType === 'IN' ? (
+            <div className="grid gap-2">
+              <Label htmlFor="ing-mov-cost">Harga satuan (IDR)</Label>
+              <Input
+                id="ing-mov-cost"
+                type="number"
+                inputMode="decimal"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value.replace(/[^0-9.]/g, ''))}
+                disabled={pending}
+                className="border-outline-variant"
+                min="0"
+                step="any"
+                placeholder="0"
+              />
+              <p className="text-on-surface-variant text-xs">
+                Digunakan untuk memperbarui biaya rata-rata stok bahan.
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid gap-2">
             <Label htmlFor="ing-mov-at">Waktu mutasi</Label>

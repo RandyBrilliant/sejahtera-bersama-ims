@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { fetchAttendanceSettings, patchAttendanceSettings } from '@/api/attendance'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { alert } from '@/lib/alert'
@@ -43,7 +44,8 @@ export function AdminAttendanceSettingsPage() {
         setGraceMinutes(String(s.grace_minutes ?? 0))
         setMinHoursCheckout(String(s.minimum_hours_before_checkout ?? 1))
         setMinWorkHoursFullDay(String(s.minimum_work_hours_full_day ?? 6))
-        setLateFineIdr(String(s.late_fine_idr ?? '20000'))
+        const fineRaw = Number(s.late_fine_idr ?? 20000)
+        setLateFineIdr(Number.isFinite(fineRaw) ? String(Math.trunc(fineRaw)) : '20000')
       } catch (e) {
         if (!cancelled) {
           alert.error('Presensi', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -62,7 +64,7 @@ export function AdminAttendanceSettingsPage() {
     const gm = Number(graceMinutes)
     const minCheckout = Number(minHoursCheckout)
     const minFullDay = Number(minWorkHoursFullDay)
-    const fine = Number(lateFineIdr.replace(/\./g, ''))
+    const fine = Number(lateFineIdr)
 
     if (!Number.isFinite(gm) || gm < 0 || !Number.isInteger(gm)) {
       alert.error('Validasi', 'Toleransi terlambat harus bilangan bulat ≥ 0.')
@@ -193,13 +195,12 @@ export function AdminAttendanceSettingsPage() {
             <Label htmlFor="late-fine" className="text-xs font-semibold uppercase">
               Denda terlambat (IDR)
             </Label>
-            <Input
+            <CurrencyInput
               id="late-fine"
-              inputMode="numeric"
-              min={0}
               value={lateFineIdr}
-              onChange={(e) => setLateFineIdr(e.target.value.replace(/[^\d]/g, ''))}
+              onChange={setLateFineIdr}
               disabled={saving}
+              placeholder="Mis. 20.000"
             />
           </div>
           <Button type="button" disabled={saving} onClick={() => void handleSave()}>

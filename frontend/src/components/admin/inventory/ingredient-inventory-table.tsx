@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { STOCK_UNIT_LABEL } from '@/constants/stock-units'
+import { useAuth } from '@/hooks/use-auth'
 import { useIngredientInventoriesQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
@@ -48,6 +49,9 @@ function fmtQty(v: string) {
 
 export function IngredientInventoryTable() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // Staf gudang: list only — edit minimum/stok is admin/pimpinan.
+  const canEdit = user?.role !== 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<IngredientInventoryListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
@@ -121,28 +125,32 @@ export function IngredientInventoryTable() {
             <Badge variant="secondary">Aman</Badge>
           ),
       },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="size-8 px-0"
-              onClick={() =>
-                navigate(`/admin/gudang/stok-bahan/${row.original.id}/edit`)
-              }
-              aria-label={`Edit stok ${row.original.ingredient_name}`}
-            >
-              <Pencil className="size-4" />
-            </Button>
-          </div>
-        ),
-      },
+      ...(canEdit
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              cell: ({ row }: { row: { original: IngredientInventory } }) => (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="size-8 px-0"
+                    onClick={() =>
+                      navigate(`/admin/gudang/stok-bahan/${row.original.id}/edit`)
+                    }
+                    aria-label={`Edit stok ${row.original.ingredient_name}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                </div>
+              ),
+            } satisfies ColumnDef<IngredientInventory>,
+          ]
+        : []),
     ],
-    [navigate, sortHeader]
+    [canEdit, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */

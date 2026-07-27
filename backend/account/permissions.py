@@ -145,6 +145,34 @@ class InventoryAccess(permissions.BasePermission):
         return has_role(request.user, UserRole.ADMIN, UserRole.WAREHOUSE_STAFF)
 
 
+class IngredientInventoryAccess(permissions.BasePermission):
+    """
+    Bahan baku master, stok bahan rows, and mutasi endpoints:
+    - Owner/Admin: write (create mutasi, edit minimum, manage master)
+    - Warehouse/Finance/Sales: read only (staff gudang lists stock/mutasi; adjusts stock via produksi)
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+
+        if request.method in permissions.SAFE_METHODS:
+            if user_is_owner(request.user):
+                return True
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+                UserRole.SALES_STAFF,
+            )
+        if user_is_owner(request.user):
+            return True
+        return has_role(request.user, UserRole.ADMIN)
+
+
 class FinanceAccess(permissions.BasePermission):
     """
     Finance policy:

@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from account.api_responses import success_response
 from account.pagination import StandardResultsSetPagination
-from account.permissions import InventoryAccess
+from account.permissions import IngredientInventoryAccess, InventoryAccess
 
 from .filters import (
     IngredientFilter,
@@ -173,7 +173,7 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
 
 class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = IngredientSerializer
-    permission_classes = [InventoryAccess]
+    permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -187,7 +187,7 @@ class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
 
 class IngredientInventoryViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = IngredientInventorySerializer
-    permission_classes = [InventoryAccess]
+    permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientInventoryFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -436,7 +436,7 @@ class RangeInventoryRecapView(APIView):
 
 class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, viewsets.ModelViewSet):
     serializer_class = IngredientStockMovementSerializer
-    permission_classes = [InventoryAccess]
+    permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientStockMovementFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -469,16 +469,36 @@ class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin
         if movement == StockMovementType.OUT and inventory.remaining_stock < qty:
             raise ValueError("Stok bahan tidak mencukupi untuk stock out.")
 
-        delta = qty if movement == StockMovementType.IN else -qty
-        inventory.remaining_stock = inventory.remaining_stock + delta
-        inventory.updated_by = self.request.user
-        inventory.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
-
-        serializer.save(
-            ingredient_inventory=inventory,
-            created_by=self.request.user,
-            updated_by=self.request.user,
-        )
+        if movement == StockMovementType.IN:
+            unit_cost = Decimal(str(serializer.validated_data["unit_cost_idr"]))
+            inventory.avg_cost_idr = weighted_moving_average(
+                old_qty=inventory.remaining_stock,
+                old_avg_unit_cost=inventory.avg_cost_idr,
+                add_qty=qty,
+                add_total_cost=Decimal(str(qty)) * unit_cost,
+            )
+            inventory.remaining_stock = inventory.remaining_stock + qty
+            inventory.updated_by = self.request.user
+            inventory.save(
+                update_fields=["remaining_stock", "avg_cost_idr", "updated_by", "updated_at"]
+            )
+            serializer.save(
+                ingredient_inventory=inventory,
+                unit_cost_idr=unit_cost,
+                created_by=self.request.user,
+                updated_by=self.request.user,
+            )
+        else:
+            unit_cost = inventory.avg_cost_idr
+            inventory.remaining_stock = inventory.remaining_stock - qty
+            inventory.updated_by = self.request.user
+            inventory.save(update_fields=["remaining_stock", "updated_by", "updated_at"])
+            serializer.save(
+                ingredient_inventory=inventory,
+                unit_cost_idr=unit_cost,
+                created_by=self.request.user,
+                updated_by=self.request.user,
+            )
         self._touch_inventory_summary_cache()
 
     def create(self, request, *args, **kwargs):
@@ -493,7 +513,7 @@ class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin
 
 class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, viewsets.ModelViewSet):
     serializer_class = ProductStockMovementSerializer
-    permission_classes = [InventoryAccess]
+    permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductStockMovementFilter
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -549,15 +569,48 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
                 "Stok produk (massa utama) tidak mencukupi untuk pengeluaran ini."
             )
 
-        product.remaining_mass_grams = next_mass
-        product.updated_by = self.request.user
-        product.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
-
-        serializer.save(
-            product_packaging=None,
-            created_by=self.request.user,
-            updated_by=self.request.user,
-        )
+        if movement == StockMovementType.IN:
+            unit_cost_per_kg = Decimal(str(serializer.validated_data["unit_cost_per_kg_idr"]))
+            add_mass = mass + bonus_mass
+            add_total_cost = (add_mass / Decimal("1000")) * unit_cost_per_kg
+            old_mass = product.remaining_mass_grams or Decimal("0")
+            old_avg_per_g = Decimal(str(product.avg_cost_per_kg_idr or 0)) / Decimal("1000")
+            new_avg_per_g = weighted_moving_average(
+                old_qty=old_mass,
+                old_avg_unit_cost=old_avg_per_g,
+                add_qty=add_mass,
+                add_total_cost=add_total_cost,
+            )
+            product.remaining_mass_grams = next_mass
+            product.avg_cost_per_kg_idr = (new_avg_per_g * Decimal("1000")).quantize(
+                Decimal("0.0001")
+            )
+            product.updated_by = self.request.user
+            product.save(
+                update_fields=[
+                    "remaining_mass_grams",
+                    "avg_cost_per_kg_idr",
+                    "updated_by",
+                    "updated_at",
+                ]
+            )
+            serializer.save(
+                product_packaging=None,
+                unit_cost_per_kg_idr=unit_cost_per_kg,
+                created_by=self.request.user,
+                updated_by=self.request.user,
+            )
+        else:
+            unit_cost_per_kg = product.avg_cost_per_kg_idr
+            product.remaining_mass_grams = next_mass
+            product.updated_by = self.request.user
+            product.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+            serializer.save(
+                product_packaging=None,
+                unit_cost_per_kg_idr=unit_cost_per_kg,
+                created_by=self.request.user,
+                updated_by=self.request.user,
+            )
         self._touch_inventory_summary_cache()
 
     def create(self, request, *args, **kwargs):
@@ -604,8 +657,16 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
             )
 
             material_cost = Decimal("0")
+            inv_ids = sorted({row["ingredient_inventory"].pk for row in ingredient_usages})
+            inventories = {
+                inv.pk: inv
+                for inv in IngredientInventory.objects.select_for_update()
+                .select_related("ingredient")
+                .filter(pk__in=inv_ids)
+                .order_by("pk")
+            }
             for row in ingredient_usages:
-                inventory = IngredientInventory.objects.select_for_update().get(pk=row["ingredient_inventory"].pk)
+                inventory = inventories[row["ingredient_inventory"].pk]
                 quantity_used = row["quantity_used"]
                 if inventory.remaining_stock < quantity_used:
                     raise ValueError(f"Stok bahan tidak cukup: {inventory.ingredient.name}")
@@ -683,7 +744,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                 )
 
             for row in packaging_outputs:
-                packaging = ProductPackaging.objects.select_for_update().get(pk=row["product_packaging"].pk)
+                packaging = row["product_packaging"]
                 quantity_produced = row["quantity_produced"]
                 bonus_quantity = row.get("bonus_quantity") or Decimal("0")
                 grams_per_pkg = Decimal(str(packaging.net_mass_kg)) * Decimal("1000")

@@ -367,23 +367,35 @@ export default function App() {
               >
                 <Route path="gudang" element={<AdminWarehouseLayout />}>
                   <Route index element={<AdminWarehousePage />} />
-                  <Route path="bahan-baku/baru" element={<AdminIngredientNewPage />} />
                   <Route
-                    path="bahan-baku/:ingredientId/edit"
-                    element={<AdminIngredientEditPage />}
-                  />
-                  <Route path="bahan-baku" element={<AdminIngredientsPage />} />
-                  <Route
-                    path="stok-bahan/:inventoryId/edit"
-                    element={<AdminIngredientInventoryEditPage />}
-                  />
+                    element={
+                      <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />
+                    }
+                  >
+                    <Route path="bahan-baku/baru" element={<AdminIngredientNewPage />} />
+                    <Route
+                      path="bahan-baku/:ingredientId/edit"
+                      element={<AdminIngredientEditPage />}
+                    />
+                    <Route path="bahan-baku" element={<AdminIngredientsPage />} />
+                    <Route
+                      path="stok-bahan/:inventoryId/edit"
+                      element={<AdminIngredientInventoryEditPage />}
+                    />
+                  </Route>
                   <Route path="stok-bahan" element={<AdminIngredientInventoryPage />} />
                   <Route path="produksi/baru" element={<AdminProductionBatchNewPage />} />
                   <Route path="produksi/:batchId" element={<AdminProductionBatchDetailPage />} />
                   <Route path="produksi" element={<AdminProductionBatchesPage />} />
-                  <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
+                  <Route
+                    element={
+                      <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />
+                    }
+                  >
+                    <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
+                    <Route path="mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
+                  </Route>
                   <Route path="mutasi-bahan" element={<AdminIngredientMovementsPage />} />
-                  <Route path="mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
                   <Route path="mutasi-produk" element={<AdminProductMovementsPage />} />
                 </Route>
               </Route>

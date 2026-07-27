@@ -13,13 +13,17 @@ export function AdminProductionBatchesPage() {
             Produksi
           </h1>
           <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-            Batch produksi harian: pemakaian bahan baku dan hasil kemasan. Setiap batch memperbarui
-            stok secara otomatis dan tidak dapat diubah setelah disimpan.
+            Daftar produksi harian. Ketuk Catat produksi untuk mengisi bahan yang dipakai dan hasil
+            kemasan — langkah demi langkah.
           </p>
         </div>
-        <Button type="button" className="shrink-0 gap-2" asChild>
+        <Button
+          type="button"
+          className="min-h-12 shrink-0 gap-2 px-5 text-base font-semibold"
+          asChild
+        >
           <Link to="/admin/gudang/produksi/baru">
-            <Plus className="size-4" />
+            <Plus className="size-5" />
             Catat produksi
           </Link>
         </Button>

@@ -30,6 +30,7 @@ import { CurrencyInput } from '@/components/ui/currency-input'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import {
   useCreateCustomerMutation,
@@ -115,9 +116,16 @@ function RequiredAsterisk() {
   )
 }
 
-function cartFromInitial(order: SalesOrder | null): CartItem[] {
+function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): CartItem[] {
   if (!order?.lines?.length) return []
   return order.lines.map((l) => {
+    if (!allowCustomPrice) {
+      return {
+        product_packaging: l.product_packaging,
+        quantity: String(l.quantity),
+        unit_price_per_kg_idr: '',
+      }
+    }
     const mass = Number(String(l.net_mass_kg ?? '').replace(',', '.'))
     const perKgDefault = l.price_per_kg_idr ?? null
     const defaultUnit =
@@ -142,6 +150,12 @@ type InnerProps = {
 }
 
 function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: InnerProps) {
+  const { user } = useAuth()
+  const isSalesStaff = user?.role === 'SALES_STAFF'
+  const canSetCustomPrice = !isSalesStaff
+  /** Sales may only change cart lines when editing — nota header stays locked. */
+  const lockNotaDetails = mode === 'edit' && isSalesStaff
+
   const customersQuery = useCustomersQuery({ ...listParams, is_active: true })
   const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
   const packagingQuery = useProductPackagingListQuery(listParams)
@@ -168,7 +182,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
   const [notes, setNotes] = useState(() => initial?.notes ?? '')
-  const [cart, setCart] = useState<CartItem[]>(() => cartFromInitial(initial))
+  const [cart, setCart] = useState<CartItem[]>(() => cartFromInitial(initial, canSetCustomPrice))
   const [expandedCustom, setExpandedCustom] = useState<Set<number>>(new Set())
 
   const [catalogSearch, setCatalogSearch] = useState('')
@@ -383,22 +397,32 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
         product_packaging: it.product_packaging,
         quantity: it.quantity.trim(),
       }
-      const priceRaw = it.unit_price_per_kg_idr.trim()
-      if (priceRaw) line.unit_price_per_kg_idr = Number(priceRaw)
+      if (canSetCustomPrice) {
+        const priceRaw = it.unit_price_per_kg_idr.trim()
+        if (priceRaw) line.unit_price_per_kg_idr = Number(priceRaw)
+      }
       payloadLines.push(line)
     }
 
-    const body = {
-      customer: customerId as number,
-      invoice_number: invoiceNumber.trim() || undefined,
-      invoice_date: invoiceDate || null,
-      notes: notes.trim(),
-      lines: payloadLines,
-    }
+    const body = lockNotaDetails
+      ? { lines: payloadLines }
+      : {
+          customer: customerId as number,
+          invoice_number: invoiceNumber.trim() || undefined,
+          invoice_date: invoiceDate || null,
+          notes: notes.trim(),
+          lines: payloadLines,
+        }
 
     try {
       if (mode === 'create') {
-        const o = await createMut.mutateAsync(body)
+        const o = await createMut.mutateAsync({
+          customer: customerId as number,
+          invoice_number: invoiceNumber.trim() || undefined,
+          invoice_date: invoiceDate || null,
+          notes: notes.trim(),
+          lines: payloadLines,
+        })
         alert.success('Berhasil', 'Order penjualan dibuat.')
         onSaved(o.id)
       } else {
@@ -525,6 +549,25 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                 Pelanggan
                 <RequiredAsterisk />
               </Label>
+              {lockNotaDetails ? (
+                <>
+                  <div className="border-outline-variant bg-surface-container-low rounded-lg border px-3 py-2 text-sm">
+                    {selectedCustomer?.name ??
+                      (customerId !== '' ? `#${customerId}` : '—')}
+                  </div>
+                  {selectedCustomer ? (
+                    <p className="text-on-surface-variant truncate text-xs">
+                      {[selectedCustomer.wilayah_name, selectedCustomer.phone]
+                        .filter(Boolean)
+                        .join(' · ') || 'Tanpa detail'}
+                    </p>
+                  ) : null}
+                  <p className="text-on-surface-variant text-[11px]">
+                    Detail nota tidak dapat diubah. Anda hanya dapat mengubah item pesanan.
+                  </p>
+                </>
+              ) : (
+                <>
               <DropdownMenu open={customerDropdownOpen} onOpenChange={setCustomerDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -611,6 +654,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                     .join(' · ') || 'Tanpa detail'}
                 </p>
               ) : null}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -632,8 +677,10 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                     const pkg = packagingById.get(it.product_packaging)
                     const unit = unitTotalFor(it)
                     const qtyNum = Number(it.quantity) || 0
-                    const isCustom = it.unit_price_per_kg_idr.trim() !== ''
-                    const expanded = expandedCustom.has(it.product_packaging) || isCustom
+                    const isCustom = canSetCustomPrice && it.unit_price_per_kg_idr.trim() !== ''
+                    const expanded =
+                      canSetCustomPrice &&
+                      (expandedCustom.has(it.product_packaging) || isCustom)
                     const lineKg = qtyNum * massKgOf(pkg)
                     const pricePerKg = isCustom
                       ? Number(it.unit_price_per_kg_idr) || 0
@@ -699,29 +746,31 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                             {formatIdr(qtyNum * unit)}
                           </span>
                         </div>
-                        {expanded ? (
-                          <div className="grid gap-1">
-                            <Label className="text-on-surface-variant text-[11px]">
-                              Harga khusus per kg (IDR)
-                            </Label>
-                            <CurrencyInput
-                              value={it.unit_price_per_kg_idr}
-                              onChange={(v) => setCustomPerKg(it.product_packaging, v)}
+                        {canSetCustomPrice ? (
+                          expanded ? (
+                            <div className="grid gap-1">
+                              <Label className="text-on-surface-variant text-[11px]">
+                                Harga khusus per kg (IDR)
+                              </Label>
+                              <CurrencyInput
+                                value={it.unit_price_per_kg_idr}
+                                onChange={(v) => setCustomPerKg(it.product_packaging, v)}
+                                disabled={pending}
+                                placeholder="Auto (harga produk)"
+                                className="border-outline-variant h-8"
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleCustom(it.product_packaging)}
                               disabled={pending}
-                              placeholder="Auto (harga produk)"
-                              className="border-outline-variant h-8"
-                            />
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => toggleCustom(it.product_packaging)}
-                            disabled={pending}
-                            className="text-primary text-[11px] font-medium"
-                          >
-                            + Harga khusus
-                          </button>
-                        )}
+                              className="text-primary text-[11px] font-medium"
+                            >
+                              + Harga khusus
+                            </button>
+                          )
+                        ) : null}
                       </li>
                     )
                   })}
@@ -732,6 +781,41 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
           <Card className="border-outline-variant bg-card">
             <CardContent className="space-y-3 p-4">
+              {lockNotaDetails ? (
+                <div className="grid gap-2 text-sm">
+                  <div>
+                    <p className="text-on-surface-variant text-xs">Nomor faktur</p>
+                    <p className="text-on-surface font-medium">{invoiceNumber || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-on-surface-variant text-xs">Tanggal faktur</p>
+                    <p className="text-on-surface font-medium">{invoiceDate || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-on-surface-variant text-xs">Catatan</p>
+                    <p className="text-on-surface whitespace-pre-wrap">{notes.trim() || '—'}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+              <div className="grid gap-1.5">
+                <Label htmlFor="so-notes" className="text-xs">
+                  Catatan pesanan
+                </Label>
+                <textarea
+                  id="so-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  disabled={pending}
+                  rows={3}
+                  placeholder="Catatan untuk pesanan ini (opsional)…"
+                  className={cn(
+                    'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                    'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
+                  )}
+                />
+              </div>
+
               <button
                 type="button"
                 onClick={() => setFakturOpen((v) => !v)}
@@ -768,24 +852,10 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       disabled={pending}
                     />
                   </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="so-notes" className="text-xs">
-                      Catatan
-                    </Label>
-                    <textarea
-                      id="so-notes"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      disabled={pending}
-                      rows={2}
-                      className={cn(
-                        'border-outline-variant bg-field min-h-[60px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
-                        'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
-                      )}
-                    />
-                  </div>
                 </div>
               ) : null}
+                </>
+              )}
 
               <div className="border-outline-variant flex items-center justify-between border-t pt-3 text-sm">
                 <span className="text-on-surface-variant">Total berat</span>

@@ -79,6 +79,8 @@ export function AdminSalesOrderDetailPage() {
   const { user } = useAuth()
   const isOwner = user?.role === 'LEADERSHIP'
   const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
+  const isSalesStaff = user?.role === 'SALES_STAFF'
+  const canCancelOrder = !isFinanceReadOnly && !isSalesStaff
 
   const { data: order, isLoading, isError, refetch } = useSalesOrderQuery(validId ? id : null)
   const uploadMut = useUploadSalesPaymentProofMutation(id)
@@ -337,7 +339,7 @@ export function AdminSalesOrderDetailPage() {
             {uploadMut.isPending ? 'Mengunggah…' : 'Unggah bukti pembayaran'}
           </Button>
         ) : null}
-        {!isFinanceReadOnly &&
+        {canCancelOrder &&
         order.status !== 'VERIFIED' &&
         order.status !== 'CANCELLED' ? (
           <Button

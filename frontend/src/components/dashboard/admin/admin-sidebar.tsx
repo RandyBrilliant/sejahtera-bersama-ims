@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils'
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 const navItems: NavItem[] = [
-  { to: '/admin/dashboard', label: 'Dasbor', icon: LayoutDashboard, end: true },
+  { to: '/admin/dashboard', label: 'Beranda', icon: LayoutDashboard, end: true },
   { to: '/admin/staf', label: 'Pengguna & staf', icon: Users },
   { to: '/admin/inventaris', label: 'Inventaris', icon: Package },
   { to: '/admin/pelanggan', label: 'Pelanggan', icon: Contact },
@@ -48,7 +48,6 @@ const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: Tre
 
 const warehouseNavItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor gudang', icon: LayoutDashboard, end: true },
-  { to: '/admin/gudang/bahan-baku', label: 'Bahan baku', icon: Warehouse },
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan', icon: Package },
   { to: '/admin/gudang/produksi', label: 'Produksi', icon: Boxes },
   { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan', icon: ShoppingCart },
@@ -123,6 +122,8 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           </div>
         </div>
       </div>
+
+      <div className="border-outline-variant mx-4 border-t" />
 
       <div className="mt-1 flex flex-1 flex-col gap-1 overflow-y-auto px-4">
         {visibleNavItems.map((item) => {

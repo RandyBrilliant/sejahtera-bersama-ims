@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import success_response
+from account.models import UserRole
 from account.pagination import StandardResultsSetPagination
 from account.permissions import (
     CustomerAccess,
@@ -213,12 +214,17 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         now = timezone.now()
-        for line in order.lines.select_related("ingredient_inventory__ingredient").all():
-            inv = (
-                IngredientInventory.objects.select_for_update()
-                .select_related("ingredient")
-                .get(pk=line.ingredient_inventory_id)
-            )
+        lines = list(order.lines.select_related("ingredient_inventory__ingredient").all())
+        inv_ids = sorted({line.ingredient_inventory_id for line in lines})
+        inventories = {
+            inv.pk: inv
+            for inv in IngredientInventory.objects.select_for_update()
+            .select_related("ingredient")
+            .filter(pk__in=inv_ids)
+            .order_by("pk")
+        }
+        for line in lines:
+            inv = inventories[line.ingredient_inventory_id]
             inv.avg_cost_idr = weighted_moving_average(
                 old_qty=inv.remaining_stock,
                 old_avg_unit_cost=inv.avg_cost_idr,
@@ -246,10 +252,19 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
         return Response(PurchaseInOrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="cancel")
+    @transaction.atomic
     def cancel(self, request, pk=None):
-        order = self.get_object()
+        order = PurchaseInOrder.objects.select_for_update().get(pk=self.get_object().pk)
         if order.status == OrderStatus.VERIFIED:
-            return Response({"detail": "Order terverifikasi tidak dapat dibatalkan.", "code": "validation_error"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Order terverifikasi tidak dapat dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if order.status == OrderStatus.CANCELLED:
+            return Response(
+                {"detail": "Order sudah dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         order.status = OrderStatus.CANCELLED
         order.updated_by = request.user
         order.save(update_fields=["status", "updated_by", "updated_at"])
@@ -689,10 +704,30 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         return Response(SalesOrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="cancel")
+    @transaction.atomic
     def cancel(self, request, pk=None):
-        order = self.get_object()
+        if (
+            getattr(request.user, "role", None) == UserRole.SALES_STAFF
+            and not getattr(request.user, "is_superuser", False)
+        ):
+            return Response(
+                {
+                    "detail": "Staf penjualan tidak dapat membatalkan order.",
+                    "code": "permission_denied",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        order = SalesOrder.objects.select_for_update().get(pk=self.get_object().pk)
         if order.status == OrderStatus.VERIFIED:
-            return Response({"detail": "Order terverifikasi tidak dapat dibatalkan.", "code": "validation_error"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Order terverifikasi tidak dapat dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if order.status == OrderStatus.CANCELLED:
+            return Response(
+                {"detail": "Order sudah dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         order.status = OrderStatus.CANCELLED
         order.updated_by = request.user
         order.save(update_fields=["status", "updated_by", "updated_at"])

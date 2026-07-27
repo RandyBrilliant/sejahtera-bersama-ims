@@ -1,11 +1,22 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 
 import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { useAuth } from '@/hooks/use-auth'
 
+/** Full shop-floor catat produksi — no Gudang chrome for any role. */
+function isShopFloorProductionPath(pathname: string) {
+  return pathname === '/admin/gudang/produksi/baru' || pathname.endsWith('/gudang/produksi/baru')
+}
+
 export function AdminWarehouseLayout() {
   const { user } = useAuth()
+  const { pathname } = useLocation()
   const showSubnav = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
+  const shopFloorMode = isShopFloorProductionPath(pathname)
+
+  if (shopFloorMode) {
+    return <Outlet />
+  }
 
   return (
     <div className="space-y-8">

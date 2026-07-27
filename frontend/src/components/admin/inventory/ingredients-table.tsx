@@ -31,7 +31,6 @@ import {
 import { useIngredientsQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
-import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import type { Ingredient, IngredientsListParams } from '@/types/inventory'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
@@ -40,8 +39,6 @@ const PAGE_SIZES = TABLE_PAGE_SIZES
 
 export function IngredientsTable() {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const canDelete = user?.role !== 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<IngredientsListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
@@ -113,24 +110,22 @@ export function IngredientsTable() {
               >
                 <Pencil className="size-4" />
               </Button>
-              {canDelete ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive size-8 px-0"
-                  onClick={() => setDeleteTarget(ing)}
-                  aria-label={`Hapus ${ing.name}`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive size-8 px-0"
+                onClick={() => setDeleteTarget(ing)}
+                aria-label={`Hapus ${ing.name}`}
+              >
+                <Trash2 className="size-4" />
+              </Button>
             </div>
           )
         },
       },
     ],
-    [canDelete, navigate, sortHeader]
+    [navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */
@@ -144,15 +139,13 @@ export function IngredientsTable() {
 
   return (
     <div className="space-y-4">
-      {canDelete ? (
-        <IngredientDeleteModal
-          open={!!deleteTarget}
-          onOpenChange={(o) => {
-            if (!o) setDeleteTarget(null)
-          }}
-          ingredient={deleteTarget}
-        />
-      ) : null}
+      <IngredientDeleteModal
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null)
+        }}
+        ingredient={deleteTarget}
+      />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">

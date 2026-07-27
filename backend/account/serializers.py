@@ -90,7 +90,13 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"password": ["Password wajib diisi saat membuat pengguna."]}
                 )
-            candidate = User(**{k: v for k, v in attrs.items() if k != "password"})
+            candidate = User(
+                **{
+                    k: v
+                    for k, v in attrs.items()
+                    if k not in ("password", "joined_date")
+                }
+            )
             candidate.username = attrs.get("username", "")
             candidate.full_name = attrs.get("full_name", "")
             try:

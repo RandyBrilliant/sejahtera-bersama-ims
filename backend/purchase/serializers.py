@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from account.media_fields import SignedMediaUrlField
+from account.models import UserRole
 from inventory.models import ProductPackaging
 
 from .models import (
@@ -19,6 +20,16 @@ from .models import (
     Wilayah,
 )
 from .utils import next_order_code, recompute_order_totals
+
+
+def _request_user_can_set_custom_line_price(request) -> bool:
+    """Sales staff cannot override line prices; admin/owner may set harga khusus."""
+    user = getattr(request, "user", None) if request else None
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False) or getattr(user, "role", None) == UserRole.LEADERSHIP:
+        return True
+    return getattr(user, "role", None) == UserRole.ADMIN
 
 
 def _user_mini(u):
@@ -311,7 +322,9 @@ def _price_from_per_kg(per_kg, net_mass_kg) -> int:
     return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def _resolve_sales_unit_price(customer, packaging: ProductPackaging, explicit_per_kg) -> int:
+def _resolve_sales_unit_price(
+    customer, packaging: ProductPackaging, explicit_per_kg, *, allow_custom: bool = True
+) -> int:
     """
     Resolve the per-package unit price for a sales line.
 
@@ -321,6 +334,14 @@ def _resolve_sales_unit_price(customer, packaging: ProductPackaging, explicit_pe
     """
     net_mass_kg = packaging.net_mass_kg
     if explicit_per_kg is not None and explicit_per_kg != "":
+        if not allow_custom:
+            raise serializers.ValidationError(
+                {
+                    "unit_price_per_kg_idr": [
+                        "Staf penjualan tidak dapat mengatur harga khusus. Gunakan harga katalog atau harga pelanggan."
+                    ]
+                }
+            )
         per_kg = int(explicit_per_kg)
         if per_kg < 1:
             raise serializers.ValidationError(
@@ -504,10 +525,13 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             created_by=user,
             updated_by=updated_by,
         )
+        allow_custom = _request_user_can_set_custom_line_price(request)
         for row in lines_data:
             packaging = row["product_packaging"]
             explicit = row.get("unit_price_per_kg_idr")
-            unit_price = _resolve_sales_unit_price(customer, packaging, explicit)
+            unit_price = _resolve_sales_unit_price(
+                customer, packaging, explicit, allow_custom=allow_custom
+            )
             SalesOrderLine.objects.create(
                 order=order,
                 product_packaging=packaging,
@@ -527,6 +551,28 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         if user is None:
             user = request.user if request and request.user.is_authenticated else None
         lines_data = validated_data.pop("lines", None)
+
+        # Sales staff may only change line items — not nota / customer header fields.
+        is_sales = (
+            user
+            and getattr(user, "role", None) == UserRole.SALES_STAFF
+            and not getattr(user, "is_superuser", False)
+        )
+        if is_sales:
+            blocked = [
+                field
+                for field in ("customer", "invoice_number", "invoice_date", "notes", "due_date")
+                if field in validated_data
+            ]
+            if blocked:
+                raise serializers.ValidationError(
+                    {
+                        field: ["Staf penjualan tidak dapat mengubah detail nota. Hanya item pesanan yang boleh diubah."]
+                        for field in blocked
+                    }
+                )
+            validated_data = {}
+
         customer = validated_data.get("customer", instance.customer)
         validated_data.pop("status", None)
         validated_data.pop("due_date", None)
@@ -540,11 +586,14 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         if lines_data is not None:
             if instance.status not in (OrderStatus.DRAFT, OrderStatus.SUBMITTED, OrderStatus.AWAITING_PAYMENT):
                 raise serializers.ValidationError({"lines": ["Baris hanya dapat diubah saat status masih draft/submitted/awaiting payment."]})
+            allow_custom = _request_user_can_set_custom_line_price(request)
             instance.lines.all().delete()
             for row in lines_data:
                 packaging = row["product_packaging"]
                 explicit = row.get("unit_price_per_kg_idr")
-                unit_price = _resolve_sales_unit_price(customer, packaging, explicit)
+                unit_price = _resolve_sales_unit_price(
+                    customer, packaging, explicit, allow_custom=allow_custom
+                )
                 SalesOrderLine.objects.create(
                     order=instance,
                     product_packaging=packaging,

@@ -48,6 +48,7 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
   /** Input dalam kg; dikirim ke API sebagai gram. */
   const [massKg, setMassKg] = useState('')
   const [bonusKg, setBonusKg] = useState('')
+  const [unitCostPerKg, setUnitCostPerKg] = useState('')
   const [note, setNote] = useState('')
   const [movementAtLocal, setMovementAtLocal] = useState(defaultMovementDatetimeLocal)
 
@@ -102,6 +103,11 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
     const mainG = mainKg * 1000
     const bonusG = bonusKgVal * 1000
 
+    if (movementType === 'IN' && !unitCostPerKg.trim()) {
+      alert.error('Validasi', 'HPP per kg wajib diisi untuk mutasi masuk.')
+      return
+    }
+
     try {
       await mutation.mutateAsync({
         product: productId as number,
@@ -109,6 +115,7 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
         mass_grams: String(mainG),
         bonus_mass_grams:
           movementType === 'IN' && bonusG > 0 ? String(bonusG) : undefined,
+        unit_cost_per_kg_idr: movementType === 'IN' ? unitCostPerKg.trim() : undefined,
         note: note.trim() || undefined,
         movement_at: datetimeLocalValueToIso(movementAtLocal),
       })
@@ -229,6 +236,27 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
               Keluar tidak menggunakan bonus; server menolak bonus &gt; 0 untuk OUT.
             </p>
           )}
+
+          {movementType === 'IN' ? (
+            <div className="grid gap-2">
+              <Label htmlFor="prod-mov-cost">HPP per kg (IDR)</Label>
+              <Input
+                id="prod-mov-cost"
+                type="number"
+                inputMode="decimal"
+                value={unitCostPerKg}
+                onChange={(e) => setUnitCostPerKg(e.target.value.replace(/[^0-9.]/g, ''))}
+                disabled={pending}
+                className="border-outline-variant"
+                min="0"
+                step="any"
+                placeholder="0"
+              />
+              <p className="text-on-surface-variant text-xs">
+                Digunakan untuk memperbarui biaya rata-rata produk jadi.
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid gap-2">
             <Label htmlFor="prod-mov-at">Waktu mutasi</Label>

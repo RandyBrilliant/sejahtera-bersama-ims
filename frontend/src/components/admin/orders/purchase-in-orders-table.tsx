@@ -64,6 +64,8 @@ export function PurchaseInOrdersTable() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canManagePurchase = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP' || user?.role === 'WAREHOUSE_STAFF'
+  /** Owner-only — matches backend `IsOwner` on purchase verify. */
+  const canVerifyPurchase = user?.role === 'LEADERSHIP'
   const [params, setParams] = useState<PurchaseInOrdersListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,
@@ -166,7 +168,7 @@ export function PurchaseInOrdersTable() {
                 </a>
               </Button>
             ) : null}
-            {canManagePurchase &&
+            {canVerifyPurchase &&
             (row.original.status === 'PAYMENT_PROOF_UPLOADED' ||
               (row.original.status === 'AWAITING_PAYMENT' && !!row.original.payment_proof)) ? (
               <Button
@@ -205,7 +207,7 @@ export function PurchaseInOrdersTable() {
         ),
       },
     ],
-    [canManagePurchase, navigate, sortHeader]
+    [canManagePurchase, canVerifyPurchase, navigate, sortHeader]
   )
 
   /* eslint-disable-next-line react-hooks/incompatible-library */

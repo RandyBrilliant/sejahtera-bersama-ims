@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { fetchEmployeeCompensation, patchEmployeeCompensation } from '@/api/payroll'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import { alert } from '@/lib/alert'
 import { cn } from '@/lib/utils'
@@ -29,14 +29,22 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof detail === 'string' ? detail : undefined
 }
 
+/** Normalize API decimal/string amounts to digits-only for CurrencyInput. */
+function idrToDigits(value: string | number | null | undefined): string {
+  if (value == null || value === '') return ''
+  const n = Number(value)
+  if (!Number.isFinite(n)) return ''
+  return String(Math.trunc(n))
+}
+
 function draftFromSnap(snap: EmployeeCompensation | null): Draft {
   if (!snap) {
     return { pay_type: 'DAILY', daily_rate_idr: '', monthly_base_salary_idr: '' }
   }
   return {
     pay_type: snap.pay_type ?? 'DAILY',
-    daily_rate_idr: String(snap.daily_rate_idr ?? ''),
-    monthly_base_salary_idr: String(snap.monthly_base_salary_idr ?? ''),
+    daily_rate_idr: idrToDigits(snap.daily_rate_idr),
+    monthly_base_salary_idr: idrToDigits(snap.monthly_base_salary_idr),
   }
 }
 
@@ -44,10 +52,11 @@ function draftMatchesSnap(draft: Draft, snap: EmployeeCompensation | null): bool
   if (!snap) {
     return !draft.daily_rate_idr.trim() && !draft.monthly_base_salary_idr.trim()
   }
+  const fromSnap = draftFromSnap(snap)
   return (
-    draft.pay_type === (snap.pay_type ?? 'DAILY') &&
-    draft.daily_rate_idr.trim() === String(snap.daily_rate_idr ?? '').trim() &&
-    draft.monthly_base_salary_idr.trim() === String(snap.monthly_base_salary_idr ?? '').trim()
+    draft.pay_type === fromSnap.pay_type &&
+    draft.daily_rate_idr.trim() === fromSnap.daily_rate_idr &&
+    draft.monthly_base_salary_idr.trim() === fromSnap.monthly_base_salary_idr
   )
 }
 
@@ -167,12 +176,11 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
 
       {draft.pay_type === 'DAILY' ? (
         <FieldGroup label="Tarif harian (IDR)" htmlFor={`daily-rate-${userId}`}>
-          <Input
+          <CurrencyInput
             id={`daily-rate-${userId}`}
-            inputMode="decimal"
-            placeholder="Mis. 100000"
+            placeholder="Mis. 100.000"
             value={draft.daily_rate_idr}
-            onChange={(e) => setDraft((d) => ({ ...d, daily_rate_idr: e.target.value }))}
+            onChange={(daily_rate_idr) => setDraft((d) => ({ ...d, daily_rate_idr }))}
             disabled={saving}
           />
         </FieldGroup>
@@ -183,12 +191,13 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
         htmlFor={`monthly-ref-${userId}`}
         hint="Hanya untuk catatan; perhitungan slip memakai presensi atau kupas sesuai tipe di atas."
       >
-        <Input
+        <CurrencyInput
           id={`monthly-ref-${userId}`}
-          inputMode="decimal"
-          placeholder="Mis. 5000000"
+          placeholder="Mis. 5.000.000"
           value={draft.monthly_base_salary_idr}
-          onChange={(e) => setDraft((d) => ({ ...d, monthly_base_salary_idr: e.target.value }))}
+          onChange={(monthly_base_salary_idr) =>
+            setDraft((d) => ({ ...d, monthly_base_salary_idr }))
+          }
           disabled={saving}
         />
       </FieldGroup>

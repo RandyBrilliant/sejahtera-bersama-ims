@@ -173,6 +173,7 @@ class PurchaseInOrder(AuditModel):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["status", "verified_at"]),
             models.Index(fields=["created_by"]),
         ]
 
@@ -268,6 +269,7 @@ class SalesOrder(AuditModel):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["status", "verified_at"]),
             models.Index(fields=["customer", "status"]),
             models.Index(fields=["created_by"]),
         ]

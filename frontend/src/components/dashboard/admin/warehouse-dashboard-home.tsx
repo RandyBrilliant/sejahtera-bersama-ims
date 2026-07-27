@@ -42,7 +42,7 @@ export function WarehouseDashboardHome() {
           </p>
         </div>
         <Button asChild className="shrink-0 gap-2">
-          <Link to="/admin/gudang/mutasi-bahan/baru">Catat mutasi bahan</Link>
+          <Link to="/admin/gudang/produksi/baru">Catat produksi</Link>
         </Button>
       </div>
 

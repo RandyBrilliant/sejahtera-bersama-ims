@@ -147,6 +147,7 @@ export type IngredientStockMovement = {
   ingredient_unit: StockUnit
   movement_type: StockMovementType
   quantity: string
+  unit_cost_idr: string | null
   note: string
   movement_at: string
   created_at: string
@@ -165,6 +166,7 @@ export type ProductStockMovement = {
   mass_grams: string
   bonus_mass_grams: string
   total_mass_grams: string
+  unit_cost_per_kg_idr: string | null
   note: string
   movement_at: string
   created_at: string
@@ -226,6 +228,8 @@ export type IngredientStockMovementCreateInput = {
   ingredient_inventory: number
   movement_type: StockMovementType
   quantity: string | number
+  /** Required for IN — updates moving-average cost. */
+  unit_cost_idr?: string | number | null
   note?: string
   movement_at: string
 }
@@ -235,6 +239,8 @@ export type ProductStockMovementCreateInput = {
   movement_type: StockMovementType
   mass_grams: string | number
   bonus_mass_grams?: string | number
+  /** Required for IN — updates moving-average cost per kg. */
+  unit_cost_per_kg_idr?: string | number | null
   note?: string
   movement_at: string
 }

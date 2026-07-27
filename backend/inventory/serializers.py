@@ -225,6 +225,7 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
             "ingredient_unit",
             "movement_type",
             "quantity",
+            "unit_cost_idr",
             "note",
             "movement_at",
             "created_at",
@@ -233,6 +234,21 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
             "updated_by",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def validate(self, attrs):
+        mt = attrs.get("movement_type") or getattr(self.instance, "movement_type", None)
+        unit_cost = attrs.get("unit_cost_idr", serializers.empty)
+        if unit_cost is serializers.empty and self.instance is not None:
+            unit_cost = self.instance.unit_cost_idr
+        if mt == StockMovementType.IN and unit_cost is None:
+            raise serializers.ValidationError(
+                {"unit_cost_idr": "Harga satuan wajib diisi untuk mutasi masuk (IN)."}
+            )
+        if mt == StockMovementType.IN and unit_cost is not None and Decimal(str(unit_cost)) <= 0:
+            raise serializers.ValidationError(
+                {"unit_cost_idr": "Harga satuan harus lebih dari nol untuk mutasi masuk."}
+            )
+        return attrs
 
 
 class ProductStockMovementSerializer(serializers.ModelSerializer):
@@ -256,6 +272,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
             "mass_grams",
             "bonus_mass_grams",
             "total_mass_grams",
+            "unit_cost_per_kg_idr",
             "note",
             "movement_at",
             "created_at",
@@ -284,13 +301,36 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         return obj.mass_grams + obj.bonus_mass_grams
 
     def validate(self, attrs):
-        mt = attrs["movement_type"]
+        mt = attrs.get("movement_type") or getattr(self.instance, "movement_type", None)
         bonus = attrs.get("bonus_mass_grams")
         if bonus is None:
             bonus = Decimal("0")
         if mt == StockMovementType.OUT and bonus > 0:
             raise serializers.ValidationError(
                 {"bonus_mass_grams": "Bonus massa hanya untuk mutasi masuk (IN)."}
+            )
+        unit_cost = attrs.get("unit_cost_per_kg_idr", serializers.empty)
+        if unit_cost is serializers.empty and self.instance is not None:
+            unit_cost = self.instance.unit_cost_per_kg_idr
+        if mt == StockMovementType.IN and unit_cost is None:
+            raise serializers.ValidationError(
+                {
+                    "unit_cost_per_kg_idr": (
+                        "HPP per kg wajib diisi untuk mutasi masuk (IN)."
+                    )
+                }
+            )
+        if (
+            mt == StockMovementType.IN
+            and unit_cost is not None
+            and Decimal(str(unit_cost)) <= 0
+        ):
+            raise serializers.ValidationError(
+                {
+                    "unit_cost_per_kg_idr": (
+                        "HPP per kg harus lebih dari nol untuk mutasi masuk."
+                    )
+                }
             )
         return attrs
 

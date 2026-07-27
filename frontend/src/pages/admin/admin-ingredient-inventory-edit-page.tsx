@@ -2,15 +2,21 @@ import { Navigate, useParams } from 'react-router-dom'
 
 import { IngredientInventoryForm } from '@/components/admin/inventory/ingredient-inventory-form'
 import { PageBackLink } from '@/components/navigation/page-back-link'
+import { useAuth } from '@/hooks/use-auth'
 import { useGoBack } from '@/hooks/use-go-back'
 
 const LIST_PATH = '/admin/gudang/stok-bahan'
 
 export function AdminIngredientInventoryEditPage() {
   const goBack = useGoBack()
+  const { user } = useAuth()
   const { inventoryId: idParam } = useParams<{ inventoryId: string }>()
   const id = Number(idParam)
   const validId = Number.isFinite(id) && id > 0
+
+  if (user?.role === 'WAREHOUSE_STAFF') {
+    return <Navigate to={LIST_PATH} replace />
+  }
 
   if (!validId) {
     return <Navigate to={LIST_PATH} replace />

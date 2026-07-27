@@ -3,8 +3,12 @@ import { Plus } from 'lucide-react'
 
 import { ProductStockMovementsTable } from '@/components/admin/inventory/product-stock-movements-table'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
 
 export function AdminProductMovementsPage() {
+  const { user } = useAuth()
+  const canCreate = user?.role !== 'WAREHOUSE_STAFF'
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -13,16 +17,19 @@ export function AdminProductMovementsPage() {
             Mutasi produk
           </h1>
           <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-            Riwayat masuk/keluar per kemasan (SKU). Masuk dapat mencakup bonus; keluar hanya memakai
-            kuantitas utama.
+            {canCreate
+              ? 'Riwayat masuk/keluar per kemasan (SKU). Masuk dapat mencakup bonus; keluar hanya memakai kuantitas utama.'
+              : 'Riwayat masuk/keluar per kemasan (SKU). Staf gudang hanya dapat melihat daftar mutasi.'}
           </p>
         </div>
-        <Button type="button" className="shrink-0 gap-2" asChild>
-          <Link to="/admin/gudang/mutasi-produk/baru">
-            <Plus className="size-4" />
-            Catat mutasi
-          </Link>
-        </Button>
+        {canCreate ? (
+          <Button type="button" className="shrink-0 gap-2" asChild>
+            <Link to="/admin/gudang/mutasi-produk/baru">
+              <Plus className="size-4" />
+              Catat mutasi
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <ProductStockMovementsTable />

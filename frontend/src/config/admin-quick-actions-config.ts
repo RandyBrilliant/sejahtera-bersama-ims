@@ -86,7 +86,7 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
     description: 'Stok jadi',
     to: '/admin/gudang/mutasi-produk/baru',
     icon: ArrowLeftRight,
-    allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
+    allowedRoles: ['ADMIN', 'LEADERSHIP'],
   },
   {
     id: 'ingredient-movement-new',
@@ -94,12 +94,12 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
     description: 'Stok bahan baku',
     to: '/admin/gudang/mutasi-bahan/baru',
     icon: Box,
-    allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
+    allowedRoles: ['ADMIN', 'LEADERSHIP'],
   },
   {
     id: 'production-batch-new',
     label: 'Catat produksi',
-    description: 'Batch bahan → kemasan',
+    description: 'Alur langkah: bahan → hasil',
     to: '/admin/gudang/produksi/baru',
     icon: ClipboardList,
     allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
