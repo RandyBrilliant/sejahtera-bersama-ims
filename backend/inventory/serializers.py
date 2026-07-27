@@ -238,13 +238,13 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         mt = attrs.get("movement_type") or getattr(self.instance, "movement_type", None)
         unit_cost = attrs.get("unit_cost_idr", serializers.empty)
-        if unit_cost is serializers.empty and self.instance is not None:
-            unit_cost = self.instance.unit_cost_idr
+        if unit_cost is serializers.empty:
+            unit_cost = self.instance.unit_cost_idr if self.instance is not None else None
         if mt == StockMovementType.IN and unit_cost is None:
             raise serializers.ValidationError(
                 {"unit_cost_idr": "Harga satuan wajib diisi untuk mutasi masuk (IN)."}
             )
-        if mt == StockMovementType.IN and unit_cost is not None and Decimal(str(unit_cost)) <= 0:
+        if mt == StockMovementType.IN and Decimal(str(unit_cost)) <= 0:
             raise serializers.ValidationError(
                 {"unit_cost_idr": "Harga satuan harus lebih dari nol untuk mutasi masuk."}
             )
@@ -310,8 +310,10 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
                 {"bonus_mass_grams": "Bonus massa hanya untuk mutasi masuk (IN)."}
             )
         unit_cost = attrs.get("unit_cost_per_kg_idr", serializers.empty)
-        if unit_cost is serializers.empty and self.instance is not None:
-            unit_cost = self.instance.unit_cost_per_kg_idr
+        if unit_cost is serializers.empty:
+            unit_cost = (
+                self.instance.unit_cost_per_kg_idr if self.instance is not None else None
+            )
         if mt == StockMovementType.IN and unit_cost is None:
             raise serializers.ValidationError(
                 {
@@ -320,11 +322,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
                     )
                 }
             )
-        if (
-            mt == StockMovementType.IN
-            and unit_cost is not None
-            and Decimal(str(unit_cost)) <= 0
-        ):
+        if mt == StockMovementType.IN and Decimal(str(unit_cost)) <= 0:
             raise serializers.ValidationError(
                 {
                     "unit_cost_per_kg_idr": (
