@@ -5,7 +5,7 @@ from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from account.models import UserRole
-from inventory.models import Ingredient, IngredientInventory, StockUnit
+from inventory.models import Ingredient, StockUnit
 from inventory.product_stock import weighted_moving_average
 
 User = get_user_model()
@@ -41,12 +41,11 @@ class IngredientMutasiCostingTests(TestCase):
         self.client.force_authenticate(self.admin)
 
         ingredient = Ingredient.objects.create(name="Minyak", default_unit=StockUnit.LITER)
-        self.inv = IngredientInventory.objects.create(
-            ingredient=ingredient,
-            remaining_stock=Decimal("10"),
-            minimum_stock=Decimal("1"),
-            avg_cost_idr=Decimal("20000"),
-        )
+        self.inv = ingredient.inventory
+        self.inv.remaining_stock = Decimal("10")
+        self.inv.minimum_stock = Decimal("1")
+        self.inv.avg_cost_idr = Decimal("20000")
+        self.inv.save()
 
     def test_in_requires_unit_cost(self):
         resp = self.client.post(
