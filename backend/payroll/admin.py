@@ -11,8 +11,15 @@ from payroll.models import (
 
 @admin.register(EmployeeCompensation)
 class EmployeeCompensationAdmin(admin.ModelAdmin):
-    list_display = ("user", "pay_type", "daily_rate_idr", "monthly_base_salary_idr", "updated_at")
-    list_filter = ("pay_type",)
+    list_display = (
+        "user",
+        "pay_type",
+        "pay_cadence",
+        "daily_rate_idr",
+        "monthly_base_salary_idr",
+        "updated_at",
+    )
+    list_filter = ("pay_type", "pay_cadence")
     raw_id_fields = ("user",)
     search_fields = ("user__username", "user__full_name")
 
@@ -36,7 +43,15 @@ class KupasProductionRecordAdmin(admin.ModelAdmin):
 
 @admin.register(PayrollPeriod)
 class PayrollPeriodAdmin(admin.ModelAdmin):
-    list_display = ("pay_date", "period_start_date", "period_end_date", "status", "finalized_at")
+    list_display = (
+        "cadence",
+        "pay_date",
+        "period_start_date",
+        "period_end_date",
+        "status",
+        "finalized_at",
+    )
+    list_filter = ("cadence", "status")
 
 
 @admin.register(PayrollEntry)
@@ -47,9 +62,10 @@ class PayrollEntryAdmin(admin.ModelAdmin):
         "pay_type_snapshot",
         "gross_idr",
         "net_pay_idr",
+        "paid_out",
         "days_present",
         "total_kg",
     )
-    list_filter = ("pay_type_snapshot",)
+    list_filter = ("pay_type_snapshot", "paid_out")
     raw_id_fields = ("period", "employee")
     list_select_related = ("period", "employee")

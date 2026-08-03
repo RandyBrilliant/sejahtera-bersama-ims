@@ -7,6 +7,7 @@ import {
   patchEmployeeCompensation,
 } from '@/api/payroll'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -20,8 +21,8 @@ import {
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
 import { useAuth } from '@/hooks/use-auth'
 import { alert } from '@/lib/alert'
-import type { PayType, PayrollCompensationTableRow } from '@/types/payroll'
-import { PAY_TYPE_LABEL } from '@/types/payroll'
+import type { PayCadence, PayType, PayrollCompensationTableRow } from '@/types/payroll'
+import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 function axiosDetail(err: unknown): string | undefined {
@@ -30,10 +31,19 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof d?.detail === 'string' ? d.detail : undefined
 }
 
+/** Normalize API decimal/string amounts to digits-only for CurrencyInput. */
+function idrToDigits(value: string | number | null | undefined): string {
+  if (value == null || value === '') return ''
+  const n = Number(value)
+  if (!Number.isFinite(n)) return ''
+  return String(Math.trunc(n))
+}
+
 const LIST_PATH = '/admin/gaji'
 
 type DraftRow = {
   pay_type: PayType
+  pay_cadence: PayCadence
   daily_rate_idr: string
   monthly_base_salary_idr: string
 }
@@ -57,9 +67,9 @@ export function AdminPayrollCompensationPage() {
       for (const r of list) {
         init[r.user_id] = {
           pay_type: r.pay_type ?? 'DAILY',
-          daily_rate_idr: r.daily_rate_idr != null ? String(r.daily_rate_idr) : '',
-          monthly_base_salary_idr:
-            r.monthly_base_salary_idr != null ? String(r.monthly_base_salary_idr) : '',
+          pay_cadence: r.pay_cadence ?? 'MONTHLY',
+          daily_rate_idr: idrToDigits(r.daily_rate_idr),
+          monthly_base_salary_idr: idrToDigits(r.monthly_base_salary_idr),
         }
       }
       setDraft(init)
@@ -89,15 +99,25 @@ export function AdminPayrollCompensationPage() {
   async function saveRow(uid: number) {
     const d = draft[uid]
     if (!d) return
-    if (d.pay_type === 'DAILY' && !d.daily_rate_idr.trim()) {
-      alert.error('Validasi', 'Isi tarif harian untuk pegawai presensi.')
-      return
+    if (d.pay_type === 'DAILY') {
+      const hasPokok = d.pay_cadence === 'MONTHLY' && d.monthly_base_salary_idr.trim().length > 0
+      const hasDaily = d.daily_rate_idr.trim().length > 0
+      if (!hasPokok && !hasDaily) {
+        alert.error(
+          'Validasi',
+          d.pay_cadence === 'MONTHLY'
+            ? 'Isi gaji pokok bulanan, atau tarif harian jika pokok dikosongkan.'
+            : 'Isi tarif harian untuk pegawai berpresensi.'
+        )
+        return
+      }
     }
     setSavingId(uid)
     try {
       const updated = await patchEmployeeCompensation(uid, {
         pay_type: d.pay_type,
-        daily_rate_idr: d.pay_type === 'DAILY' ? d.daily_rate_idr : '0',
+        pay_cadence: d.pay_cadence,
+        daily_rate_idr: d.daily_rate_idr || '0',
         monthly_base_salary_idr: d.monthly_base_salary_idr || '0',
       })
       setRows((prev) =>
@@ -106,8 +126,9 @@ export function AdminPayrollCompensationPage() {
             ? {
                 ...row,
                 pay_type: updated.pay_type,
-                daily_rate_idr: String(updated.daily_rate_idr),
-                monthly_base_salary_idr: String(updated.monthly_base_salary_idr),
+                pay_cadence: updated.pay_cadence,
+                daily_rate_idr: idrToDigits(updated.daily_rate_idr),
+                monthly_base_salary_idr: idrToDigits(updated.monthly_base_salary_idr),
                 compensation_updated_at: updated.updated_at,
               }
             : row
@@ -117,8 +138,9 @@ export function AdminPayrollCompensationPage() {
         ...prev,
         [uid]: {
           pay_type: updated.pay_type,
-          daily_rate_idr: String(updated.daily_rate_idr),
-          monthly_base_salary_idr: String(updated.monthly_base_salary_idr),
+          pay_cadence: updated.pay_cadence,
+          daily_rate_idr: idrToDigits(updated.daily_rate_idr),
+          monthly_base_salary_idr: idrToDigits(updated.monthly_base_salary_idr),
         },
       }))
       alert.success('Kompensasi disimpan.')
@@ -135,9 +157,9 @@ export function AdminPayrollCompensationPage() {
     if (!row || !d) return false
     return (
       d.pay_type !== (row.pay_type ?? 'DAILY') ||
-      d.daily_rate_idr.trim() !== (row.daily_rate_idr != null ? String(row.daily_rate_idr).trim() : '') ||
-      d.monthly_base_salary_idr.trim() !==
-        (row.monthly_base_salary_idr != null ? String(row.monthly_base_salary_idr).trim() : '')
+      d.pay_cadence !== (row.pay_cadence ?? 'MONTHLY') ||
+      d.daily_rate_idr.trim() !== idrToDigits(row.daily_rate_idr) ||
+      d.monthly_base_salary_idr.trim() !== idrToDigits(row.monthly_base_salary_idr)
     )
   }
 
@@ -149,9 +171,9 @@ export function AdminPayrollCompensationPage() {
           Kompensasi pegawai aktif
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Atur tipe gaji: <strong>harian (presensi)</strong> dengan tarif per hari, atau{' '}
-          <strong>borongan kupas</strong> (tanpa presensi, dibayar per kg). Satu pegawai hanya bisa
-          salah satu tipe.
+          Atur tipe gaji (harian / borongan kupas) dan periode bayar (mingguan / bulanan) per orang.
+          Bulanan + harian: isi gaji pokok untuk bruto tetap, atau kosongkan pokok agar pakai tarif
+          harian × hadir. Kupas selalu dihitung dari kg × tarif.
         </p>
       </div>
 
@@ -178,14 +200,16 @@ export function AdminPayrollCompensationPage() {
                 <TableHead>Nama</TableHead>
                 <TableHead>Peran</TableHead>
                 <TableHead>Tipe gaji</TableHead>
+                <TableHead>Periode bayar</TableHead>
                 <TableHead>Tarif harian (IDR)</TableHead>
-                <TableHead>Gaji pokok bln (ref.)</TableHead>
+                <TableHead>Gaji pokok bln (ops.)</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((r) => {
                 const d = draft[r.user_id]
+                const showDaily = d?.pay_type === 'DAILY'
                 return (
                   <TableRow key={r.user_id}>
                     <TableCell>
@@ -218,16 +242,37 @@ export function AdminPayrollCompensationPage() {
                       </select>
                     </TableCell>
                     <TableCell>
-                      {d?.pay_type === 'DAILY' ? (
-                        <Input
-                          forceUppercase={false}
-                          inputMode="decimal"
+                      <select
+                        className="border-input bg-field h-10 rounded-lg border px-2 text-sm"
+                        value={d?.pay_cadence ?? 'MONTHLY'}
+                        disabled={savingId === r.user_id}
+                        onChange={(e) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            [r.user_id]: {
+                              ...prev[r.user_id],
+                              pay_cadence: e.target.value as PayCadence,
+                            },
+                          }))
+                        }
+                      >
+                        {(Object.keys(PAY_CADENCE_LABEL) as PayCadence[]).map((pc) => (
+                          <option key={pc} value={pc}>
+                            {PAY_CADENCE_LABEL[pc]}
+                          </option>
+                        ))}
+                      </select>
+                    </TableCell>
+                    <TableCell>
+                      {showDaily ? (
+                        <CurrencyInput
                           className="h-10 min-w-[9rem]"
+                          placeholder="Mis. 100.000"
                           value={d.daily_rate_idr}
-                          onChange={(e) =>
+                          onChange={(daily_rate_idr) =>
                             setDraft((prev) => ({
                               ...prev,
-                              [r.user_id]: { ...prev[r.user_id], daily_rate_idr: e.target.value },
+                              [r.user_id]: { ...prev[r.user_id], daily_rate_idr },
                             }))
                           }
                           disabled={savingId === r.user_id}
@@ -237,17 +282,16 @@ export function AdminPayrollCompensationPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Input
-                        forceUppercase={false}
-                        inputMode="decimal"
+                      <CurrencyInput
                         className="h-10 min-w-[9rem]"
+                        placeholder="Mis. 5.000.000"
                         value={d?.monthly_base_salary_idr ?? ''}
-                        onChange={(e) =>
+                        onChange={(monthly_base_salary_idr) =>
                           setDraft((prev) => ({
                             ...prev,
                             [r.user_id]: {
                               ...prev[r.user_id],
-                              monthly_base_salary_idr: e.target.value,
+                              monthly_base_salary_idr,
                             },
                           }))
                         }

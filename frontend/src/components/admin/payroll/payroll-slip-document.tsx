@@ -5,7 +5,7 @@ import { formatIdr } from '@/lib/format-idr'
 import { formatKg, formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import type { PayrollSlipDetail } from '@/types/payroll'
-import { PAY_TYPE_LABEL } from '@/types/payroll'
+import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
 
 type Props = {
   slip: PayrollSlipDetail
@@ -30,10 +30,16 @@ export const PayrollSlipDocument = forwardRef<HTMLElement, Props>(function Payro
   ref
 ) {
   const isKupas = slip.pay_type_snapshot === 'PIECE_RATE'
+  const isMonthlyFixed =
+    !isKupas &&
+    slip.cadence === 'MONTHLY' &&
+    Number(slip.daily_rate_snapshot_idr) === 0 &&
+    Number(slip.base_salary_snapshot_idr ?? 0) > 0
   const periodLabel = formatPayrollWeekLabel(
     slip.pay_date,
     slip.period_start_date,
-    slip.period_end_date
+    slip.period_end_date,
+    slip.cadence
   )
 
   return (
@@ -68,11 +74,20 @@ export const PayrollSlipDocument = forwardRef<HTMLElement, Props>(function Payro
         <div>
           <span className="text-on-surface-variant">Tipe gaji: </span>
           <span>{PAY_TYPE_LABEL[slip.pay_type_snapshot]}</span>
+          {slip.cadence ? (
+            <span className="text-on-surface-variant"> · {PAY_CADENCE_LABEL[slip.cadence]}</span>
+          ) : null}
         </div>
-        {!isKupas ? (
+        {!isKupas && !isMonthlyFixed ? (
           <div>
             <span className="text-on-surface-variant">Tarif harian: </span>
             <span>{formatIdr(slip.daily_rate_snapshot_idr)}</span>
+          </div>
+        ) : null}
+        {isMonthlyFixed && slip.base_salary_snapshot_idr ? (
+          <div>
+            <span className="text-on-surface-variant">Gaji pokok: </span>
+            <span>{formatIdr(slip.base_salary_snapshot_idr)}</span>
           </div>
         ) : null}
       </section>
@@ -130,7 +145,11 @@ export const PayrollSlipDocument = forwardRef<HTMLElement, Props>(function Payro
                       </>
                     ) : (
                       <td className="bg-white py-2 pr-2 text-xs">
-                        {line.is_half_day ? 'Setengah hari' : 'Hari penuh'}
+                        {line.line_type === 'SALARY'
+                          ? line.kupas_item_name || 'Gaji pokok bulanan'
+                          : line.is_half_day
+                            ? 'Setengah hari'
+                            : 'Hari penuh'}
                         {line.is_late ? ' · Terlambat' : ''}
                       </td>
                     )}

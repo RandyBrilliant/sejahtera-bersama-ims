@@ -14,8 +14,9 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import {
+  endOfMonth,
   formatPayrollWeekLabel,
-  parseIsoDateOnly,
+  previewPeriodBounds,
   toIsoDateOnly,
   upcomingPaySaturday,
 } from '@/lib/payroll-week'
@@ -28,7 +29,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { alert } from '@/lib/alert'
-import type { PayrollPeriod } from '@/types/payroll'
+import type { PayCadence, PayrollPeriod } from '@/types/payroll'
+import { PAY_CADENCE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 const PERIODS_PAGE_SIZE = 20
@@ -39,12 +41,19 @@ function axiosDetail(err: unknown): string | undefined {
   return typeof d?.detail === 'string' ? d.detail : undefined
 }
 
+const selectClass = cn(
+  'border-input bg-field h-10 w-full rounded-lg border px-3 text-sm outline-none',
+  'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
+  'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
+)
+
 export function AdminPayrollPeriodsPage() {
   const [rows, setRows] = useState<PayrollPeriod[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [cadence, setCadence] = useState<PayCadence>('WEEKLY')
   const [payDate, setPayDate] = useState(() => toIsoDateOnly(upcomingPaySaturday()))
   const [cutoffDate, setCutoffDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -53,16 +62,10 @@ export function AdminPayrollPeriodsPage() {
 
   const periodPreview = useMemo(() => {
     if (!payDate) return null
-    try {
-      const pay = parseIsoDateOnly(payDate)
-      const end = cutoffDate ? parseIsoDateOnly(cutoffDate) : pay
-      const start = new Date(end)
-      start.setDate(start.getDate() - 6)
-      return formatPayrollWeekLabel(payDate, toIsoDateOnly(start), toIsoDateOnly(end))
-    } catch {
-      return null
-    }
-  }, [payDate, cutoffDate])
+    const bounds = previewPeriodBounds(payDate, cadence, cutoffDate.trim() || undefined)
+    if (!bounds) return null
+    return formatPayrollWeekLabel(payDate, bounds.start, bounds.end, cadence)
+  }, [payDate, cutoffDate, cadence])
 
   async function reload(targetPage = page) {
     setLoading(true)
@@ -86,6 +89,16 @@ export function AdminPayrollPeriodsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
+  function handleCadenceChange(next: PayCadence) {
+    setCadence(next)
+    if (next === 'WEEKLY') {
+      setPayDate(toIsoDateOnly(upcomingPaySaturday()))
+    } else {
+      setPayDate(toIsoDateOnly(endOfMonth()))
+    }
+    setCutoffDate('')
+  }
+
   async function handleCreate() {
     if (!payDate) {
       alert.error('Validasi', 'Pilih tanggal pembayaran.')
@@ -94,6 +107,7 @@ export function AdminPayrollPeriodsPage() {
     setCreating(true)
     try {
       await createPayrollPeriod({
+        cadence,
         pay_date: payDate,
         cutoff_date: cutoffDate.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -133,9 +147,9 @@ export function AdminPayrollPeriodsPage() {
           Periode gaji
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Buat draft periode dengan tanggal bayar fleksibel (mis. Jumat). Cutoff menentukan pekerjaan
-          mana yang masuk periode ini; pekerjaan setelah cutoff otomatis menggulung ke periode
-          berikutnya. Generate entri dari presensi (harian) atau hasil kupas (borongan), lalu kunci.
+          Buat periode <strong>mingguan</strong> (Minggu–Sabtu, biasanya bayar Sabtu) atau{' '}
+          <strong>bulanan</strong>. Hanya pegawai dengan periode bayar yang sama yang masuk generate.
+          Kerja Minggu dihitung dengan tarif yang sama.
         </p>
       </div>
 
@@ -145,6 +159,22 @@ export function AdminPayrollPeriodsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
+            <Label htmlFor="cadence">Jenis periode</Label>
+            <select
+              id="cadence"
+              className={selectClass}
+              value={cadence}
+              disabled={creating}
+              onChange={(e) => handleCadenceChange(e.target.value as PayCadence)}
+            >
+              {(Object.keys(PAY_CADENCE_LABEL) as PayCadence[]).map((pc) => (
+                <option key={pc} value={pc}>
+                  {PAY_CADENCE_LABEL[pc]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="pay-date">Tanggal pembayaran</Label>
             <DatePickerInput
               id="pay-date"
@@ -152,8 +182,13 @@ export function AdminPayrollPeriodsPage() {
               onChange={setPayDate}
               disabled={creating}
             />
+            {cadence === 'WEEKLY' ? (
+              <p className="text-on-surface-variant text-xs">
+                Disarankan hari Sabtu (default rentang Minggu–Sabtu).
+              </p>
+            ) : null}
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="cutoff-date">Cutoff (opsional)</Label>
             <DatePickerInput
               id="cutoff-date"
@@ -162,8 +197,9 @@ export function AdminPayrollPeriodsPage() {
               disabled={creating}
             />
             <p className="text-on-surface-variant text-xs">
-              Kosongkan = cutoff sama dengan tanggal bayar. Pekerjaan setelah cutoff masuk periode
-              berikutnya.
+              {cadence === 'MONTHLY'
+                ? 'Kosongkan = akhir bulan dari tanggal bayar. Cutoff menentukan pekerjaan mana yang masuk.'
+                : 'Kosongkan = cutoff sama dengan tanggal bayar. Pekerjaan setelah cutoff masuk periode berikutnya.'}
             </p>
           </div>
         </div>
@@ -202,6 +238,7 @@ export function AdminPayrollPeriodsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Jenis</TableHead>
                   <TableHead>Periode / bayar</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
@@ -211,6 +248,11 @@ export function AdminPayrollPeriodsPage() {
                 {rows.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
+                      <Badge variant="secondary">
+                        {PAY_CADENCE_LABEL[p.cadence] ?? p.cadence}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <Link
                         to={`/admin/gaji/${p.id}`}
                         className="text-primary hover:underline font-medium"
@@ -218,7 +260,8 @@ export function AdminPayrollPeriodsPage() {
                         {formatPayrollWeekLabel(
                           p.pay_date,
                           p.period_start_date,
-                          p.period_end_date
+                          p.period_end_date,
+                          p.cadence
                         )}
                       </Link>
                     </TableCell>

@@ -1,8 +1,14 @@
 export type PayType = 'DAILY' | 'PIECE_RATE'
+export type PayCadence = 'WEEKLY' | 'MONTHLY'
 
 export const PAY_TYPE_LABEL: Record<PayType, string> = {
   DAILY: 'Harian (presensi)',
   PIECE_RATE: 'Borongan kupas',
+}
+
+export const PAY_CADENCE_LABEL: Record<PayCadence, string> = {
+  WEEKLY: 'Mingguan',
+  MONTHLY: 'Bulanan',
 }
 
 export type EmployeeCompensation = {
@@ -10,6 +16,7 @@ export type EmployeeCompensation = {
   username: string
   full_name: string
   pay_type: PayType
+  pay_cadence: PayCadence
   daily_rate_idr: string | number
   monthly_base_salary_idr: string | number
   updated_at: string
@@ -23,6 +30,7 @@ export type PayrollCompensationTableRow = {
   role: string
   employee_code: string
   pay_type: PayType
+  pay_cadence: PayCadence
   daily_rate_idr: string | null
   monthly_base_salary_idr: string | null
   compensation_updated_at: string | null
@@ -58,6 +66,7 @@ export type KupasProductionRecord = {
 
 export type PayrollPeriod = {
   id: number
+  cadence: PayCadence
   pay_date: string
   period_start_date: string
   period_end_date: string
@@ -85,6 +94,8 @@ export type PayrollEntryRow = {
   deductions_idr: string | number
   net_pay_idr: string | number
   notes: string
+  paid_out: boolean
+  paid_out_at: string | null
   created_at: string
   updated_at: string
 }
@@ -110,7 +121,7 @@ export type MyPayrollSlip = {
 }
 
 export type PayrollSlipLine = {
-  line_type: 'ATTENDANCE' | 'KUPAS'
+  line_type: 'ATTENDANCE' | 'KUPAS' | 'SALARY'
   work_date: string
   kupas_item_name: string
   kg: string
@@ -127,12 +138,14 @@ export type PayrollSlipDetail = {
   pay_date: string
   period_start_date: string
   period_end_date: string
+  cadence?: PayCadence
   finalized_at: string | null
   employee_id: number
   employee_name: string
   employee_username: string
   pay_type_snapshot: PayType
   daily_rate_snapshot_idr: string
+  base_salary_snapshot_idr?: string
   days_present: number
   late_count: number
   total_kg: string

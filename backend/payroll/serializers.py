@@ -7,6 +7,7 @@ from payroll.models import (
     EmployeeCompensation,
     KupasItem,
     KupasProductionRecord,
+    PayCadence,
     PayrollEntry,
     PayrollPeriod,
     PayType,
@@ -28,6 +29,7 @@ class EmployeeCompensationSerializer(serializers.ModelSerializer):
             "username",
             "full_name",
             "pay_type",
+            "pay_cadence",
             "daily_rate_idr",
             "monthly_base_salary_idr",
             "updated_at",
@@ -36,6 +38,7 @@ class EmployeeCompensationSerializer(serializers.ModelSerializer):
 
 class EmployeeCompensationUpdateSerializer(serializers.Serializer):
     pay_type = serializers.ChoiceField(choices=PayType.choices, required=False)
+    pay_cadence = serializers.ChoiceField(choices=PayCadence.choices, required=False)
     daily_rate_idr = serializers.DecimalField(
         max_digits=14, decimal_places=2, min_value=Decimal("0"), required=False
     )
@@ -132,6 +135,7 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
         model = PayrollPeriod
         fields = (
             "id",
+            "cadence",
             "pay_date",
             "period_start_date",
             "period_end_date",
@@ -144,6 +148,7 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "cadence",
             "period_start_date",
             "period_end_date",
             "status",
@@ -155,6 +160,7 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
 
 
 class PayrollPeriodCreateSerializer(serializers.Serializer):
+    cadence = serializers.ChoiceField(choices=PayCadence.choices, default=PayCadence.WEEKLY)
     pay_date = serializers.DateField()
     cutoff_date = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
@@ -162,19 +168,25 @@ class PayrollPeriodCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         pay_date = attrs["pay_date"]
         cutoff = attrs.get("cutoff_date")
-        if PayrollPeriod.objects.filter(pay_date=pay_date).exists():
-            raise serializers.ValidationError({"pay_date": ["Periode gaji untuk tanggal bayar ini sudah ada."]})
+        cadence = attrs.get("cadence", PayCadence.WEEKLY)
+        if PayrollPeriod.objects.filter(cadence=cadence, pay_date=pay_date).exists():
+            raise serializers.ValidationError(
+                {"pay_date": ["Periode gaji untuk cadence & tanggal bayar ini sudah ada."]}
+            )
         try:
-            default_bounds_for_pay_date(pay_date, cutoff)
+            default_bounds_for_pay_date(pay_date, cutoff, cadence=cadence)
         except PayrollPeriodError as e:
-            raise serializers.ValidationError({"cutoff_date": [e.detail]}) from e
+            field = "pay_date" if cadence == PayCadence.WEEKLY and "Sabtu" in e.detail else "cutoff_date"
+            raise serializers.ValidationError({field: [e.detail]}) from e
         return attrs
 
     def create(self, validated_data):
         pay_date = validated_data["pay_date"]
         cutoff = validated_data.get("cutoff_date")
-        period_start, period_end = default_bounds_for_pay_date(pay_date, cutoff)
+        cadence = validated_data.get("cadence", PayCadence.WEEKLY)
+        period_start, period_end = default_bounds_for_pay_date(pay_date, cutoff, cadence=cadence)
         return PayrollPeriod.objects.create(
+            cadence=cadence,
             pay_date=pay_date,
             period_start_date=period_start,
             period_end_date=period_end,
@@ -204,6 +216,8 @@ class PayrollEntrySerializer(serializers.ModelSerializer):
             "deductions_idr",
             "net_pay_idr",
             "notes",
+            "paid_out",
+            "paid_out_at",
             "created_at",
             "updated_at",
         )
@@ -218,9 +232,15 @@ class PayrollEntrySerializer(serializers.ModelSerializer):
             "late_count",
             "total_kg",
             "gross_idr",
+            "paid_out",
+            "paid_out_at",
             "created_at",
             "updated_at",
         )
+
+
+class PayrollEntryPaidOutSerializer(serializers.Serializer):
+    paid_out = serializers.BooleanField()
 
 
 class PayrollEntryAdjustSerializer(serializers.ModelSerializer):

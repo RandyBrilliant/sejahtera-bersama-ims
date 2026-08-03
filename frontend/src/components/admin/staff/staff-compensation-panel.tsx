@@ -7,8 +7,8 @@ import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import { alert } from '@/lib/alert'
 import { cn } from '@/lib/utils'
-import type { EmployeeCompensation, PayType } from '@/types/payroll'
-import { PAY_TYPE_LABEL } from '@/types/payroll'
+import type { EmployeeCompensation, PayCadence, PayType } from '@/types/payroll'
+import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 type Props = {
@@ -18,6 +18,7 @@ type Props = {
 
 type Draft = {
   pay_type: PayType
+  pay_cadence: PayCadence
   daily_rate_idr: string
   monthly_base_salary_idr: string
 }
@@ -39,10 +40,16 @@ function idrToDigits(value: string | number | null | undefined): string {
 
 function draftFromSnap(snap: EmployeeCompensation | null): Draft {
   if (!snap) {
-    return { pay_type: 'DAILY', daily_rate_idr: '', monthly_base_salary_idr: '' }
+    return {
+      pay_type: 'DAILY',
+      pay_cadence: 'MONTHLY',
+      daily_rate_idr: '',
+      monthly_base_salary_idr: '',
+    }
   }
   return {
     pay_type: snap.pay_type ?? 'DAILY',
+    pay_cadence: snap.pay_cadence ?? 'MONTHLY',
     daily_rate_idr: idrToDigits(snap.daily_rate_idr),
     monthly_base_salary_idr: idrToDigits(snap.monthly_base_salary_idr),
   }
@@ -55,6 +62,7 @@ function draftMatchesSnap(draft: Draft, snap: EmployeeCompensation | null): bool
   const fromSnap = draftFromSnap(snap)
   return (
     draft.pay_type === fromSnap.pay_type &&
+    draft.pay_cadence === fromSnap.pay_cadence &&
     draft.daily_rate_idr.trim() === fromSnap.daily_rate_idr &&
     draft.monthly_base_salary_idr.trim() === fromSnap.monthly_base_salary_idr
   )
@@ -119,15 +127,26 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
   }, [userId])
 
   async function handleSave() {
-    if (draft.pay_type === 'DAILY' && !draft.daily_rate_idr.trim()) {
-      alert.error('Validasi', 'Isi tarif harian untuk pegawai presensi.')
-      return
+    if (draft.pay_type === 'DAILY') {
+      const hasPokok =
+        draft.pay_cadence === 'MONTHLY' && draft.monthly_base_salary_idr.trim().length > 0
+      const hasDaily = draft.daily_rate_idr.trim().length > 0
+      if (!hasPokok && !hasDaily) {
+        alert.error(
+          'Validasi',
+          draft.pay_cadence === 'MONTHLY'
+            ? 'Isi gaji pokok bulanan, atau tarif harian jika pokok dikosongkan.'
+            : 'Isi tarif harian untuk pegawai berpresensi.'
+        )
+        return
+      }
     }
     setSaving(true)
     try {
       const updated = await patchEmployeeCompensation(userId, {
         pay_type: draft.pay_type,
-        daily_rate_idr: draft.pay_type === 'DAILY' ? draft.daily_rate_idr.trim() : '0',
+        pay_cadence: draft.pay_cadence,
+        daily_rate_idr: draft.daily_rate_idr.trim() || '0',
         monthly_base_salary_idr: draft.monthly_base_salary_idr.trim() || '0',
       })
       setSnap(updated)
@@ -141,10 +160,12 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
   }
 
   const dirty = !draftMatchesSnap(draft, snap)
+  const showDailyRate = draft.pay_type === 'DAILY'
+  const showMonthlyBase = draft.pay_type === 'DAILY' || draft.pay_type === 'PIECE_RATE'
   const canSave =
     draft.pay_type === 'PIECE_RATE' ||
     draft.daily_rate_idr.trim().length > 0 ||
-    draft.monthly_base_salary_idr.trim().length > 0
+    (draft.pay_cadence === 'MONTHLY' && draft.monthly_base_salary_idr.trim().length > 0)
 
   const form = loading ? (
     <p className="text-on-surface-variant text-sm">Memuat…</p>
@@ -155,8 +176,8 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
         htmlFor={`pay-type-${userId}`}
         hint={
           draft.pay_type === 'DAILY'
-            ? 'Gaji dihitung dari presensi × tarif harian. Potongan telat dan bonus diatur per periode payroll.'
-            : 'Gaji dihitung dari hasil kupas (kg × tarif jenis barang). Tidak pakai presensi.'
+            ? 'Presensi × tarif harian. Bulanan: jika gaji pokok diisi → pokok tetap; jika kosong → tarif harian × hadir.'
+            : 'Borongan kupas (kg × tarif), dibayar mingguan atau digabung bulanan — bukan gaji pokok.'
         }
       >
         <select
@@ -174,8 +195,36 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
         </select>
       </FieldGroup>
 
-      {draft.pay_type === 'DAILY' ? (
-        <FieldGroup label="Tarif harian (IDR)" htmlFor={`daily-rate-${userId}`}>
+      <FieldGroup
+        label="Periode bayar"
+        htmlFor={`pay-cadence-${userId}`}
+        hint="Mingguan masuk periode Sabtu; bulanan masuk periode bulanan. Bisa diganti per orang (termasuk staf kupas)."
+      >
+        <select
+          id={`pay-cadence-${userId}`}
+          className={selectClass}
+          value={draft.pay_cadence}
+          onChange={(e) => setDraft((d) => ({ ...d, pay_cadence: e.target.value as PayCadence }))}
+          disabled={saving}
+        >
+          {(Object.keys(PAY_CADENCE_LABEL) as PayCadence[]).map((pc) => (
+            <option key={pc} value={pc}>
+              {PAY_CADENCE_LABEL[pc]}
+            </option>
+          ))}
+        </select>
+      </FieldGroup>
+
+      {showDailyRate ? (
+        <FieldGroup
+          label="Tarif harian (IDR)"
+          htmlFor={`daily-rate-${userId}`}
+          hint={
+            draft.pay_cadence === 'MONTHLY'
+              ? 'Dipakai jika gaji pokok bulanan kosong.'
+              : undefined
+          }
+        >
           <CurrencyInput
             id={`daily-rate-${userId}`}
             placeholder="Mis. 100.000"
@@ -186,21 +235,31 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
         </FieldGroup>
       ) : null}
 
-      <FieldGroup
-        label="Gaji pokok bulanan (referensi, opsional)"
-        htmlFor={`monthly-ref-${userId}`}
-        hint="Hanya untuk catatan; perhitungan slip memakai presensi atau kupas sesuai tipe di atas."
-      >
-        <CurrencyInput
-          id={`monthly-ref-${userId}`}
-          placeholder="Mis. 5.000.000"
-          value={draft.monthly_base_salary_idr}
-          onChange={(monthly_base_salary_idr) =>
-            setDraft((d) => ({ ...d, monthly_base_salary_idr }))
+      {showMonthlyBase ? (
+        <FieldGroup
+          label={
+            draft.pay_type === 'DAILY' && draft.pay_cadence === 'MONTHLY'
+              ? 'Gaji pokok bulanan (opsional)'
+              : 'Gaji pokok bulanan (referensi, opsional)'
           }
-          disabled={saving}
-        />
-      </FieldGroup>
+          htmlFor={`monthly-ref-${userId}`}
+          hint={
+            draft.pay_type === 'DAILY' && draft.pay_cadence === 'MONTHLY'
+              ? 'Jika diisi: bruto tetap tiap bulan (+ potongan telat). Jika kosong: pakai tarif harian × hadir.'
+              : 'Opsional untuk catatan; tidak dipakai hitung borongan kupas.'
+          }
+        >
+          <CurrencyInput
+            id={`monthly-ref-${userId}`}
+            placeholder="Mis. 5.000.000"
+            value={draft.monthly_base_salary_idr}
+            onChange={(monthly_base_salary_idr) =>
+              setDraft((d) => ({ ...d, monthly_base_salary_idr }))
+            }
+            disabled={saving}
+          />
+        </FieldGroup>
+      ) : null}
 
       <div className="pt-1">
         <Button
@@ -216,8 +275,8 @@ export function StaffCompensationPanel({ userId, variant = 'embedded' }: Props) 
 
   const title = 'Kompensasi & gaji'
   const description = snap
-    ? 'Atur tipe gaji pegawai ini. Satu orang hanya bisa harian (presensi) atau borongan kupas.'
-    : 'Belum ada data kompensasi. Isi tipe gaji dan tarif di bawah untuk membuat rekaman.'
+    ? 'Atur tipe dan periode bayar. Gudang/kupas biasanya mingguan; bisa diganti bulanan per orang.'
+    : 'Belum ada data kompensasi. Isi tipe gaji, periode bayar, dan tarif di bawah.'
 
   if (variant === 'standalone') {
     return (

@@ -1,9 +1,9 @@
 import { format, parseISO } from 'date-fns'
 import {
+  AlertTriangle,
   Banknote,
   Download,
   Minus,
-  MoreHorizontal,
   Package,
   Plus,
   ShoppingCart,
@@ -14,9 +14,14 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import {
+  DashboardTrendChart,
+  PackagingStockChart,
+} from '@/components/dashboard/admin/admin-dashboard-charts'
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { Button } from '@/components/ui/button'
 import { useAdminDashboardQuery } from '@/hooks/use-admin-dashboard-query'
+import { useAuth } from '@/hooks/use-auth'
 import { formatRangeSubtitle } from '@/lib/dashboard-ranges'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { formatIdr } from '@/lib/format-idr'
@@ -57,6 +62,43 @@ function formatTrend(
   }
 }
 
+function TrendLine({
+  trend,
+  invertColors,
+  error,
+  errorText,
+}: {
+  trend: { type: 'up' | 'down' | 'steady'; text: string }
+  invertColors?: boolean
+  error?: boolean
+  errorText?: string
+}) {
+  if (error) {
+    return <div className="text-on-surface-variant mt-1 text-[13px]">{errorText}</div>
+  }
+
+  const positiveIsGood = !invertColors
+  const tone =
+    trend.type === 'steady'
+      ? 'text-on-surface-variant'
+      : trend.type === 'up'
+        ? positiveIsGood
+          ? 'text-trend-positive'
+          : 'text-error-app'
+        : positiveIsGood
+          ? 'text-error-app'
+          : 'text-trend-positive'
+
+  return (
+    <div className={cn('mt-1 flex items-center gap-1 text-[13px] font-medium tabular-nums', tone)}>
+      {trend.type === 'up' && <TrendingUp className="size-4 shrink-0" />}
+      {trend.type === 'down' && <TrendingDown className="size-4 shrink-0" />}
+      {trend.type === 'steady' && <Minus className="size-4 shrink-0" />}
+      {trend.text}
+    </div>
+  )
+}
+
 function KpiSkeleton() {
   return (
     <div className="ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
@@ -71,6 +113,8 @@ function KpiSkeleton() {
 
 export function AdminDashboardHome() {
   const dash = useAdminDashboardQuery()
+  const { user } = useAuth()
+  const displayName = user?.full_name?.trim() || user?.username || 'Pengguna'
 
   const versusPrev = 'vs 7 hari sebelumnya'
 
@@ -80,38 +124,44 @@ export function AdminDashboardHome() {
       : '—'
 
   const stockQtySub = dash.inventorySummary
-    ? `${formatProductMassKgFromGrams(dash.inventorySummary.products.total_product_mass_grams)} kg utama · ${dash.inventorySummary.products.active_packaging.toLocaleString('id-ID')} SKU aktif`
+    ? `${formatProductMassKgFromGrams(dash.inventorySummary.products.total_product_mass_grams)} kg · ${dash.inventorySummary.products.active_packaging.toLocaleString('id-ID')} SKU`
     : ''
 
   const revenueTrend = formatTrend(dash.revenueNow, dash.revenueThen, versusPrev)
-  const expenseTrend = formatTrend(dash.expenseNow, dash.expenseThen, versusPrev)
+  const netCashTrend = formatTrend(dash.netCashNow, dash.netCashThen, versusPrev)
+  const ordersTrend = formatTrend(
+    dash.verifiedOrdersNow,
+    dash.verifiedOrdersThen,
+    versusPrev
+  )
 
   const rangeLabel = formatRangeSubtitle(
     dash.rangeCurrent.startDate,
     dash.rangeCurrent.endDate
   )
 
-  const topRows = dash.topPackagingRows
-  const quantities = topRows.map((r) => Number(r.remaining_stock))
-  const maxQty = Math.max(1, ...quantities.map((n) => (Number.isNaN(n) ? 0 : n)))
-
   const lowRows = dash.lowIngredientRows
-  const lowCount = dash.inventorySummary?.ingredients.low_stock_items ?? lowRows.length
+  const lowCount =
+    dash.inventorySummary?.ingredients.low_stock_items ?? lowRows.length
 
   const kpiLoading = dash.ordersPending || dash.inventoryPending
+  const staffPct =
+    dash.usersTotal > 0
+      ? Math.round((dash.usersActive / dash.usersTotal) * 100)
+      : 0
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="page-enter space-y-6 lg:space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-            Dasbor
+            Selamat datang, {displayName}
           </h1>
           <p className="text-on-surface-variant mt-1 text-sm">
-            Ringkasan inventaris, pesanan, dan kas — data langsung dari server
+            Statistik operasional selama 7 hari
           </p>
           <p className="text-on-surface-variant mt-0.5 text-xs tabular-nums">
-            Periode pendapatan &amp; biaya: {rangeLabel}
+            Periode: {rangeLabel}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -139,7 +189,7 @@ export function AdminDashboardHome() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {kpiLoading ? (
           <>
             <KpiSkeleton />
@@ -149,266 +199,243 @@ export function AdminDashboardHome() {
           </>
         ) : (
           <>
-            <div className="ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
-              <div className="flex items-start justify-between">
-                <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
-                  Nilai stok produk
-                </span>
-                <span className="bg-surface-container-low text-primary rounded p-1">
-                  <Package className="size-5" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {dash.inventoryError ? '—' : stockValueLabel}
-                </div>
-                <div className="text-on-surface-variant mt-1 text-[13px] leading-[18px] font-medium tabular-nums">
-                  {dash.inventoryError
-                    ? 'Gagal memuat ringkasan inventaris.'
-                    : stockQtySub}
-                </div>
-              </div>
-            </div>
-
-            <div className="ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
-              <div className="flex items-start justify-between">
-                <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
-                  Pesanan aktif
-                </span>
-                <span className="bg-surface-container-low text-primary rounded p-1">
-                  <ShoppingCart className="size-5" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {dash.activeOrdersTotal.toLocaleString('id-ID')}
-                </div>
-                <div className="text-on-surface-variant mt-1 flex flex-wrap items-center gap-x-2 text-[13px] leading-[18px] font-medium tabular-nums">
-                  <span>
-                    Jual: {Math.max(0, dash.activeSalesOrders).toLocaleString('id-ID')}
-                  </span>
-                  <span className="text-on-surface-variant/70">·</span>
-                  <span>
-                    Beli:{' '}
-                    {Math.max(0, dash.activePurchaseOrders).toLocaleString('id-ID')}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
+            <div className="dash-rise ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
               <div className="flex items-start justify-between">
                 <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
                   Pendapatan terverifikasi
                 </span>
-                <span className="bg-surface-container-low text-primary rounded p-1">
-                  <Banknote className="size-5" />
-                </span>
+                <Banknote className="text-primary size-7 shrink-0" aria-hidden />
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
                   {dash.revenueError ? '—' : formatIdr(dash.revenueNow)}
                 </div>
-                <div
-                  className={cn(
-                    'mt-1 flex items-center gap-1 text-[13px] leading-[18px] font-medium tabular-nums',
-                    dash.revenueError && 'text-on-surface-variant',
-                    !dash.revenueError &&
-                      revenueTrend.type === 'up' &&
-                      'text-trend-positive',
-                    !dash.revenueError &&
-                      revenueTrend.type === 'down' &&
-                      'text-error-app',
-                    !dash.revenueError &&
-                      revenueTrend.type === 'steady' &&
-                      'text-on-surface-variant'
-                  )}
-                >
-                  {!dash.revenueError && (
-                    <>
-                      {revenueTrend.type === 'up' && (
-                        <TrendingUp className="size-4 shrink-0" />
-                      )}
-                      {revenueTrend.type === 'down' && (
-                        <TrendingDown className="size-4 shrink-0" />
-                      )}
-                      {revenueTrend.type === 'steady' && (
-                        <Minus className="size-4 shrink-0" />
-                      )}
-                    </>
-                  )}
-                  {dash.revenueError
-                    ? 'Tidak dapat memuat laporan pendapatan.'
-                    : revenueTrend.text}
-                </div>
+                <TrendLine
+                  trend={revenueTrend}
+                  error={dash.revenueError}
+                  errorText="Tidak dapat memuat pendapatan."
+                />
+                {!dash.revenueError && (
+                  <p className="text-on-surface-variant mt-1 text-xs tabular-nums">
+                    {dash.verifiedOrdersNow.toLocaleString('id-ID')} pesanan ·{' '}
+                    {ordersTrend.type === 'up'
+                      ? '↑'
+                      : ordersTrend.type === 'down'
+                        ? '↓'
+                        : '→'}{' '}
+                    volume vs minggu lalu
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
+            <div className="dash-rise dash-rise-delay-1 ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
               <div className="flex items-start justify-between">
                 <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
-                  Pengeluaran operasional
+                  Kas operasional (net)
                 </span>
-                <span className="bg-surface-container-low text-primary rounded p-1">
-                  <Wallet className="size-5" />
+                <Wallet className="text-primary size-7 shrink-0" aria-hidden />
+              </div>
+              <div className="mt-4">
+                <div
+                  className={cn(
+                    'font-heading text-2xl font-semibold tabular-nums tracking-tight',
+                    dash.opsCashError
+                      ? 'text-on-surface'
+                      : dash.netCashNow >= 0
+                        ? 'text-on-surface'
+                        : 'text-error-app'
+                  )}
+                >
+                  {dash.opsCashError ? '—' : formatIdr(dash.netCashNow)}
+                </div>
+                <TrendLine
+                  trend={netCashTrend}
+                  error={dash.opsCashError}
+                  errorText="Akses kas mungkin terbatas — hubungi admin."
+                />
+                {!dash.opsCashError && (
+                  <p className="text-on-surface-variant mt-1 text-xs tabular-nums">
+                    Masuk {formatIdr(dash.incomeNow)} · Keluar {formatIdr(dash.expenseNow)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="dash-rise dash-rise-delay-2 ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
+              <div className="flex items-start justify-between">
+                <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
+                  Pesanan aktif
                 </span>
+                <ShoppingCart className="text-primary size-7 shrink-0" aria-hidden />
               </div>
               <div className="mt-4">
                 <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
-                  {dash.opsCashError ? '—' : formatIdr(dash.expenseNow)}
+                  {dash.activeOrdersTotal.toLocaleString('id-ID')}
                 </div>
-                <div
-                  className={cn(
-                    'mt-1 flex items-center gap-1 text-[13px] leading-[18px] font-medium tabular-nums',
-                    dash.opsCashError && 'text-on-surface-variant',
-                    !dash.opsCashError &&
-                      expenseTrend.type === 'up' &&
-                      'text-error-app',
-                    !dash.opsCashError &&
-                      expenseTrend.type === 'down' &&
-                      'text-trend-positive',
-                    !dash.opsCashError &&
-                      expenseTrend.type === 'steady' &&
-                      'text-on-surface-variant'
-                  )}
-                >
-                  {!dash.opsCashError && (
-                    <>
-                      {expenseTrend.type === 'up' && (
-                        <TrendingUp className="size-4 shrink-0" />
-                      )}
-                      {expenseTrend.type === 'down' && (
-                        <TrendingDown className="size-4 shrink-0" />
-                      )}
-                      {expenseTrend.type === 'steady' && (
-                        <Minus className="size-4 shrink-0" />
-                      )}
-                    </>
-                  )}
-                  {dash.opsCashError
-                    ? 'Akun ini mungkin tidak punya akses kas operasional — hubungi admin.'
-                    : expenseTrend.text}
+                <div className="text-on-surface-variant mt-1 flex flex-wrap items-center gap-x-2 text-[13px] font-medium tabular-nums">
+                  <Link
+                    to="/admin/pesanan/penjualan"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Jual {Math.max(0, dash.activeSalesOrders).toLocaleString('id-ID')}
+                  </Link>
+                  <span className="text-on-surface-variant/70">·</span>
+                  <Link
+                    to="/admin/pesanan/pembelian"
+                    className="hover:text-primary transition-colors"
+                  >
+                    Beli {Math.max(0, dash.activePurchaseOrders).toLocaleString('id-ID')}
+                  </Link>
                 </div>
+                <p className="text-on-surface-variant mt-1 text-xs">
+                  Belum diverifikasi / dibatalkan
+                </p>
+              </div>
+            </div>
+
+            <div className="dash-rise dash-rise-delay-3 ambient-shadow border-outline-variant bg-surface-container-lowest flex flex-col justify-between rounded-xl border p-4">
+              <div className="flex items-start justify-between">
+                <span className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
+                  {lowCount > 0 ? 'Stok bahan rendah' : 'Nilai stok produk'}
+                </span>
+                {lowCount > 0 ? (
+                  <AlertTriangle className="text-error-app size-7 shrink-0" aria-hidden />
+                ) : (
+                  <Package className="text-primary size-7 shrink-0" aria-hidden />
+                )}
+              </div>
+              <div className="mt-4">
+                {lowCount > 0 ? (
+                  <>
+                    <div className="text-error-app font-heading text-2xl font-semibold tabular-nums tracking-tight">
+                      {lowCount.toLocaleString('id-ID')} item
+                    </div>
+                    <p className="text-on-surface-variant mt-1 text-[13px] font-medium">
+                      Di bawah batas minimum — perlu restock
+                    </p>
+                    <Link
+                      to="/admin/gudang/stok-bahan"
+                      className="text-primary mt-1 inline-block text-xs font-semibold hover:underline"
+                    >
+                      Buka stok bahan
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-on-surface font-heading text-2xl font-semibold tabular-nums tracking-tight">
+                      {dash.inventoryError ? '—' : stockValueLabel}
+                    </div>
+                    <p className="text-on-surface-variant mt-1 text-[13px] font-medium tabular-nums">
+                      {dash.inventoryError
+                        ? 'Gagal memuat inventaris.'
+                        : stockQtySub}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-        <div className="space-y-6 lg:col-span-2 lg:space-y-8">
-          <section className="ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
-            <div className="border-outline-variant mb-4 flex items-center justify-between border-b pb-3">
-              <h2 className="text-on-surface font-heading text-lg font-semibold">
-                Setara unit kemasan tertinggi
-              </h2>
-              <button
-                type="button"
-                className="text-on-surface-variant hover:text-primary transition-colors"
-                aria-label="Menu lainnya"
-              >
-                <MoreHorizontal className="size-5" />
-              </button>
-            </div>
-            {dash.topPackagingPending ? (
-              <div className="text-on-surface-variant flex h-48 items-center justify-center text-sm">
-                Memuat data kemasan…
-              </div>
-            ) : topRows.length === 0 ? (
-              <div className="text-on-surface-variant flex h-48 items-center justify-center text-sm">
-                Belum ada kemasan aktif.
-              </div>
-            ) : (
-              <>
-                <div className="flex h-64 items-end gap-2 px-2 pb-2">
-                  {topRows.slice(0, 6).map((row, i) => {
-                    const q = Number(row.remaining_stock)
-                    const safe = Number.isNaN(q) ? 0 : q
-                    const pct = Math.min(100, Math.round((safe / maxQty) * 100))
-                    const isHi = i === 0
-                    return (
-                      <div
-                        key={row.id}
-                        className="flex h-full min-h-0 flex-1 flex-col justify-end"
-                        title={`${row.product_variant_name} · ${row.label}`}
-                      >
-                        <div
-                          className={cn(
-                            'w-full min-h-[6px] rounded-t-sm transition-opacity',
-                            isHi
-                              ? 'bg-primary'
-                              : 'bg-surface-container-low hover:opacity-90'
-                          )}
-                          style={{ height: `${pct}%` }}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="border-outline-variant text-on-surface-variant flex justify-between gap-1 overflow-x-auto border-t px-2 pt-2 text-[10px] font-semibold tracking-wider uppercase">
-                  {topRows.slice(0, 6).map((row) => (
-                    <span key={row.id} className="min-w-0 flex-1 truncate text-center">
-                      {row.label || row.sku}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-8">
+        <section className="dash-rise dash-rise-delay-2 ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5 lg:col-span-3">
+          <DashboardTrendChart
+            revenueByDay={dash.revenueByDay}
+            cashByDay={dash.cashByDay}
+            loading={dash.isPending}
+          />
+        </section>
 
-          <section className="ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
-            <div className="border-outline-variant mb-3 flex items-center justify-between border-b pb-3">
+        <section className="dash-rise dash-rise-delay-3 ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
               <h2 className="text-on-surface font-heading text-lg font-semibold">
-                Aktivitas pesanan terbaru
+                Stok kemasan teratas
               </h2>
-              <Link
-                to="/admin/pesanan/penjualan"
-                className="text-primary text-xs font-semibold hover:underline"
-              >
-                Lihat semua
-              </Link>
+              <p className="text-on-surface-variant mt-0.5 text-xs">
+                Unit tersisa (hover untuk detail)
+              </p>
             </div>
-            {dash.activityPending ? (
-              <p className="text-on-surface-variant text-sm">Memuat…</p>
-            ) : dash.activityRows.length === 0 ? (
-              <p className="text-on-surface-variant text-sm">Belum ada pesanan.</p>
-            ) : (
-              <ul className="divide-outline-variant max-h-72 divide-y overflow-auto">
-                {dash.activityRows.map((row) => {
-                  const href =
-                    row.kind === 'sales'
-                      ? `/admin/pesanan/penjualan/${row.id}`
-                      : `/admin/pesanan/pembelian/${row.id}`
-                  const kindLabel = row.kind === 'sales' ? 'Penjualan' : 'Pembelian'
-                  return (
-                    <li key={`${row.kind}-${row.id}`}>
-                      <Link
-                        to={href}
-                        className="hover:bg-surface-container-low -mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors"
-                      >
-                        <div>
-                          <div className="text-on-surface text-sm font-semibold">
-                            {row.order_code}{' '}
-                            <span className="text-on-surface-variant font-normal">
-                              · {kindLabel}
-                            </span>
-                          </div>
-                          <div className="text-on-surface-variant text-xs tabular-nums">
-                            {format(parseISO(row.created_at), 'd MMM yyyy, HH:mm')}
-                          </div>
+            <Link
+              to="/admin/gudang/produk"
+              className="text-primary shrink-0 text-xs font-semibold hover:underline"
+            >
+              Semua
+            </Link>
+          </div>
+          <PackagingStockChart
+            rows={dash.topPackagingRows}
+            loading={dash.topPackagingPending}
+          />
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+        <section className="dash-rise dash-rise-delay-4 ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5 lg:col-span-2">
+          <div className="border-outline-variant mb-3 flex items-center justify-between border-b pb-3">
+            <h2 className="text-on-surface font-heading text-lg font-semibold">
+              Aktivitas pesanan terbaru
+            </h2>
+            <Link
+              to="/admin/pesanan/penjualan"
+              className="text-primary text-xs font-semibold hover:underline"
+            >
+              Lihat semua
+            </Link>
+          </div>
+          {dash.activityPending ? (
+            <p className="text-on-surface-variant text-sm">Memuat…</p>
+          ) : dash.activityRows.length === 0 ? (
+            <p className="text-on-surface-variant text-sm">Belum ada pesanan.</p>
+          ) : (
+            <ul className="divide-outline-variant divide-y">
+              {dash.activityRows.map((row, i) => {
+                const href =
+                  row.kind === 'sales'
+                    ? `/admin/pesanan/penjualan/${row.id}`
+                    : `/admin/pesanan/pembelian/${row.id}`
+                const kindLabel = row.kind === 'sales' ? 'Penjualan' : 'Pembelian'
+                const total = Number(row.total_idr ?? 0)
+                return (
+                  <li
+                    key={`${row.kind}-${row.id}`}
+                    className="dash-rise"
+                    style={{ animationDelay: `${320 + i * 40}ms` }}
+                  >
+                    <Link
+                      to={href}
+                      className="hover:bg-surface-container-low -mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-on-surface text-sm font-semibold">
+                          {row.order_code}{' '}
+                          <span className="text-on-surface-variant font-normal">
+                            · {kindLabel}
+                          </span>
                         </div>
-                        <OrderStatusBadge status={row.status as OrderStatus} />
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </section>
-        </div>
+                        <div className="text-on-surface-variant text-xs tabular-nums">
+                          {format(parseISO(row.created_at), 'd MMM yyyy, HH:mm')}
+                          {!Number.isNaN(total) && total > 0 ? (
+                            <>
+                              {' '}
+                              · <span className="text-on-surface font-medium">{formatIdr(total)}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      <OrderStatusBadge status={row.status as OrderStatus} />
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
 
         <div className="space-y-6 lg:space-y-8">
-          <section className="ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
+          <section className="dash-rise dash-rise-delay-4 ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
             <div className="border-outline-variant mb-3 flex items-center justify-between border-b pb-3">
               <h2 className="text-on-surface font-heading text-lg font-semibold">
                 Kesehatan stok bahan
@@ -421,7 +448,7 @@ export function AdminDashboardHome() {
                     : 'bg-surface-container-high text-on-surface-variant'
                 )}
               >
-                {lowCount.toLocaleString('id-ID')} di bawah minimum
+                {lowCount.toLocaleString('id-ID')} di bawah min.
               </span>
             </div>
             {dash.lowIngredientPending ? (
@@ -432,32 +459,45 @@ export function AdminDashboardHome() {
               </p>
             ) : (
               <ul className="space-y-2">
-                {lowRows.map((inv) => (
-                  <li
-                    key={inv.id}
-                    className="border-surface-container-high flex items-center justify-between gap-3 border-b py-2 last:border-b-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-on-surface truncate text-sm font-semibold">
-                        {inv.ingredient_name}
+                {lowRows.map((inv) => {
+                  const rem = Number(inv.remaining_stock)
+                  const min = Number(inv.minimum_stock)
+                  const pct =
+                    !Number.isNaN(min) && min > 0 && !Number.isNaN(rem)
+                      ? Math.min(100, Math.round((rem / min) * 100))
+                      : 0
+                  return (
+                    <li key={inv.id} className="space-y-1.5 py-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-on-surface truncate text-sm font-semibold">
+                            {inv.ingredient_name}
+                          </div>
+                          <div className="text-error-app text-[12px] font-medium tabular-nums">
+                            {fmtKg(inv.remaining_stock)} / min {fmtKg(inv.minimum_stock)}
+                          </div>
+                        </div>
+                        <Link
+                          to="/admin/gudang/stok-bahan"
+                          className="border-outline-variant text-primary shrink-0 rounded border bg-surface-app px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase transition-colors hover:bg-surface-container-low"
+                        >
+                          Buka
+                        </Link>
                       </div>
-                      <div className="text-error-app text-[13px] font-medium tabular-nums">
-                        {fmtKg(inv.remaining_stock)} (min. {fmtKg(inv.minimum_stock)})
+                      <div className="bg-surface-container-high h-1.5 overflow-hidden rounded-full">
+                        <div
+                          className="bg-error-app h-full rounded-full transition-[width] duration-700 ease-out"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
-                    </div>
-                    <Link
-                      to="/admin/gudang/stok-bahan"
-                      className="border-outline-variant text-primary shrink-0 rounded border bg-surface-app px-3 py-1 text-[11px] font-semibold tracking-wider uppercase transition-colors hover:bg-surface-container-low"
-                    >
-                      Buka
-                    </Link>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
 
-          <section className="ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
+          <section className="dash-rise dash-rise-delay-5 ambient-shadow border-outline-variant bg-surface-container-lowest rounded-xl border p-4 md:p-5">
             <div className="border-outline-variant mb-3 flex items-center justify-between border-b pb-3">
               <h2 className="text-on-surface font-heading text-lg font-semibold">Staf</h2>
               <Users className="text-on-surface-variant size-5" aria-hidden />
@@ -465,23 +505,25 @@ export function AdminDashboardHome() {
             {dash.usersPending ? (
               <p className="text-on-surface-variant text-sm">Memuat…</p>
             ) : (
-              <div className="flex items-center gap-4 py-2">
-                <div className="border-primary bg-surface-container-low text-primary flex size-16 items-center justify-center rounded-full border-4 border-r-surface-container-low">
-                  <span className="font-heading text-lg font-bold tabular-nums">
-                    {dash.usersTotal > 0
-                      ? Math.round((dash.usersActive / dash.usersTotal) * 100)
-                      : 0}
-                    %
-                  </span>
+              <div className="flex items-center gap-4 py-1">
+                <div
+                  className="relative flex size-16 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: `conic-gradient(var(--primary) ${staffPct * 3.6}deg, #e8e6f0 0)`,
+                  }}
+                >
+                  <div className="bg-surface-container-lowest flex size-12 items-center justify-center rounded-full">
+                    <span className="text-primary font-heading text-sm font-bold tabular-nums">
+                      {staffPct}%
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <div className="text-on-surface text-base">
                     <strong>{dash.usersActive.toLocaleString('id-ID')}</strong> /{' '}
                     {dash.usersTotal.toLocaleString('id-ID')}
                   </div>
-                  <div className="text-on-surface-variant text-sm">
-                    Akun aktif di sistem
-                  </div>
+                  <div className="text-on-surface-variant text-sm">Akun aktif</div>
                   <Link
                     to="/admin/staf"
                     className="text-primary mt-1 inline-block text-xs font-semibold hover:underline"

@@ -25,12 +25,26 @@ export type DashboardCashBlock = {
   net_cash_idr: number
 }
 
+export type DashboardRevenueDayRow = {
+  date: string
+  revenue_idr: number
+  order_count: number
+}
+
+export type DashboardCashDayRow = {
+  date: string
+  income_idr: number
+  expense_idr: number
+  net_idr: number
+}
+
 export type DashboardActivityRow = {
   id: number
   order_code: string
   status: OrderStatus
   created_at: string
   kind: 'sales' | 'purchase'
+  total_idr?: string | number
 }
 
 export type InventorySummaryPayload = {
@@ -62,6 +76,10 @@ export type AdminDashboardPayload = {
   operational_cash: {
     current: DashboardCashBlock
     previous: DashboardCashBlock
+  }
+  series?: {
+    revenue_by_day: DashboardRevenueDayRow[]
+    cash_by_day: DashboardCashDayRow[]
   }
   inventory_summary: InventorySummaryPayload
   top_packaging: { results: ProductPackaging[] }

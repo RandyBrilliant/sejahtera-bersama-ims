@@ -21,9 +21,9 @@ class PayrollManageAccess(permissions.BasePermission):
 
 
 class PayrollFinalizeAccess(permissions.BasePermission):
-    """Finalisasi periode (immutable): ADMIN / Pemilik."""
+    """Finalisasi / buka kunci periode: ADMIN / Pemilik."""
 
-    message = "Hanya pemilik atau admin yang dapat mengunci periode gaji."
+    message = "Hanya pemilik atau admin yang dapat mengunci atau membuka kunci periode gaji."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:

@@ -45,6 +45,11 @@ urlpatterns = [
         name="period-finalize",
     ),
     path(
+        "periods/<int:pk>/unfinalize/",
+        views.PayrollPeriodUnfinalizeView.as_view(),
+        name="period-unfinalize",
+    ),
+    path(
         "periods/<int:pk>/entries/",
         views.PayrollEntryListView.as_view(),
         name="period-entry-list",

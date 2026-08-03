@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +11,7 @@ from payroll.models import (
     EmployeeCompensation,
     KupasItem,
     KupasProductionRecord,
+    PayCadence,
     PayrollEntry,
     PayrollPeriod,
     PayType,
@@ -22,6 +24,7 @@ from payroll.serializers import (
     KupasProductionRecordSerializer,
     KupasProductionRecordWriteSerializer,
     PayrollEntryAdjustSerializer,
+    PayrollEntryPaidOutSerializer,
     PayrollEntrySerializer,
     PayrollPeriodCreateSerializer,
     PayrollPeriodNotesSerializer,
@@ -32,6 +35,7 @@ from payroll.services import (
     build_payroll_slip_detail,
     finalize_payroll_period,
     generate_payroll_entries,
+    unfinalize_payroll_period,
 )
 
 User = get_user_model()
@@ -42,6 +46,7 @@ _STAFF_ROLES_FOR_PAYROLL = (
     UserRole.WAREHOUSE_STAFF,
     UserRole.SALES_STAFF,
     UserRole.FINANCE_STAFF,
+    UserRole.KUPAS_STAFF,
 )
 
 
@@ -78,6 +83,7 @@ class EmployeeCompensationTableView(APIView):
                     "role": u.role,
                     "employee_code": emp.employee_code if emp else "",
                     "pay_type": ec.pay_type if ec else PayType.DAILY,
+                    "pay_cadence": ec.pay_cadence if ec else PayCadence.MONTHLY,
                     "daily_rate_idr": str(ec.daily_rate_idr) if ec else None,
                     "monthly_base_salary_idr": str(ec.monthly_base_salary_idr) if ec else None,
                     "compensation_updated_at": ec.updated_at.isoformat() if ec else None,
@@ -99,7 +105,13 @@ class EmployeeCompensationByUserView(APIView):
     def patch(self, request, user_id: int):
         obj = EmployeeCompensation.objects.filter(user_id=user_id).first()
         if obj is None:
-            obj = EmployeeCompensation.objects.create(user_id=user_id)
+            user = get_object_or_404(User, pk=user_id)
+            from payroll.period_week import default_cadence_for_role
+
+            obj = EmployeeCompensation.objects.create(
+                user_id=user_id,
+                pay_cadence=default_cadence_for_role(user.role),
+            )
 
         us = EmployeeCompensationUpdateSerializer(data=request.data)
         us.is_valid(raise_exception=True)
@@ -108,6 +120,9 @@ class EmployeeCompensationByUserView(APIView):
         if "pay_type" in data:
             obj.pay_type = data["pay_type"]
             update_fields.append("pay_type")
+        if "pay_cadence" in data:
+            obj.pay_cadence = data["pay_cadence"]
+            update_fields.append("pay_cadence")
         if "daily_rate_idr" in data:
             obj.daily_rate_idr = data["daily_rate_idr"]
             update_fields.append("daily_rate_idr")
@@ -132,6 +147,7 @@ class EmployeeCompensationMeView(APIView):
                     data={
                         "user_id": request.user.pk,
                         "pay_type": None,
+                        "pay_cadence": None,
                         "daily_rate_idr": None,
                         "monthly_base_salary_idr": None,
                         "detail": "Belum ada data kompensasi.",
@@ -292,11 +308,6 @@ class PayrollPeriodDetailView(APIView):
 
     def patch(self, request, pk: int):
         p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
-        if p.status != PayrollPeriod.Status.DRAFT:
-            return Response(
-                error_response(detail="Periode terkunci. Catatan tidak dapat diubah.", code=ApiCode.BAD_REQUEST),
-                status=400,
-            )
         ser = PayrollPeriodNotesSerializer(p, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
@@ -349,6 +360,26 @@ class PayrollPeriodFinalizeView(APIView):
         )
 
 
+class PayrollPeriodUnfinalizeView(APIView):
+    """Buka kunci periode — ADMIN / Pemilik."""
+
+    permission_classes = [PayrollFinalizeAccess]
+
+    def post(self, request, pk: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        try:
+            p = unfinalize_payroll_period(p)
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        return Response(
+            success_response(
+                data=PayrollPeriodSerializer(p).data,
+                detail="Kunci periode dibuka. Periode kembali draft.",
+            ),
+            status=200,
+        )
+
+
 class PayrollEntryListView(APIView):
     permission_classes = [PayrollManageAccess]
 
@@ -363,12 +394,29 @@ class PayrollEntryAdjustView(APIView):
 
     def patch(self, request, pk: int, entry_id: int):
         p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(PayrollEntry.objects.filter(period=p), pk=entry_id)
+
+        # paid_out checklist can be toggled even after the period is locked
+        if "paid_out" in request.data and set(request.data.keys()) <= {"paid_out"}:
+            paid_ser = PayrollEntryPaidOutSerializer(data=request.data)
+            paid_ser.is_valid(raise_exception=True)
+            paid_out = paid_ser.validated_data["paid_out"]
+            entry.paid_out = paid_out
+            entry.paid_out_at = timezone.now() if paid_out else None
+            entry.save(update_fields=["paid_out", "paid_out_at", "updated_at"])
+            return Response(
+                success_response(
+                    data=PayrollEntrySerializer(entry).data,
+                    detail="Status pembayaran diperbarui.",
+                ),
+                status=200,
+            )
+
         if p.status != PayrollPeriod.Status.DRAFT:
             return Response(
                 error_response(detail="Penyesuaian hanya di periode draft.", code=ApiCode.BAD_REQUEST),
                 status=400,
             )
-        entry = get_object_or_404(PayrollEntry.objects.filter(period=p), pk=entry_id)
         ser = PayrollEntryAdjustSerializer(entry, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()

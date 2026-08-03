@@ -9,9 +9,11 @@ import {
   generatePayrollPeriod,
   patchPayrollEntry,
   patchPayrollPeriodNotes,
+  unfinalizePayrollPeriod,
 } from '@/api/payroll'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -30,7 +32,7 @@ import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
-import { PAY_TYPE_LABEL } from '@/types/payroll'
+import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 const LIST_PATH = '/admin/gaji'
@@ -53,6 +55,8 @@ export function AdminPayrollPeriodDetailPage() {
   const idNum = Number(periodId)
 
   const canFinalize = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
+  const canUnlock = canFinalize
+
 
   const [period, setPeriod] = useState<PayrollPeriod | null>(null)
   const [entries, setEntries] = useState<PayrollEntryRow[]>([])
@@ -95,12 +99,25 @@ export function AdminPayrollPeriodDetailPage() {
   }, [idNum])
 
   async function handleSaveNotes() {
-    if (!period || !isDraft) return
+    if (!period) return
     setBusy(true)
     try {
       const p = await patchPayrollPeriodNotes(period.id, notes)
       setPeriod(p)
       alert.success('Catatan disimpan.')
+    } catch (e) {
+      alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleTogglePaidOut(row: PayrollEntryRow, paidOut: boolean) {
+    if (!period) return
+    setBusy(true)
+    try {
+      const updated = await patchPayrollEntry(period.id, row.id, { paid_out: paidOut })
+      setEntries((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
     } catch (e) {
       alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
@@ -131,7 +148,7 @@ export function AdminPayrollPeriodDetailPage() {
     const ok =
       typeof window !== 'undefined'
         ? window.confirm(
-            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date)}? Penyesuaian tidak bisa diubah setelah dikunci.`
+            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}? Penyesuaian tidak bisa diubah setelah dikunci.`
           )
         : false
     if (!ok) return
@@ -143,6 +160,28 @@ export function AdminPayrollPeriodDetailPage() {
       await loadAll()
     } catch (e) {
       alert.error('Finalize gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleUnfinalize() {
+    if (!period || !canUnlock || period.status !== 'FINALIZED') return
+    const ok =
+      typeof window !== 'undefined'
+        ? window.confirm(
+            `Buka kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}? Periode kembali draft agar bisa diubah, lalu kunci ulang setelah selesai.`
+          )
+        : false
+    if (!ok) return
+    setBusy(true)
+    try {
+      const p = await unfinalizePayrollPeriod(period.id)
+      setPeriod(p)
+      alert.success('Kunci dibuka', 'Periode kembali draft.')
+      await loadAll()
+    } catch (e) {
+      alert.error('Buka kunci gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -205,10 +244,14 @@ export function AdminPayrollPeriodDetailPage() {
               {formatPayrollWeekLabel(
                 period.pay_date,
                 period.period_start_date,
-                period.period_end_date
+                period.period_end_date,
+                period.cadence
               )}
             </h1>
             <div className="text-on-surface-variant mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant="secondary">
+                {PAY_CADENCE_LABEL[period.cadence] ?? period.cadence}
+              </Badge>
               <Badge variant={period.status === 'FINALIZED' ? 'default' : 'secondary'}>
                 {period.status === 'FINALIZED' ? 'Dikunci' : 'Draft'}
               </Badge>
@@ -230,7 +273,7 @@ export function AdminPayrollPeriodDetailPage() {
             <Label htmlFor="per-notes">Catatan periode</Label>
             <textarea
               id="per-notes"
-              disabled={busy || period.status !== 'DRAFT'}
+              disabled={busy}
               value={notes}
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
               rows={3}
@@ -240,15 +283,13 @@ export function AdminPayrollPeriodDetailPage() {
                 'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
               )}
             />
-            {period.status === 'DRAFT' ? (
-              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleSaveNotes()}>
-                Simpan catatan
-              </Button>
-            ) : null}
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void handleSaveNotes()}>
+              Simpan catatan
+            </Button>
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={busy} onClick={() => void handleGenerate()}>
+            <Button type="button" variant="outline" disabled={busy || !isDraft} onClick={() => void handleGenerate()}>
               Bangkitkan dari pekerjaan belum dibayar (presensi / kupas)
             </Button>
             {canFinalize && period.status === 'DRAFT' ? (
@@ -256,10 +297,24 @@ export function AdminPayrollPeriodDetailPage() {
                 Kunci periode gaji (finalize)
               </Button>
             ) : null}
+            {canUnlock && period.status === 'FINALIZED' ? (
+              <Button type="button" variant="outline" disabled={busy} onClick={() => void handleUnfinalize()}>
+                Buka kunci periode
+              </Button>
+            ) : null}
           </div>
 
           <section className="space-y-4">
-            <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">Entri per pegawai</h2>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">
+                Entri per pegawai
+              </h2>
+              {entries.length > 0 ? (
+                <p className="text-on-surface-variant text-xs">
+                  Sudah dibayar: {entries.filter((e) => e.paid_out).length} / {entries.length}
+                </p>
+              ) : null}
+            </div>
             {entries.length === 0 ? (
               <p className="text-on-surface-variant text-sm">
                 Belum ada entri. Jalankan pembangkit menggunakan tombol di atas.
@@ -269,6 +324,7 @@ export function AdminPayrollPeriodDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12 text-center">Bayar</TableHead>
                       <TableHead>Nama</TableHead>
                       <TableHead>Tipe</TableHead>
                       <TableHead className="text-right">Hadir / kg</TableHead>
@@ -286,7 +342,19 @@ export function AdminPayrollPeriodDetailPage() {
                       const isKupas = row.pay_type_snapshot === 'PIECE_RATE'
                       const d = draft[row.id]
                       return (
-                        <TableRow key={row.id}>
+                        <TableRow key={row.id} className={row.paid_out ? 'bg-primary/5' : undefined}>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={row.paid_out}
+                                disabled={busy}
+                                onCheckedChange={(v) =>
+                                  void handleTogglePaidOut(row, v === true)
+                                }
+                                aria-label={`Tandai ${row.employee_name} sudah dibayar`}
+                              />
+                            </div>
+                          </TableCell>
                           <TableCell className="font-medium">{row.employee_name}</TableCell>
                           <TableCell className="text-xs whitespace-nowrap">
                             {PAY_TYPE_LABEL[row.pay_type_snapshot]}

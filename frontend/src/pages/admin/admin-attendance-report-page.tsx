@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchAttendanceReport } from '@/api/attendance'
 import { fetchUsers } from '@/api/system-users'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -173,18 +173,20 @@ export function AdminAttendanceReportPage() {
       </div>
 
       <section className="border-outline-variant flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="space-y-1.5">
-          <Label htmlFor="rep-from">Dari</Label>
-          <Input
-            id="rep-from"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+        <div className="min-w-[min(100%,280px)] flex-1 space-y-1.5 sm:max-w-sm">
+          <Label htmlFor="rep-range">Rentang tanggal</Label>
+          <DateRangePickerInput
+            id="rep-range"
+            startDate={dateFrom}
+            endDate={dateTo}
+            disabled={loading}
+            onChange={({ start, end }) => {
+              if (!start || !end) return
+              setDateFrom(start)
+              setDateTo(end)
+            }}
+            ariaLabel="Rentang tanggal laporan presensi"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rep-to">Sampai</Label>
-          <Input id="rep-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
         <div className="min-w-[200px] space-y-1.5">
           <Label htmlFor="rep-emp">Pegawai (opsional)</Label>
@@ -203,7 +205,7 @@ export function AdminAttendanceReportPage() {
           </Select>
         </div>
         <Button type="button" variant="outline" disabled={loading} onClick={() => void runFetch(1)}>
-          Terapkan
+          Muat ulang
         </Button>
       </section>
 

@@ -13,6 +13,11 @@ class PayType(models.TextChoices):
     PIECE_RATE = "PIECE_RATE", _("Piece rate (kupas)")
 
 
+class PayCadence(models.TextChoices):
+    WEEKLY = "WEEKLY", _("Weekly")
+    MONTHLY = "MONTHLY", _("Monthly")
+
+
 class EmployeeCompensation(models.Model):
     """Kompensasi pegawai — harian (presensi) atau borongan kupas."""
 
@@ -29,13 +34,21 @@ class EmployeeCompensation(models.Model):
         default=PayType.DAILY,
         db_index=True,
     )
+    pay_cadence = models.CharField(
+        _("pay cadence"),
+        max_length=16,
+        choices=PayCadence.choices,
+        default=PayCadence.MONTHLY,
+        db_index=True,
+        help_text=_("Mingguan atau bulanan — independen dari pay_type."),
+    )
     daily_rate_idr = models.DecimalField(
         _("daily rate (IDR)"),
         max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
         default=Decimal("0"),
-        help_text=_("Gaji per hari hadir (untuk pay_type DAILY)."),
+        help_text=_("Gaji per hari hadir (DAILY; dipakai jika gaji pokok bulanan kosong)."),
     )
     monthly_base_salary_idr = models.DecimalField(
         _("monthly base salary (IDR)"),
@@ -43,7 +56,10 @@ class EmployeeCompensation(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
         default=Decimal("0"),
-        help_text=_("Referensi opsional; tidak dipakai untuk hitung gaji harian."),
+        help_text=_(
+            "Jika diisi (>0) dan cadence MONTHLY + DAILY: dipakai sebagai gaji pokok. "
+            "Jika kosong: hitung dari tarif harian × hadir. Tidak dipakai untuk PIECE_RATE."
+        ),
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -51,7 +67,7 @@ class EmployeeCompensation(models.Model):
         verbose_name = _("employee compensation")
 
     def __str__(self) -> str:
-        return f"{self.user_id} [{self.pay_type}]"
+        return f"{self.user_id} [{self.pay_type}/{self.pay_cadence}]"
 
 
 class KupasItem(models.Model):
@@ -87,12 +103,19 @@ class KupasItem(models.Model):
 
 
 class PayrollPeriod(models.Model):
-    """Satu periode gaji — tanggal bayar fleksibel, cutoff inklusif di period_end_date."""
+    """Satu periode gaji — scoped by cadence; cutoff inklusif di period_end_date."""
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", _("Draft")
         FINALIZED = "FINALIZED", _("Final")
 
+    cadence = models.CharField(
+        _("cadence"),
+        max_length=16,
+        choices=PayCadence.choices,
+        default=PayCadence.WEEKLY,
+        db_index=True,
+    )
     pay_date = models.DateField(_("pay date"), db_index=True)
     period_start_date = models.DateField(_("period start"))
     period_end_date = models.DateField(_("period end (cutoff)"))
@@ -114,12 +137,12 @@ class PayrollPeriod(models.Model):
         verbose_name = _("payroll period")
         verbose_name_plural = _("payroll periods")
         constraints = [
-            models.UniqueConstraint(fields=("pay_date",), name="uniq_payroll_pay_date"),
+            models.UniqueConstraint(fields=("cadence", "pay_date"), name="uniq_payroll_cadence_pay_date"),
         ]
         ordering = ["-pay_date"]
 
     def __str__(self) -> str:
-        return f"{self.pay_date.isoformat()} [{self.status}]"
+        return f"{self.cadence} {self.pay_date.isoformat()} [{self.status}]"
 
 
 class KupasProductionRecord(models.Model):
@@ -282,6 +305,13 @@ class PayrollEntry(models.Model):
         default=Decimal("0"),
     )
     notes = models.TextField(_("notes"), blank=True)
+    paid_out = models.BooleanField(
+        _("paid out"),
+        default=False,
+        db_index=True,
+        help_text=_("Centang saat uang gaji sudah diserahkan ke pegawai."),
+    )
+    paid_out_at = models.DateTimeField(_("paid out at"), null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,13 +1,14 @@
 """Aggregated admin dashboard payload (single round-trip for the home screen)."""
 
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db.models import Count, F, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
-from expenses.reporting import aggregate_summary, entries_queryset_for_range
+from expenses.reporting import aggregate_summary, by_day_rows, entries_queryset_for_range
 from inventory.models import IngredientInventory, ProductPackaging
 from inventory.product_stock import annotate_packaging_derived_remaining
 from inventory.serializers import IngredientInventorySerializer, ProductPackagingSerializer
@@ -72,6 +73,87 @@ def _operational_cash_summary(start_d: date, end_d: date) -> dict:
     }
 
 
+def _iter_days(start_d: date, end_d: date):
+    cur = start_d
+    while cur <= end_d:
+        yield cur
+        cur += timedelta(days=1)
+
+
+def _as_int(value) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, Decimal):
+        return int(value)
+    return int(value or 0)
+
+
+def _revenue_by_day(start_d: date, end_d: date) -> list[dict]:
+    """Verified sales revenue per calendar day (local), zero-filled."""
+    tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(datetime.combine(start_d, time.min), tz)
+    end_dt = timezone.make_aware(datetime.combine(end_d, time.max), tz)
+    rows = (
+        SalesOrder.objects.filter(
+            status=OrderStatus.VERIFIED,
+            verified_at__gte=start_dt,
+            verified_at__lte=end_dt,
+        )
+        .annotate(day=TruncDate("verified_at", tzinfo=tz))
+        .values("day")
+        .annotate(
+            revenue_idr=Coalesce(Sum("total_idr"), Value(0)),
+            order_count=Count("id"),
+        )
+        .order_by("day")
+    )
+    by_day: dict[date, dict] = {}
+    for r in rows:
+        day = r["day"]
+        if day is None:
+            continue
+        if isinstance(day, datetime):
+            day = timezone.localtime(day, tz).date()
+        by_day[day] = {
+            "revenue_idr": _as_int(r["revenue_idr"]),
+            "order_count": int(r["order_count"] or 0),
+        }
+
+    out = []
+    for d in _iter_days(start_d, end_d):
+        hit = by_day.get(d, {"revenue_idr": 0, "order_count": 0})
+        out.append(
+            {
+                "date": d.isoformat(),
+                "revenue_idr": hit["revenue_idr"],
+                "order_count": hit["order_count"],
+            }
+        )
+    return out
+
+
+def _cash_by_day(start_d: date, end_d: date) -> list[dict]:
+    """Operational cash income/expense/net per day, zero-filled."""
+    qs = entries_queryset_for_range(start_d, end_d)
+    sparse = {r["occurred_on"]: r for r in by_day_rows(qs)}
+    out = []
+    for d in _iter_days(start_d, end_d):
+        key = d.isoformat()
+        hit = sparse.get(key)
+        if hit is None:
+            out.append({"date": key, "income_idr": 0, "expense_idr": 0, "net_idr": 0})
+        else:
+            out.append(
+                {
+                    "date": key,
+                    "income_idr": hit["income_idr"],
+                    "expense_idr": hit["expense_idr"],
+                    "net_idr": hit["net_idr"],
+                }
+            )
+    return out
+
+
 def _order_activity_row(order, *, kind: str) -> dict:
     return {
         "id": order.id,
@@ -79,6 +161,7 @@ def _order_activity_row(order, *, kind: str) -> dict:
         "status": order.status,
         "created_at": order.created_at.isoformat(),
         "kind": kind,
+        "total_idr": str(getattr(order, "total_idr", "0") or "0"),
     }
 
 
@@ -148,6 +231,10 @@ def build_admin_dashboard_payload() -> dict:
         "operational_cash": {
             "current": _operational_cash_summary(*range_current),
             "previous": _operational_cash_summary(*range_prev),
+        },
+        "series": {
+            "revenue_by_day": _revenue_by_day(*range_current),
+            "cash_by_day": _cash_by_day(*range_current),
         },
         "inventory_summary": get_inventory_summary_cached(),
         "top_packaging": {

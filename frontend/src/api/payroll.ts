@@ -4,6 +4,7 @@ import type {
   KupasItem,
   KupasProductionRecord,
   MyPayrollSlip,
+  PayCadence,
   PayType,
   PayrollCompensationTableRow,
   PayrollEntryRow,
@@ -31,6 +32,7 @@ export async function patchEmployeeCompensation(
   userId: number,
   patch: {
     pay_type?: PayType
+    pay_cadence?: PayCadence
     daily_rate_idr?: string | number
     monthly_base_salary_idr?: string | number
   }
@@ -153,6 +155,7 @@ export async function fetchPayrollPeriods(params?: {
 }
 
 export async function createPayrollPeriod(payload: {
+  cadence: PayCadence
   pay_date: string
   cutoff_date?: string
   notes?: string
@@ -187,6 +190,11 @@ export async function finalizePayrollPeriod(id: number): Promise<PayrollPeriod> 
   return data.data
 }
 
+export async function unfinalizePayrollPeriod(id: number): Promise<PayrollPeriod> {
+  const { data } = await api.post<Envelope<PayrollPeriod>>(`/api/payroll/periods/${id}/unfinalize/`)
+  return data.data
+}
+
 export async function fetchPayrollEntries(periodId: number): Promise<PayrollEntryRow[]> {
   const { data } = await api.get<Envelope<PayrollEntryRow[]>>(
     `/api/payroll/periods/${periodId}/entries/`
@@ -202,6 +210,7 @@ export async function patchPayrollEntry(
     bonus_idr?: string | number
     advance_deduction_idr?: string | number
     notes?: string
+    paid_out?: boolean
   }
 ): Promise<PayrollEntryRow> {
   const { data } = await api.patch<Envelope<PayrollEntryRow>>(

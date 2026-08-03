@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   Banknote,
@@ -9,6 +9,8 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   QrCode,
   Settings,
   ShoppingCart,
@@ -18,6 +20,7 @@ import {
   Users,
   Wallet,
   Warehouse,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
@@ -43,7 +46,6 @@ const navItems: NavItem[] = [
   { to: '/admin/gaji', label: 'Payroll', icon: CircleDollarSign },
 ]
 
-// Owner-only (LEADERSHIP) extra nav entry appended to the default menu.
 const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: TrendingUp }
 
 const warehouseNavItems: NavItem[] = [
@@ -72,23 +74,63 @@ const financeNavItems: NavItem[] = [
   { to: '/admin/pesanan/pembelian', label: 'Pesanan pembelian', icon: Truck },
 ]
 
+const SIDEBAR_COLLAPSED_KEY = 'admin-sidebar-collapsed'
+
 type AdminSidebarProps = {
   className?: string
   onNavigate?: () => void
+  collapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
+  /** When true, hide collapse control (mobile drawer always expanded). */
+  forceExpanded?: boolean
 }
 
-const sidebarNavLinkClass = (isActive: boolean) =>
-  cn(
-    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-    'focus-visible:font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-variant/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container-lowest',
+function sidebarNavLinkClass(isActive: boolean, collapsed: boolean) {
+  return cn(
+    'group relative flex items-center gap-3 rounded-lg text-sm font-medium outline-none',
+    'transition-colors duration-150',
+    collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5',
+    'focus-visible:bg-[var(--sidebar-accent)]',
     isActive
-      ? 'bg-surface-container-low font-semibold text-on-surface'
-      : 'text-on-surface-variant hover:bg-surface-container-low/60 hover:text-on-surface'
+      ? 'bg-[var(--sidebar-accent)] font-semibold text-primary'
+      : 'text-[var(--sidebar-foreground)]/65 hover:bg-[var(--sidebar-accent)]/80 hover:text-[var(--sidebar-accent-foreground)]'
   )
+}
 
-export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
+export function AdminSidebar({
+  className,
+  onNavigate,
+  collapsed: collapsedProp,
+  onCollapsedChange,
+  forceExpanded = false,
+}: AdminSidebarProps) {
   const { user } = useAuth()
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [internalCollapsed, setInternalCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const collapsed = forceExpanded ? false : (collapsedProp ?? internalCollapsed)
+
+  useEffect(() => {
+    if (forceExpanded || collapsedProp != null) return
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }, [collapsed, collapsedProp, forceExpanded])
+
+  function setCollapsed(next: boolean) {
+    if (onCollapsedChange) onCollapsedChange(next)
+    else setInternalCollapsed(next)
+  }
+
   const isWarehouseStaff = user?.role === 'WAREHOUSE_STAFF'
   const isSalesStaff = user?.role === 'SALES_STAFF'
   const isFinanceStaff = user?.role === 'FINANCE_STAFF'
@@ -105,93 +147,160 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
 
   return (
     <>
-    <nav
-      className={cn(
-        'border-outline-variant bg-surface-container-lowest text-on-surface flex h-full w-64 shrink-0 flex-col gap-2 border-r py-4',
-        className
-      )}
-    >
-      <div className="flex items-center gap-2 px-6 py-4">
-        <div className="bg-primary-container text-on-primary-container flex size-8 items-center justify-center rounded font-bold">
-          S
-        </div>
-        <div>
-          <div className="font-heading text-lg font-semibold tracking-tight">{APP_BRAND_NAME}</div>
-          <div className="text-on-surface-variant text-[11px] font-semibold tracking-wider uppercase">
-            IMS v1.0.0
+      <nav
+        aria-label="Navigasi utama"
+        data-collapsed={collapsed ? 'true' : 'false'}
+        className={cn(
+          'admin-sidebar text-[var(--sidebar-foreground)] flex h-full shrink-0 flex-col',
+          'border-r border-[var(--sidebar-border)] bg-[var(--sidebar)]',
+          'transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          collapsed ? 'w-[4.5rem]' : 'w-64',
+          className
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-start gap-2 px-3 pt-5 pb-3',
+            collapsed ? 'flex-col items-center' : 'justify-between'
+          )}
+        >
+          <div className={cn('min-w-0', collapsed && 'hidden')}>
+            <p className="font-heading text-[var(--sidebar-foreground)] text-[15px] leading-snug font-bold tracking-tight">
+              {APP_BRAND_NAME}
+            </p>
+            <p className="text-[var(--sidebar-foreground)]/45 mt-0.5 text-[10px] font-semibold tracking-[0.14em] uppercase">
+              IMS
+            </p>
           </div>
-        </div>
-      </div>
 
-      <div className="border-outline-variant mx-4 border-t" />
-
-      <div className="mt-1 flex flex-1 flex-col gap-1 overflow-y-auto px-4">
-        {visibleNavItems.map((item) => {
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) => sidebarNavLinkClass(isActive)}
-            >
-              <Icon className="size-5 shrink-0" />
-              <span>{item.label}</span>
-            </NavLink>
-          )
-        })}
-      </div>
-
-      <div className="mt-auto px-4 py-4">
-        <AdminQuickActionsDropdown
-          side="top"
-          align="center"
-          sideOffset={8}
-          onNavigate={onNavigate}
-          trigger={
+          {!forceExpanded ? (
             <button
               type="button"
-              className="ambient-shadow bg-primary text-primary-foreground hover:opacity-90 w-full rounded-lg py-2 text-[11px] font-semibold tracking-wider uppercase transition-opacity"
+              onClick={() => setCollapsed(!collapsed)}
+              className={cn(
+                'text-[var(--sidebar-foreground)]/55 hover:text-[var(--sidebar-foreground)]',
+                'hover:bg-[var(--sidebar-accent)] focus-visible:bg-[var(--sidebar-accent)]',
+                'inline-flex size-9 shrink-0 items-center justify-center rounded-lg outline-none',
+                'transition-colors duration-150'
+              )}
+              aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+              aria-expanded={!collapsed}
+              title={collapsed ? 'Perluas' : 'Ciutkan'}
             >
-              Aksi cepat
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" />
+              ) : (
+                <PanelLeftClose className="size-4" />
+              )}
             </button>
-          }
-        />
-        <div className="border-outline-variant mt-4 flex flex-col gap-1 border-t pt-4">
-          {!isWarehouseStaff && !isSalesStaff && !isFinanceStaff ? (
-            <NavLink
-              to="/admin/pengaturan"
-              onClick={onNavigate}
-              className={({ isActive }) => sidebarNavLinkClass(isActive)}
-            >
-              <Settings className="size-5" />
-              <span>Pengaturan</span>
-            </NavLink>
           ) : null}
-          <NavLink
-            to="/admin/profil"
-            onClick={onNavigate}
-            className={({ isActive }) => sidebarNavLinkClass(isActive)}
-          >
-            <User className="size-5" />
-            <span>Profil</span>
-          </NavLink>
-          <button
-            type="button"
-            className={cn(
-              sidebarNavLinkClass(false),
-              'w-full text-left'
-            )}
-            onClick={() => setLogoutOpen(true)}
-          >
-            <LogOut className="size-5" />
-            <span>Keluar</span>
-          </button>
         </div>
-      </div>
-    </nav>
-    <LogoutConfirmModal open={logoutOpen} onOpenChange={setLogoutOpen} />
+
+        <div className="mx-3 h-px bg-[var(--sidebar-border)]" />
+
+        <div
+          className={cn(
+            'mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden',
+            collapsed ? 'px-2' : 'px-3'
+          )}
+        >
+          {visibleNavItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) => sidebarNavLinkClass(isActive, collapsed)}
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon
+                      className={cn(
+                        'size-[1.15rem] shrink-0',
+                        isActive ? 'text-primary' : 'opacity-80'
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        'truncate',
+                        collapsed && 'sr-only',
+                        isActive && 'font-semibold text-primary'
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            )
+          })}
+        </div>
+
+        <div className={cn('mt-auto pb-4', collapsed ? 'px-2' : 'px-3')}>
+          <AdminQuickActionsDropdown
+            side="top"
+            align="center"
+            sideOffset={8}
+            onNavigate={onNavigate}
+            trigger={
+              <button
+                type="button"
+                title="Aksi cepat"
+                className={cn(
+                  'bg-primary text-primary-foreground w-full rounded-lg text-[11px] font-semibold tracking-wider uppercase outline-none',
+                  'transition-opacity duration-150 hover:opacity-90',
+                  'focus-visible:opacity-90',
+                  collapsed ? 'px-0 py-2.5' : 'px-3 py-2.5'
+                )}
+              >
+                {collapsed ? (
+                  <Zap className="mx-auto size-4" aria-hidden />
+                ) : (
+                  'Aksi cepat'
+                )}
+              </button>
+            }
+          />
+
+          <div className="mt-3 h-px bg-[var(--sidebar-border)]" />
+
+          <div className="mt-3 flex flex-col gap-0.5">
+            {!isWarehouseStaff && !isSalesStaff && !isFinanceStaff ? (
+              <NavLink
+                to="/admin/pengaturan"
+                onClick={onNavigate}
+                title={collapsed ? 'Pengaturan' : undefined}
+                className={({ isActive }) => sidebarNavLinkClass(isActive, collapsed)}
+              >
+                <Settings className="size-[1.15rem] shrink-0 opacity-80" />
+                <span className={cn(collapsed && 'sr-only')}>Pengaturan</span>
+              </NavLink>
+            ) : null}
+            <NavLink
+              to="/admin/profil"
+              onClick={onNavigate}
+              title={collapsed ? 'Profil' : undefined}
+              className={({ isActive }) => sidebarNavLinkClass(isActive, collapsed)}
+            >
+              <User className="size-[1.15rem] shrink-0 opacity-80" />
+              <span className={cn(collapsed && 'sr-only')}>Profil</span>
+            </NavLink>
+            <button
+              type="button"
+              title={collapsed ? 'Keluar' : undefined}
+              className={cn(sidebarNavLinkClass(false, collapsed), 'w-full')}
+              onClick={() => setLogoutOpen(true)}
+            >
+              <LogOut className="size-[1.15rem] shrink-0 opacity-80" />
+              <span className={cn(collapsed && 'sr-only')}>Keluar</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+      <LogoutConfirmModal open={logoutOpen} onOpenChange={setLogoutOpen} />
     </>
   )
 }
