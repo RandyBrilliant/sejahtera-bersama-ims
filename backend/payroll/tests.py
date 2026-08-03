@@ -19,8 +19,12 @@ from payroll.models import (
     PayType,
 )
 from payroll.period_week import default_bounds_for_pay_date, week_bounds_for_pay_saturday
-from payroll.services import generate_payroll_entries, finalize_payroll_period, unfinalize_payroll_period
-from payroll.services import PayrollWorkflowError
+from payroll.services import (
+    PayrollWorkflowError,
+    finalize_payroll_period,
+    generate_payroll_entries,
+    unfinalize_payroll_period,
+)
 
 User = get_user_model()
 
