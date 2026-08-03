@@ -151,17 +151,38 @@ else
     exit 1
 fi
 
-# Setup auto-renewal (weekly)
+# Setup auto-renewal (certbot.timer twice daily + deploy hook that copies into nginx)
 echo ""
 echo -e "${BLUE}Setting up certificate auto-renewal...${NC}"
-# Create renewal script
-cat > /etc/cron.weekly/renew-ssl-cert <<EOF
-#!/bin/bash
-set -e
-certbot renew --quiet --webroot -w "$WEBROOT_DIR" --deploy-hook "cd $APP_DIR && cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem nginx/ssl/$DOMAIN/fullchain.pem && cp /etc/letsencrypt/live/$DOMAIN/privkey.pem nginx/ssl/$DOMAIN/privkey.pem && cp /etc/letsencrypt/live/$DOMAIN/chain.pem nginx/ssl/$DOMAIN/chain.pem && docker compose $COMPOSE_OPTS exec -T nginx nginx -s reload"
+
+# Host webroot must match the nginx bind-mount source (not the in-container path).
+# Docker-based renewals can accidentally rewrite this to /var/www/certbot.
+RENEWAL_CONF="/etc/letsencrypt/renewal/${DOMAIN}.conf"
+if [ -f "$RENEWAL_CONF" ]; then
+    sed -i "s|^webroot_path = .*|webroot_path = ${WEBROOT_DIR},|" "$RENEWAL_CONF"
+    sed -i "s|^${DOMAIN} = .*|${DOMAIN} = ${WEBROOT_DIR}|" "$RENEWAL_CONF"
+fi
+
+install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
+install -m 755 "$SCRIPT_DIR/deploy-ssl-certs.sh" /etc/letsencrypt/renewal-hooks/deploy/ims-deploy-ssl-certs.sh
+
+# Prefer systemd timer (twice daily). Remove the old weekly cron that renewed LE
+# certs without a reliable nginx copy/reload hook.
+rm -f /etc/cron.weekly/renew-ssl-cert
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+fi
+
+# Safety net with the correct host webroot (deploy hooks still run after renew).
+cat > /etc/cron.d/ims-ssl-renew <<EOF
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+# Twice daily; no-op unless expiry is within 30 days. Deploy hook syncs nginx/ssl.
+15 3,15 * * * root test -x /usr/bin/certbot && certbot -q renew --no-random-sleep-on-renew --webroot -w $WEBROOT_DIR
 EOF
-chmod +x /etc/cron.weekly/renew-ssl-cert
-echo -e "${GREEN}✓ Auto-renewal configured${NC}"
+chmod 644 /etc/cron.d/ims-ssl-renew
+
+echo -e "${GREEN}✓ Auto-renewal configured (certbot.timer + deploy hook + cron safety net)${NC}"
 
 echo ""
 echo -e "${GREEN}=========================================="
@@ -176,7 +197,8 @@ echo ""
 echo -e "${GREEN}Your site is now available at: https://$DOMAIN${NC}"
 echo ""
 echo -e "${YELLOW}Important:${NC}"
-echo "  - Certificates will auto-renew weekly"
+echo "  - Certificates auto-renew twice daily via certbot.timer"
+echo "  - After renew, deploy hook copies certs into nginx/ssl and reloads nginx"
 echo "  - Update your .env file:"
 echo "    ${BLUE}SECURE_SSL_REDIRECT=1${NC}"
 echo "    ${BLUE}SESSION_COOKIE_SECURE=1${NC}"
