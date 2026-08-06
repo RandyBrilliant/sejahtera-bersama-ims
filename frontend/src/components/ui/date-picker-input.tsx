@@ -65,20 +65,19 @@ export function DatePickerInput({
           <CalendarDays className="text-on-surface-variant size-4 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(22rem,calc(100vw-1rem))] p-0" align="start">
-        <div className="border-outline-variant border-b p-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => pick(new Date())}>
-              Hari ini
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => pick(addDays(new Date(), 1))}>
-              H+1
-            </Button>
-          </div>
+      <PopoverContent className="w-auto p-0" align="start">
+        <div className="border-outline-variant flex flex-wrap gap-2 border-b px-3 py-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => pick(new Date())}>
+            Hari ini
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => pick(addDays(new Date(), 1))}>
+            H+1
+          </Button>
         </div>
         <Calendar
           mode="single"
           selected={selected}
+          defaultMonth={selected}
           onSelect={(d) => d && pick(d)}
           disabled={[
             ...(min ? [{ before: min }] : []),

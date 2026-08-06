@@ -160,7 +160,7 @@ export function DateRangePickerInput({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[min(22rem,calc(100vw-1rem))] p-0"
+        className="w-auto p-0"
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
