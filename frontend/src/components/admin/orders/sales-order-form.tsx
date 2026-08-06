@@ -37,6 +37,7 @@ import {
   useCreateSalesOrderMutation,
   useCustomersQuery,
   useSalesOrderQuery,
+  useSalesOrdersQuery,
   useUpdateSalesOrderMutation,
   useWilayahQuery,
 } from '@/hooks/use-purchase-query'
@@ -56,15 +57,23 @@ function isoTomorrowLocal(): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function defaultSalesInvoiceNumber(): string {
-  const d = new Date()
+/** Daily stem matching backend `next_order_code`: SO-20260725 */
+function salesOrderCodeStem(d = new Date()): string {
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
-  return `INV-SO-${yyyy}${mm}${dd}-${hh}${mi}${ss}`
+  return `SO-${yyyy}${mm}${dd}`
+}
+
+/** Next sequential code for the day: SO-20260725-0001 */
+function nextSalesOrderCode(existingCodes: string[], stem: string): string {
+  let max = 0
+  for (const code of existingCodes) {
+    if (!code.startsWith(`${stem}-`)) continue
+    const seq = Number.parseInt(code.split('-').at(-1) ?? '', 10)
+    if (Number.isFinite(seq) && seq > max) max = seq
+  }
+  return `${stem}-${String(max + 1).padStart(4, '0')}`
 }
 
 /** Cart line, keyed by product_packaging id (duplicates always merge). */
@@ -160,6 +169,16 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
   const packagingQuery = useProductPackagingListQuery(listParams)
 
+  const soCodeStem = useMemo(() => salesOrderCodeStem(), [])
+  const todayOrdersQuery = useSalesOrdersQuery(
+    { page: 1, page_size: 100, search: soCodeStem, ordering: '-order_code' },
+    mode === 'create'
+  )
+  const previewInvoiceNumber = useMemo(() => {
+    const codes = (todayOrdersQuery.data?.results ?? []).map((o) => o.order_code)
+    return nextSalesOrderCode(codes, soCodeStem)
+  }, [todayOrdersQuery.data?.results, soCodeStem])
+
   const customers = useMemo(() => customersQuery.data?.results ?? [], [customersQuery.data?.results])
   const packagingRows = useMemo(
     () => packagingQuery.data?.results ?? [],
@@ -174,10 +193,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const [customerId, setCustomerId] = useState<number | ''>(() =>
     initial?.customer != null ? initial.customer : ''
   )
-  const [invoiceNumber, setInvoiceNumber] = useState(() => {
-    if (initial?.invoice_number) return initial.invoice_number
-    return mode === 'create' ? defaultSalesInvoiceNumber() : ''
-  })
+  const [invoiceNumber, setInvoiceNumber] = useState(() => initial?.invoice_number ?? '')
   const [invoiceDate, setInvoiceDate] = useState(() =>
     initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
@@ -410,7 +426,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
       ? { lines: payloadLines }
       : {
           customer: customerId as number,
-          invoice_number: invoiceNumber.trim() || undefined,
+          invoice_number: isSalesStaff
+            ? undefined
+            : invoiceNumber.trim() || undefined,
           invoice_date: invoiceDate || null,
           notes: notes.trim().toUpperCase(),
           lines: payloadLines,
@@ -420,7 +438,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
       if (mode === 'create') {
         const o = await createMut.mutateAsync({
           customer: customerId as number,
-          invoice_number: invoiceNumber.trim() || undefined,
+          invoice_number: isSalesStaff
+            ? undefined
+            : invoiceNumber.trim() || undefined,
           invoice_date: invoiceDate || null,
           notes: notes.trim().toUpperCase(),
           lines: payloadLines,
@@ -818,44 +838,64 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setFakturOpen((v) => !v)}
-                className="text-on-surface flex w-full items-center justify-between text-sm font-medium"
-              >
-                Detail faktur
-                <ChevronDown
-                  className={cn('size-4 transition', fakturOpen && 'rotate-180')}
-                />
-              </button>
-              {fakturOpen ? (
-                <div className="grid gap-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="so-inv" className="text-xs">
-                      Nomor faktur
-                    </Label>
-                    <Input
-                      id="so-inv"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      disabled={pending}
-                      className="border-outline-variant"
-                      placeholder="Otomatis dibuat, bisa diubah manual"
-                    />
+              {isSalesStaff ? (
+                <div className="grid gap-2 text-sm">
+                  <p className="text-on-surface text-sm font-medium">Detail faktur</p>
+                  <div>
+                    <p className="text-on-surface-variant text-xs">Nomor faktur</p>
+                    <p className="text-on-surface font-medium font-mono">
+                      {mode === 'create'
+                        ? previewInvoiceNumber
+                        : invoiceNumber || '—'}
+                    </p>
                   </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="so-inv-date" className="text-xs">
-                      Tanggal faktur
-                    </Label>
-                    <DatePickerInput
-                      id="so-inv-date"
-                      value={invoiceDate}
-                      onChange={setInvoiceDate}
-                      disabled={pending}
-                    />
+                  <div>
+                    <p className="text-on-surface-variant text-xs">Tanggal faktur</p>
+                    <p className="text-on-surface font-medium">{invoiceDate || '—'}</p>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setFakturOpen((v) => !v)}
+                    className="text-on-surface flex w-full items-center justify-between text-sm font-medium"
+                  >
+                    Detail faktur
+                    <ChevronDown
+                      className={cn('size-4 transition', fakturOpen && 'rotate-180')}
+                    />
+                  </button>
+                  {fakturOpen ? (
+                    <div className="grid gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="so-inv" className="text-xs">
+                          Nomor faktur
+                        </Label>
+                        <Input
+                          id="so-inv"
+                          value={invoiceNumber}
+                          onChange={(e) => setInvoiceNumber(e.target.value)}
+                          disabled={pending}
+                          className="border-outline-variant font-mono"
+                          placeholder={`Otomatis ${previewInvoiceNumber}`}
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="so-inv-date" className="text-xs">
+                          Tanggal faktur
+                        </Label>
+                        <DatePickerInput
+                          id="so-inv-date"
+                          value={invoiceDate}
+                          onChange={setInvoiceDate}
+                          disabled={pending}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
                 </>
               )}
 

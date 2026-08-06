@@ -39,7 +39,7 @@ def _user_mini(u):
 
 
 def _default_invoice_number(order_code: str) -> str:
-    return f"INV-{order_code}"
+    return order_code
 
 
 class CustomerSerializer(serializers.ModelSerializer):

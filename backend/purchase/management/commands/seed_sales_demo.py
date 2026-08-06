@@ -227,7 +227,7 @@ class Command(BaseCommand):
             order_code=order_code,
             customer=customer,
             status=status,
-            invoice_number=f"INV-{order_code}",
+            invoice_number=order_code,
             invoice_date=timezone.localdate() + timedelta(days=1),
             notes=f"{SEED_MARKER} pesanan contoh untuk uji cetak nota.",
             created_by=user,

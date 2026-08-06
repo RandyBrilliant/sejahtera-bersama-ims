@@ -208,11 +208,12 @@ export function usePurchaseInOrderQuery(id: number | null, enabled = true) {
   })
 }
 
-export function useSalesOrdersQuery(params: SalesOrdersListParams) {
+export function useSalesOrdersQuery(params: SalesOrdersListParams, enabled = true) {
   return useQuery({
     queryKey: purchaseKeys.salesOrderList(params),
     queryFn: () => fetchSalesOrders(params),
     placeholderData: keepPreviousData,
+    enabled,
   })
 }
 
