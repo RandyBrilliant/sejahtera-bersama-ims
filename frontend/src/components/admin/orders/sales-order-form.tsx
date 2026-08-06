@@ -443,8 +443,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   return (
     <>
       <div className="grid gap-4 pb-24 lg:grid-cols-[1fr_minmax(340px,400px)] lg:items-start lg:pb-0">
-        {/* LEFT: product catalog */}
-        <Card className="border-outline-variant bg-card">
+        {/* LEFT: product catalog — after pelanggan on mobile */}
+        <Card className="border-outline-variant bg-card order-2 lg:order-none">
           <CardHeader className="border-outline-variant space-y-3 border-b pb-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle className="text-base">Katalog produk</CardTitle>
@@ -543,9 +543,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
           </CardContent>
         </Card>
 
-        {/* RIGHT: cart / order */}
-        <div className="space-y-3 lg:sticky lg:top-4">
-          <Card className="border-outline-variant bg-card">
+        {/* RIGHT: cart / order — pelanggan first on mobile, then katalog, then keranjang */}
+        <div className="contents lg:sticky lg:top-4 lg:block lg:space-y-3">
+          <Card className="border-outline-variant bg-card order-1 lg:order-none">
             <CardContent className="space-y-2 p-4">
               <Label htmlFor="so-customer-search" className="text-xs">
                 Pelanggan
@@ -661,7 +661,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             </CardContent>
           </Card>
 
-          <Card className="border-outline-variant bg-card">
+          <Card className="border-outline-variant bg-card order-3 lg:order-none">
             <CardHeader className="border-outline-variant flex flex-row items-center justify-between gap-2 border-b pb-3">
               <CardTitle className="text-base">Keranjang</CardTitle>
               <span className="text-on-surface-variant text-xs tabular-nums">
@@ -781,7 +781,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             </CardContent>
           </Card>
 
-          <Card className="border-outline-variant bg-card">
+          <Card className="border-outline-variant bg-card order-4 lg:order-none">
             <CardContent className="space-y-3 p-4">
               {lockNotaDetails ? (
                 <div className="grid gap-2 text-sm">
