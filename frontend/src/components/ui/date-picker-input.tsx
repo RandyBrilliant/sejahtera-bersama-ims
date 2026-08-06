@@ -66,7 +66,7 @@ export function DatePickerInput({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <div className="border-outline-variant flex flex-wrap gap-2 border-b px-3 py-2">
+        <div className="border-outline-variant flex flex-wrap gap-2 border-b px-3 py-2.5">
           <Button type="button" variant="outline" size="sm" onClick={() => pick(new Date())}>
             Hari ini
           </Button>
