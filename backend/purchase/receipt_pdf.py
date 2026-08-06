@@ -116,8 +116,14 @@ class ReceiptLayout:
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
     # Full mode: name + up to 3 address lines (shifted up with tanggal).
     full_kepada_line_tops: tuple[float, ...] = (15.0, 19.3, 23.6, 27.9)
-    # Preprinted: name a bit higher; address lines follow under it.
+    # Preprinted: name at first top; address continues with denser, smaller lines.
     preprinted_kepada_line_tops: tuple[float, ...] = (17.6, 24.0, 30.4)
+    # Stop address before item table (table_top = 40).
+    preprinted_kepada_bottom: float = 38.5
+    preprinted_name_line_height: float = 4.2
+    preprinted_address_line_height: float = 3.2
+    font_buyer_address: float = 7.0
+    font_buyer_address_min: float = 5.5
 
     # Bon / Faktur number — full mode on the 4th KEPADA line (below WA/HP).
     faktur_label_top: float = 37.5
@@ -561,36 +567,86 @@ def _draw_values(
             # Left-align on the date line so hari clears the "tgl." label on the right.
             pdf.drawString(layout.x(date_left), layout.y(date_top), text)
 
-    # Kepada Yth. — name then alamat; wrap at fixed size, never shrink/truncate.
+    # Kepada Yth. — name then alamat.
     if include_faktur_number:
         name_x = layout.full_kepada_value_x
         kepada_tops = layout.full_kepada_line_tops
+        buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
+        wrapped: list[str] = []
+        if order.customer_id:
+            wrapped.extend(
+                _wrap_text(
+                    pdf,
+                    _caps(order.customer.name.strip()),
+                    FONT,
+                    layout.font_buyer,
+                    buyer_width,
+                )
+            )
+        address = " ".join(_address_lines(order.customer, max_lines=8))
+        if address:
+            wrapped.extend(
+                _wrap_text(pdf, _caps(address), FONT, layout.font_buyer, buyer_width)
+            )
+        pdf.setFont(FONT, layout.font_buyer)
+        for raw, top in zip(wrapped, kepada_tops):
+            pdf.drawString(layout.x(name_x), layout.y(top), raw)
     else:
+        # Nota lama (preprinted): smaller alamat + denser lines so the full address shows.
         name_x = layout.kepada_value_x
-        kepada_tops = layout.preprinted_kepada_line_tops
+        buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
+        name_top = layout.preprinted_kepada_line_tops[0]
+        top = name_top
 
-    buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-    wrapped: list[str] = []
-    if order.customer_id:
-        wrapped.extend(
-            _wrap_text(
+        name_lines: list[str] = []
+        if order.customer_id:
+            name_lines = _wrap_text(
                 pdf,
                 _caps(order.customer.name.strip()),
                 FONT,
                 layout.font_buyer,
                 buyer_width,
             )
-        )
-    # Join address segments so wrapping fills each line (not one word per line).
-    address = " ".join(_address_lines(order.customer, max_lines=8))
-    if address:
-        wrapped.extend(
-            _wrap_text(pdf, _caps(address), FONT, layout.font_buyer, buyer_width)
-        )
+        pdf.setFont(FONT, layout.font_buyer)
+        for raw in name_lines:
+            if top > layout.preprinted_kepada_bottom:
+                break
+            pdf.drawString(layout.x(name_x), layout.y(top), raw)
+            top += layout.preprinted_name_line_height
 
-    pdf.setFont(FONT, layout.font_buyer)
-    for raw, top in zip(wrapped, kepada_tops):
-        pdf.drawString(layout.x(name_x), layout.y(top), raw)
+        address = " ".join(_address_lines(order.customer, max_lines=12))
+        if address:
+            # Leave a little gap after the name block.
+            if name_lines:
+                top = max(top, name_top + layout.preprinted_name_line_height * len(name_lines))
+            available = layout.preprinted_kepada_bottom - top
+            max_addr_lines = max(
+                1, int(available / layout.preprinted_address_line_height) + 1
+            )
+            addr_size = layout.font_buyer_address
+            addr_lines = _wrap_text(
+                pdf, _caps(address), FONT, addr_size, buyer_width
+            )
+            while (
+                len(addr_lines) > max_addr_lines
+                and addr_size > layout.font_buyer_address_min
+            ):
+                addr_size -= 0.5
+                addr_lines = _wrap_text(
+                    pdf, _caps(address), FONT, addr_size, buyer_width
+                )
+            # Prefer showing every wrapped line; tighten line height if needed.
+            line_h = layout.preprinted_address_line_height
+            if len(addr_lines) > 1 and available > 0:
+                needed = (len(addr_lines) - 1) * line_h
+                if needed > available:
+                    line_h = max(2.4, available / (len(addr_lines) - 1))
+            pdf.setFont(FONT, addr_size)
+            for raw in addr_lines:
+                if top > layout.preprinted_kepada_bottom + 0.4:
+                    break
+                pdf.drawString(layout.x(name_x), layout.y(top), raw)
+                top += line_h
 
     # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
