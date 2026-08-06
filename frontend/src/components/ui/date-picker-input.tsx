@@ -61,13 +61,13 @@ export function DatePickerInput({
             className
           )}
         >
-          <span>{displayText}</span>
-          <CalendarDays className="text-on-surface-variant size-4" />
+          <span className="truncate">{displayText}</span>
+          <CalendarDays className="text-on-surface-variant size-4 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-[min(22rem,calc(100vw-1rem))] p-0" align="start">
         <div className="border-outline-variant border-b p-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => pick(new Date())}>
               Hari ini
             </Button>

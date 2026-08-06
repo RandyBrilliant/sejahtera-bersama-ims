@@ -11,6 +11,7 @@ import {
   deactivateSystemUser,
   fetchUser,
   fetchUsers,
+  resetSystemUserPassword,
   updateSystemUser,
 } from '@/api/system-users'
 import type {
@@ -83,5 +84,12 @@ export function useActivateSystemUserMutation() {
       void queryClient.invalidateQueries({ queryKey: systemUsersKeys.lists() })
       void queryClient.invalidateQueries({ queryKey: systemUsersKeys.detail(userId) })
     },
+  })
+}
+
+export function useResetSystemUserPasswordMutation() {
+  return useMutation({
+    mutationFn: ({ userId, newPassword }: { userId: number; newPassword: string }) =>
+      resetSystemUserPassword(userId, newPassword),
   })
 }

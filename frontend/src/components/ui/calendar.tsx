@@ -11,16 +11,27 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: React.ComponentProps<typeof DayPicker>) {
+  const currentYear = new Date().getFullYear()
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      captionLayout="dropdown"
+      startMonth={new Date(currentYear - 50, 0)}
+      endMonth={new Date(currentYear + 10, 11)}
       className={cn('p-3', className)}
       classNames={{
         months: 'flex flex-col gap-3',
         month: 'space-y-3',
-        caption: 'relative flex items-center justify-center pt-1',
+        caption: 'relative flex items-center justify-center gap-2 pt-1 px-8',
         caption_label: 'text-sm font-medium',
         nav: 'absolute inset-x-0 top-1 flex items-center justify-between px-1',
+        dropdowns: 'flex items-center justify-center gap-2',
+        dropdown_root: 'relative',
+        dropdown:
+          'border-input bg-field h-8 rounded-md border px-2 pr-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
+        months_dropdown: 'min-w-[7.5rem]',
+        years_dropdown: 'min-w-[5.5rem]',
         button_previous: cn(
           buttonVariants({ variant: 'outline', size: 'sm' }),
           'size-7 bg-transparent p-0 opacity-70 hover:opacity-100'

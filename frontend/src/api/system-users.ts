@@ -57,3 +57,13 @@ export async function activateSystemUser(id: number): Promise<SystemUser> {
   const { data } = await api.post<ApiWrappedUser>(`/api/account/users/${id}/activate/`)
   return data.data
 }
+
+export async function resetSystemUserPassword(
+  id: number,
+  newPassword: string
+): Promise<void> {
+  await api.post('/api/account/auth/change-password-user/', {
+    user_id: id,
+    new_password: newPassword,
+  })
+}

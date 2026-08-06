@@ -55,6 +55,7 @@ const ROLE_FILTER: { value: string; label: string }[] = [
   { value: 'WAREHOUSE_STAFF', label: USER_ROLE_LABEL.WAREHOUSE_STAFF },
   { value: 'SALES_STAFF', label: USER_ROLE_LABEL.SALES_STAFF },
   { value: 'FINANCE_STAFF', label: USER_ROLE_LABEL.FINANCE_STAFF },
+  { value: 'KUPAS_STAFF', label: USER_ROLE_LABEL.KUPAS_STAFF },
 ]
 
 type StatusIntent = 'activate' | 'deactivate'

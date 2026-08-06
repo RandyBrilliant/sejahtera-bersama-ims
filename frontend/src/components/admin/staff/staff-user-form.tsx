@@ -7,6 +7,7 @@ import {
 } from '@/constants/user-roles'
 import {
   useCreateSystemUserMutation,
+  useResetSystemUserPasswordMutation,
   useUpdateSystemUserMutation,
 } from '@/hooks/use-system-users-query'
 import { alert } from '@/lib/alert'
@@ -76,9 +77,13 @@ export function StaffUserForm({
   const [tempPassword, setTempPassword] = useState(() =>
     mode === 'create' ? generateTempPassword() : ''
   )
+  const [resetPassword, setResetPassword] = useState(() =>
+    mode === 'edit' ? generateTempPassword() : ''
+  )
 
   const createMutation = useCreateSystemUserMutation()
   const updateMutation = useUpdateSystemUserMutation(initialUser?.id ?? 0)
+  const resetPasswordMutation = useResetSystemUserPasswordMutation()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -134,7 +139,31 @@ export function StaffUserForm({
     }
   }
 
-  const submitting = createMutation.isPending || updateMutation.isPending
+  async function handleResetPassword() {
+    if (mode !== 'edit' || !initialUser) return
+    if (!resetPassword.trim()) {
+      alert.error('Validasi', 'Password sementara wajib diisi.')
+      return
+    }
+
+    try {
+      await resetPasswordMutation.mutateAsync({
+        userId: initialUser.id,
+        newPassword: resetPassword,
+      })
+      alert.success('Berhasil', 'Password pengguna berhasil direset.')
+      alert.info(
+        'Password sementara',
+        `Berikan password ini kepada pengguna (sekali tampil): ${resetPassword}`
+      )
+      setResetPassword(generateTempPassword())
+    } catch (err) {
+      alert.error('Gagal reset password', parseStaffUserMutationError(err))
+    }
+  }
+
+  const submitting =
+    createMutation.isPending || updateMutation.isPending || resetPasswordMutation.isPending
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -240,6 +269,54 @@ export function StaffUserForm({
           </div>
         </CardContent>
       </Card>
+
+      {mode === 'edit' && actorRole === 'ADMIN' ? (
+        <Card className="border-outline-variant bg-card">
+          <CardHeader className="border-outline-variant border-b pb-4">
+            <CardTitle className="text-base">Reset password</CardTitle>
+            <CardDescription>
+              Buat password sementara baru untuk pengguna ini, lalu berikan ke pengguna.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            <div className="grid gap-2">
+              <Label htmlFor="su-reset-password">Password sementara baru</Label>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id="su-reset-password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  forceUppercase={false}
+                  disabled={submitting}
+                  autoComplete="new-password"
+                  className="border-outline-variant min-w-[12rem] flex-1 font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={submitting}
+                  onClick={() => setResetPassword(generateTempPassword())}
+                >
+                  Buat ulang
+                </Button>
+              </div>
+              <p className="text-on-surface-variant text-xs">
+                Hanya admin yang dapat reset password pengguna dari halaman ini.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting}
+                onClick={() => void handleResetPassword()}
+              >
+                {resetPasswordMutation.isPending ? 'Mereset…' : 'Reset password'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
