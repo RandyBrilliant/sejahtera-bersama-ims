@@ -49,7 +49,9 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
     initial != null ? String(initial.amount_idr) : ''
   )
   const [occurredOn, setOccurredOn] = useState(initial?.occurred_on ?? todayIso())
-  const [description, setDescription] = useState(initial?.description ?? '')
+  const [description, setDescription] = useState(
+    initial?.description != null ? initial.description.toUpperCase() : ''
+  )
   const [reference, setReference] = useState(initial?.reference ?? '')
   const [salesOrderId, setSalesOrderId] = useState(
     initial?.sales_order != null ? String(initial.sales_order) : ''
@@ -90,7 +92,7 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
       alert.error('Validasi', 'Jumlah (Rp) wajib berupa bilangan bulat positif.')
       return
     }
-    const desc = description.trim()
+    const desc = description.trim().toUpperCase()
     if (!desc) {
       alert.error('Validasi', 'Deskripsi wajib diisi.')
       return
@@ -267,10 +269,10 @@ export function OperationalCashEntryForm({ mode, initial, onCancel, onSaved }: P
                 <textarea
                   id="desc"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => setDescription(e.target.value.toUpperCase())}
                   disabled={submitting}
                   rows={3}
-                  className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm uppercase shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
               <div className="grid gap-2 md:col-span-2">
