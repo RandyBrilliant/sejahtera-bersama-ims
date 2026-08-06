@@ -181,7 +181,9 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const [invoiceDate, setInvoiceDate] = useState(() =>
     initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
-  const [notes, setNotes] = useState(() => initial?.notes ?? '')
+  const [notes, setNotes] = useState(() =>
+    initial?.notes != null ? initial.notes.toUpperCase() : ''
+  )
   const [cart, setCart] = useState<CartItem[]>(() => cartFromInitial(initial, canSetCustomPrice))
   const [expandedCustom, setExpandedCustom] = useState<Set<number>>(new Set())
 
@@ -410,7 +412,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
           customer: customerId as number,
           invoice_number: invoiceNumber.trim() || undefined,
           invoice_date: invoiceDate || null,
-          notes: notes.trim(),
+          notes: notes.trim().toUpperCase(),
           lines: payloadLines,
         }
 
@@ -420,7 +422,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
           customer: customerId as number,
           invoice_number: invoiceNumber.trim() || undefined,
           invoice_date: invoiceDate || null,
-          notes: notes.trim(),
+          notes: notes.trim().toUpperCase(),
           lines: payloadLines,
         })
         alert.success('Berhasil', 'Order penjualan dibuat.')
@@ -805,12 +807,12 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                 <textarea
                   id="so-notes"
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={(e) => setNotes(e.target.value.toUpperCase())}
                   disabled={pending}
                   rows={3}
                   placeholder="Catatan untuk pesanan ini (opsional)…"
                   className={cn(
-                    'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                    'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none',
                     'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
                   )}
                 />

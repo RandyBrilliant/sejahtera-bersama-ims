@@ -101,7 +101,9 @@ function PurchaseOrderFormInner({
   const [invoiceDate, setInvoiceDate] = useState(() =>
     initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
   )
-  const [notes, setNotes] = useState(() => initial?.notes ?? '')
+  const [notes, setNotes] = useState(() =>
+    initial?.notes != null ? initial.notes.toUpperCase() : ''
+  )
   const [lines, setLines] = useState<LineDraft[]>(() => linesFromInitial(initial))
 
   const createMut = useCreatePurchaseInOrderMutation()
@@ -149,7 +151,7 @@ function PurchaseOrderFormInner({
     const body = {
       invoice_number: invoiceNumber.trim() || undefined,
       invoice_date: invoiceDate || null,
-      notes: notes.trim(),
+      notes: notes.trim().toUpperCase(),
       lines: payloadLines,
     }
 
@@ -204,11 +206,11 @@ function PurchaseOrderFormInner({
             <textarea
               id="po-notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value.toUpperCase())}
               disabled={pending}
               rows={3}
               className={cn(
-                'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none',
                 'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
               )}
             />

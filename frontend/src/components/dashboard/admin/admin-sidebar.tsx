@@ -58,7 +58,6 @@ const warehouseNavItems: NavItem[] = [
 
 const salesNavItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor penjualan', icon: LayoutDashboard, end: true },
-  { to: '/admin/inventaris', label: 'Inventaris (lihat)', icon: Package },
   { to: '/admin/pelanggan', label: 'Pelanggan', icon: Contact },
   { to: '/admin/pesanan/penjualan', label: 'Pesanan penjualan', icon: ShoppingCart },
 ]
