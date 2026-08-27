@@ -74,6 +74,7 @@ export type PayrollPeriod = {
   finalized_at: string | null
   finalized_by: number | null
   notes: string
+  gaji_cash_entry_id?: number | null
   created_at: string
   updated_at: string
 }
@@ -96,6 +97,18 @@ export type PayrollEntryRow = {
   notes: string
   paid_out: boolean
   paid_out_at: string | null
+  loan_item_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export type PayrollLoanItem = {
+  id: number
+  amount_idr: string | number
+  occurred_on: string
+  payment_method: 'CASH' | 'TRANSFER'
+  note: string
+  cash_entry_id: number | null
   created_at: string
   updated_at: string
 }

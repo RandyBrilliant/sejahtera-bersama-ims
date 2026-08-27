@@ -50,9 +50,24 @@ urlpatterns = [
         name="period-unfinalize",
     ),
     path(
+        "periods/<int:pk>/post-to-cash/",
+        views.PayrollPeriodPostGajiToCashView.as_view(),
+        name="period-post-to-cash",
+    ),
+    path(
         "periods/<int:pk>/entries/",
         views.PayrollEntryListView.as_view(),
         name="period-entry-list",
+    ),
+    path(
+        "periods/<int:pk>/entries/<int:entry_id>/loans/",
+        views.PayrollEntryLoanListCreateView.as_view(),
+        name="period-entry-loan-list",
+    ),
+    path(
+        "periods/<int:pk>/entries/<int:entry_id>/loans/<int:loan_id>/",
+        views.PayrollEntryLoanDetailView.as_view(),
+        name="period-entry-loan-detail",
     ),
     path(
         "periods/<int:pk>/entries/<int:entry_id>/slip/",

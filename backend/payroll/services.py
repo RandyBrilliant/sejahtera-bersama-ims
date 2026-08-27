@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from attendance.services import work_hours_between
 from attendance.utils_lateness import get_attendance_settings
+from payroll.exceptions import PayrollWorkflowError
 from payroll.models import (
     EmployeeCompensation,
     KupasProductionRecord,
@@ -18,12 +19,6 @@ from payroll.models import (
     PayrollPeriod,
     PayType,
 )
-
-
-class PayrollWorkflowError(Exception):
-    def __init__(self, detail: str) -> None:
-        self.detail = detail
-        super().__init__(detail)
 
 
 def _quantize_idr(value: Decimal) -> Decimal:
@@ -259,6 +254,9 @@ def generate_payroll_entries(period: PayrollPeriod) -> int:
                 setattr(existing, key, val)
             existing.notes = existing_notes
             existing.save()
+            from payroll.kas_sync import refresh_entry_advance_from_loans
+
+            refresh_entry_advance_from_loans(existing)
         else:
             PayrollEntry.objects.create(
                 period=period,

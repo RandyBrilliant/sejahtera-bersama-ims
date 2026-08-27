@@ -18,8 +18,9 @@ export function AdminStaffNewPage() {
           Tambah pengguna
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Buat akun internal baru. Password awal otomatis sama dengan username. Setelah disimpan Anda akan
-          dikembalikan ke daftar pengguna. Metadata lengkap dapat Anda lihat saat mengedit pengguna.
+          Buat akun internal baru. Isi password sendiri (atau buat otomatis jika perlu). Setelah
+          disimpan Anda akan dikembalikan ke daftar pengguna. Metadata lengkap dapat Anda lihat saat
+          mengedit pengguna.
         </p>
       </div>
 
@@ -37,9 +38,9 @@ export function AdminStaffNewPage() {
             Informasi
           </h2>
           <p className="text-on-surface-variant text-sm leading-relaxed">
-            Password awal mengikuti username. ID pengguna, tanggal bergabung, nomor telepon di server,
-            status, serta riwayat audit dan profil karyawan ditampilkan di panel kanan pada halaman edit
-            pengguna.
+            Isi password sendiri, atau gunakan tombol buat otomatis. ID pengguna, tanggal bergabung,
+            nomor telepon di server, status, serta riwayat audit dan profil karyawan ditampilkan di
+            panel kanan pada halaman edit pengguna.
           </p>
         </aside>
       </div>

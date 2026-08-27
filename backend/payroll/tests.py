@@ -313,3 +313,77 @@ class PayCadencePeriodTests(TestCase):
         )
         with self.assertRaises(PayrollWorkflowError):
             unfinalize_payroll_period(older)
+
+
+class PayrollLoanAndKasTests(TestCase):
+    def setUp(self):
+        AttendanceSettings.objects.get_or_create(pk=1, defaults={})
+        self.admin = User.objects.create_user(
+            "loan_admin", full_name="Admin Loan", role=UserRole.ADMIN, password="pass"
+        )
+        self.wh = User.objects.create_user("loan_wh", full_name="WH Loan", role=UserRole.WAREHOUSE_STAFF)
+        EmployeeCompensation.objects.update_or_create(
+            user=self.wh,
+            defaults={
+                "pay_type": PayType.DAILY,
+                "pay_cadence": PayCadence.WEEKLY,
+                "daily_rate_idr": Decimal("100000"),
+            },
+        )
+        tz = timezone.get_current_timezone()
+        AttendanceDailyCheckIn.objects.create(
+            employee=self.wh,
+            work_date=date(2026, 8, 3),
+            checked_in_at=timezone.make_aware(datetime.combine(date(2026, 8, 3), time(8, 0)), tz),
+            checked_out_at=timezone.make_aware(datetime.combine(date(2026, 8, 3), time(17, 0)), tz),
+            verified_by=self.admin,
+            is_late=False,
+        )
+        self.period = PayrollPeriod.objects.create(
+            cadence=PayCadence.WEEKLY,
+            pay_date=date(2026, 8, 8),
+            period_start_date=date(2026, 8, 2),
+            period_end_date=date(2026, 8, 8),
+        )
+        generate_payroll_entries(self.period)
+        self.entry = PayrollEntry.objects.get(period=self.period, employee=self.wh)
+
+    def test_two_loan_items_sum_into_advance_and_kas(self):
+        from expenses.models import OperationalCashEntry
+        from payroll.kas_sync import save_loan_item
+
+        save_loan_item(
+            entry=self.entry,
+            user=self.admin,
+            amount=Decimal("25000"),
+            occurred_on=date(2026, 8, 5),
+            payment_method="CASH",
+            note="Pinjam 1",
+        )
+        save_loan_item(
+            entry=self.entry,
+            user=self.admin,
+            amount=Decimal("15000"),
+            occurred_on=date(2026, 8, 6),
+            payment_method="TRANSFER",
+            note="Pinjam 2",
+        )
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.advance_deduction_idr, Decimal("40000.00"))
+        self.assertEqual(self.entry.net_pay_idr, Decimal("60000.00"))
+        self.assertEqual(OperationalCashEntry.objects.filter(reference__startswith="PAYROLL-LOAN-").count(), 2)
+
+    def test_post_period_gaji_to_cash(self):
+        from expenses.models import OperationalCashEntry
+        from payroll.kas_sync import post_period_gaji_to_cash
+
+        cash = post_period_gaji_to_cash(self.period, self.admin, "CASH")
+        self.period.refresh_from_db()
+        self.assertEqual(self.period.gaji_cash_entry_id, cash.id)
+        self.assertEqual(cash.amount_idr, 100000)
+        self.assertEqual(OperationalCashEntry.objects.filter(reference=f"PAYROLL-GAJI-{self.period.pk}").count(), 1)
+        # Update in place
+        cash2 = post_period_gaji_to_cash(self.period, self.admin, "TRANSFER")
+        self.assertEqual(cash2.id, cash.id)
+        self.assertEqual(cash2.payment_method, "TRANSFER")
+

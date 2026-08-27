@@ -23,6 +23,7 @@ from .reporting import (
     aggregate_summary,
     by_category_rows,
     by_day_rows,
+    current_saldo,
     entries_for_json,
     entries_queryset_for_range,
     linked_breakdown,
@@ -133,6 +134,15 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
             OperationalCashEntrySerializer(entry, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
+
+
+class OperationalCashSaldoView(APIView):
+    """Current running saldo from all operational cash entries (not a date range)."""
+
+    permission_classes = [FinanceAccess]
+
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK, data=success_response(data=current_saldo()))
 
 
 class OperationalCashSummaryView(APIView):

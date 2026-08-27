@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     OperationalCashEntryViewSet,
     OperationalCashReportView,
+    OperationalCashSaldoView,
     OperationalCashSummaryView,
     OperationalCategoryViewSet,
 )
@@ -15,6 +16,7 @@ router.register(r"categories", OperationalCategoryViewSet, basename="operational
 router.register(r"entries", OperationalCashEntryViewSet, basename="operational-cash-entries")
 
 urlpatterns = [
+    path("saldo/", OperationalCashSaldoView.as_view(), name="operational-cash-saldo"),
     path("summary/", OperationalCashSummaryView.as_view(), name="operational-cash-summary"),
     path("report/", OperationalCashReportView.as_view(), name="operational-cash-report"),
     path("", include(router.urls)),

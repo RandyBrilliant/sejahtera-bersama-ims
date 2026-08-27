@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 
 import { KasSubnav } from '@/components/admin/kas/kas-subnav'
+import { OperationalCashSaldoCards } from '@/components/admin/kas/operational-cash-saldo-cards'
 
 export function AdminKasLayout() {
   return (
@@ -10,10 +11,12 @@ export function AdminKasLayout() {
           Kas operasional
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Jurnal pemasukan dan pengeluaran kas harian. Kategori mengelompokkan transaksi; laporan
-          ringkas tetap tersedia dari dasbor dan endpoint laporan.
+          Jurnal pemasukan dan pengeluaran kas harian. Saldo saat ini dihitung dari seluruh entri
+          (pemasukan dikurangi pengeluaran), dipisah tunai dan transfer.
         </p>
       </div>
+
+      <OperationalCashSaldoCards />
 
       <KasSubnav />
 

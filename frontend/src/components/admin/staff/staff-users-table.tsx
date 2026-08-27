@@ -8,6 +8,7 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
+  KeyRound,
   Pencil,
   Plus,
   Search,
@@ -24,6 +25,7 @@ import { useSystemUsersQuery } from '@/hooks/use-system-users-query'
 import { formatAuditDate } from '@/lib/format-audit-datetime'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
 import { cn } from '@/lib/utils'
+import { StaffUserResetPasswordModal } from '@/components/admin/staff/staff-user-reset-password-modal'
 import { StaffUserStatusModal } from '@/components/admin/staff/staff-user-status-modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -73,6 +75,7 @@ export function StaffUsersTable() {
     user: SystemUser
     intent: StatusIntent
   } | null>(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null)
 
   const { data, isLoading, isError, error, isFetching } = useSystemUsersQuery(params)
 
@@ -188,6 +191,16 @@ export function StaffUsersTable() {
               >
                 <Pencil className="size-4" />
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="size-8 px-0"
+                onClick={() => setResetPasswordUser(u)}
+                aria-label={`Reset password ${u.username}`}
+              >
+                <KeyRound className="size-4" />
+              </Button>
               {u.is_active ? (
                 <Button
                   type="button"
@@ -237,6 +250,13 @@ export function StaffUsersTable() {
         }}
         user={statusTarget?.user ?? null}
         intent={statusTarget?.intent ?? null}
+      />
+      <StaffUserResetPasswordModal
+        open={!!resetPasswordUser}
+        onOpenChange={(o) => {
+          if (!o) setResetPasswordUser(null)
+        }}
+        user={resetPasswordUser}
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

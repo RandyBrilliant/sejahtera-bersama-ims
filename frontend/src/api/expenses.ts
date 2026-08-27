@@ -4,6 +4,7 @@ import type {
   OperationalCashEntryCreateInput,
   OperationalCashEntryListParams,
   OperationalCashEntryUpdateInput,
+  OperationalCashSaldoPayload,
   OperationalCategory,
   OperationalCategoryCreateInput,
   OperationalCategoryListParams,
@@ -45,6 +46,11 @@ function buildEntryQuery(params: OperationalCashEntryListParams): string {
   if (params.sales_order != null) search.set('sales_order', String(params.sales_order))
   const qs = search.toString()
   return qs ? `?${qs}` : ''
+}
+
+export async function fetchOperationalCashSaldo(): Promise<OperationalCashSaldoPayload> {
+  const { data } = await api.get<{ data: OperationalCashSaldoPayload }>('/api/expenses/saldo/')
+  return data.data
 }
 
 export async function fetchOperationalCashSummary(

@@ -7,12 +7,14 @@ from rest_framework.views import APIView
 
 from account.api_responses import ApiCode, error_response, success_response
 from account.models import UserRole
+from payroll.kas_sync import delete_loan_item, post_period_gaji_to_cash, save_loan_item
 from payroll.models import (
     EmployeeCompensation,
     KupasItem,
     KupasProductionRecord,
     PayCadence,
     PayrollEntry,
+    PayrollLoanItem,
     PayrollPeriod,
     PayType,
 )
@@ -26,9 +28,11 @@ from payroll.serializers import (
     PayrollEntryAdjustSerializer,
     PayrollEntryPaidOutSerializer,
     PayrollEntrySerializer,
+    PayrollLoanItemSerializer,
     PayrollPeriodCreateSerializer,
     PayrollPeriodNotesSerializer,
     PayrollPeriodSerializer,
+    PayrollPostGajiToCashSerializer,
 )
 from payroll.services import (
     PayrollWorkflowError,
@@ -387,6 +391,124 @@ class PayrollEntryListView(APIView):
         p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
         qs = PayrollEntry.objects.select_related("employee").filter(period=p).order_by("employee__full_name")
         return Response(success_response(data=PayrollEntrySerializer(qs, many=True).data), status=200)
+
+
+class PayrollPeriodPostGajiToCashView(APIView):
+    """Catat total gaji bersih periode ke kas operasional (kategori Gaji & upah)."""
+
+    permission_classes = [PayrollManageAccess]
+
+    def post(self, request, pk: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        ser = PayrollPostGajiToCashSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            cash = post_period_gaji_to_cash(p, request.user, ser.validated_data["payment_method"])
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        p.refresh_from_db()
+        return Response(
+            success_response(
+                data={
+                    "period": PayrollPeriodSerializer(p).data,
+                    "cash_entry_id": cash.id,
+                    "amount_idr": cash.amount_idr,
+                },
+                detail="Total gaji bersih dicatat ke kas operasional.",
+            ),
+            status=200,
+        )
+
+
+class PayrollEntryLoanListCreateView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def get(self, request, pk: int, entry_id: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(PayrollEntry.objects.filter(period=p), pk=entry_id)
+        qs = entry.loan_items.all()
+        return Response(success_response(data=PayrollLoanItemSerializer(qs, many=True).data), status=200)
+
+    def post(self, request, pk: int, entry_id: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(PayrollEntry.objects.select_related("employee", "period").filter(period=p), pk=entry_id)
+        ser = PayrollLoanItemSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            item = save_loan_item(
+                entry=entry,
+                user=request.user,
+                amount=ser.validated_data["amount_idr"],
+                occurred_on=ser.validated_data["occurred_on"],
+                payment_method=ser.validated_data.get("payment_method", PayrollLoanItem.PaymentMethod.CASH),
+                note=ser.validated_data.get("note", ""),
+            )
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        entry.refresh_from_db()
+        return Response(
+            success_response(
+                data={
+                    "loan": PayrollLoanItemSerializer(item).data,
+                    "entry": PayrollEntrySerializer(entry).data,
+                },
+                detail="Pinjaman ditambahkan dan dicatat ke kas.",
+            ),
+            status=201,
+        )
+
+
+class PayrollEntryLoanDetailView(APIView):
+    permission_classes = [PayrollManageAccess]
+
+    def patch(self, request, pk: int, entry_id: int, loan_id: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(PayrollEntry.objects.select_related("employee", "period").filter(period=p), pk=entry_id)
+        item = get_object_or_404(PayrollLoanItem.objects.filter(entry=entry), pk=loan_id)
+        ser = PayrollLoanItemSerializer(item, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        try:
+            item = save_loan_item(
+                entry=entry,
+                user=request.user,
+                amount=ser.validated_data.get("amount_idr", item.amount_idr),
+                occurred_on=ser.validated_data.get("occurred_on", item.occurred_on),
+                payment_method=ser.validated_data.get("payment_method", item.payment_method),
+                note=ser.validated_data.get("note", item.note),
+                item=item,
+            )
+        except PayrollWorkflowError as e:
+            return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        entry.refresh_from_db()
+        return Response(
+            success_response(
+                data={
+                    "loan": PayrollLoanItemSerializer(item).data,
+                    "entry": PayrollEntrySerializer(entry).data,
+                },
+                detail="Pinjaman diperbarui.",
+            ),
+            status=200,
+        )
+
+    def delete(self, request, pk: int, entry_id: int, loan_id: int):
+        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        entry = get_object_or_404(PayrollEntry.objects.filter(period=p), pk=entry_id)
+        item = get_object_or_404(PayrollLoanItem.objects.filter(entry=entry), pk=loan_id)
+        if p.status != PayrollPeriod.Status.DRAFT:
+            return Response(
+                error_response(detail="Pinjaman hanya bisa diubah pada periode draft.", code=ApiCode.BAD_REQUEST),
+                status=400,
+            )
+        delete_loan_item(item)
+        entry.refresh_from_db()
+        return Response(
+            success_response(
+                data={"entry": PayrollEntrySerializer(entry).data},
+                detail="Pinjaman dihapus dari slip dan kas.",
+            ),
+            status=200,
+        )
 
 
 class PayrollEntryAdjustView(APIView):

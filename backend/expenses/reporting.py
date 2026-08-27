@@ -4,11 +4,11 @@ from django.db import models
 from django.db.models import Count, Sum, Value
 from django.db.models.functions import Coalesce
 
-from .models import EntryKind, OperationalCashEntry
+from .models import EntryKind, OperationalCashEntry, PaymentMethod
 
 # Expense categories already captured as HPP elsewhere (purchases -> material cost,
 # payroll -> labor). Excluded from the OPEX layer to avoid double-counting.
-EXCLUDED_OPEX_CATEGORY_SLUGS = ("bahan-baku-produksi", "gaji-upah")
+EXCLUDED_OPEX_CATEGORY_SLUGS = ("bahan-baku-produksi", "gaji-upah", "pinjaman-karyawan")
 
 
 def opex_total_for_range(start_d, end_d) -> int:
@@ -31,6 +31,59 @@ def entries_queryset_for_range(start_d, end_d):
         .select_related("category", "sales_order", "created_by")
         .order_by("occurred_on", "id")
     )
+
+
+def current_saldo():
+    """Running operational-cash balance: all-time pemasukan − pengeluaran, by payment method."""
+    qs = OperationalCashEntry.objects.all()
+    totals = qs.aggregate(
+        income_idr=Coalesce(
+            Sum("amount_idr", filter=models.Q(direction=EntryKind.INCOME)),
+            Value(0),
+        ),
+        expense_idr=Coalesce(
+            Sum("amount_idr", filter=models.Q(direction=EntryKind.EXPENSE)),
+            Value(0),
+        ),
+        line_count=Count("id"),
+    )
+    income = int(totals["income_idr"] or 0)
+    expense = int(totals["expense_idr"] or 0)
+    method_rows = {
+        row["payment_method"]: row
+        for row in qs.values("payment_method").annotate(
+            income_idr=Coalesce(
+                Sum("amount_idr", filter=models.Q(direction=EntryKind.INCOME)),
+                Value(0),
+            ),
+            expense_idr=Coalesce(
+                Sum("amount_idr", filter=models.Q(direction=EntryKind.EXPENSE)),
+                Value(0),
+            ),
+            line_count=Count("id"),
+        )
+    }
+    by_payment_method = []
+    for method, _label in PaymentMethod.choices:
+        row = method_rows.get(method) or {}
+        method_income = int(row.get("income_idr") or 0)
+        method_expense = int(row.get("expense_idr") or 0)
+        by_payment_method.append(
+            {
+                "payment_method": method,
+                "income_idr": method_income,
+                "expense_idr": method_expense,
+                "saldo_idr": method_income - method_expense,
+                "line_count": int(row.get("line_count") or 0),
+            }
+        )
+    return {
+        "income_idr": income,
+        "expense_idr": expense,
+        "saldo_idr": income - expense,
+        "line_count": int(totals["line_count"] or 0),
+        "by_payment_method": by_payment_method,
+    }
 
 
 def aggregate_summary(qs):

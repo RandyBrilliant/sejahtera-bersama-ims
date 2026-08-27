@@ -12,6 +12,7 @@ import {
   deleteOperationalCategory,
   fetchOperationalCashEntries,
   fetchOperationalCashEntry,
+  fetchOperationalCashSaldo,
   fetchOperationalCategories,
   fetchOperationalCategory,
   updateOperationalCashEntry,
@@ -37,6 +38,7 @@ export const expensesKeys = {
   entryDetail: (id: number) => [...expensesKeys.entries(), 'detail', id] as const,
   cashSummary: (startDate: string, endDate: string) =>
     [...expensesKeys.all, 'cash-summary', startDate, endDate] as const,
+  cashSaldo: () => [...expensesKeys.all, 'cash-saldo'] as const,
 }
 
 function invalidateExpensesAll(qc: ReturnType<typeof useQueryClient>) {
@@ -84,6 +86,13 @@ export function useDeleteOperationalCategoryMutation() {
   return useMutation({
     mutationFn: deleteOperationalCategory,
     onSuccess: () => invalidateExpensesAll(qc),
+  })
+}
+
+export function useOperationalCashSaldoQuery() {
+  return useQuery({
+    queryKey: expensesKeys.cashSaldo(),
+    queryFn: fetchOperationalCashSaldo,
   })
 }
 

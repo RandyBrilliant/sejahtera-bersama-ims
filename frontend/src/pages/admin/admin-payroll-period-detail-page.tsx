@@ -11,6 +11,8 @@ import {
   patchPayrollPeriodNotes,
   unfinalizePayrollPeriod,
 } from '@/api/payroll'
+import { PayrollLoanModal } from '@/components/admin/payroll/payroll-loan-modal'
+import { PayrollPeriodTotals } from '@/components/admin/payroll/payroll-period-totals'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -46,7 +48,6 @@ function axiosDetail(err: unknown): string | undefined {
 type EntryDraft = {
   deductions_idr: string
   bonus_idr: string
-  advance_deduction_idr: string
 }
 
 export function AdminPayrollPeriodDetailPage() {
@@ -64,6 +65,7 @@ export function AdminPayrollPeriodDetailPage() {
   const [busy, setBusy] = useState(false)
   const [notes, setNotes] = useState('')
   const [draft, setDraft] = useState<Record<number, EntryDraft>>({})
+  const [loanEntry, setLoanEntry] = useState<PayrollEntryRow | null>(null)
 
   const isDraft = period?.status === 'DRAFT'
 
@@ -81,7 +83,6 @@ export function AdminPayrollPeriodDetailPage() {
         next[row.id] = {
           deductions_idr: String(row.deductions_idr ?? '0'),
           bonus_idr: String(row.bonus_idr ?? '0'),
-          advance_deduction_idr: String(row.advance_deduction_idr ?? '0'),
         }
       }
       setDraft(next)
@@ -199,8 +200,7 @@ export function AdminPayrollPeriodDetailPage() {
     if (!d) return
     const deductions = parseAmount(d.deductions_idr)
     const bonus = parseAmount(d.bonus_idr)
-    const advance = parseAmount(d.advance_deduction_idr)
-    if (deductions === null || bonus === null || advance === null) {
+    if (deductions === null || bonus === null) {
       alert.error('Validasi', 'Nilai harus bilangan tidak negatif.')
       return
     }
@@ -209,7 +209,6 @@ export function AdminPayrollPeriodDetailPage() {
       const updated = await patchPayrollEntry(period.id, row.id, {
         deductions_idr: d.deductions_idr,
         bonus_idr: d.bonus_idr,
-        advance_deduction_idr: d.advance_deduction_idr,
       })
       setEntries((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
       setDraft((prev) => ({
@@ -217,7 +216,6 @@ export function AdminPayrollPeriodDetailPage() {
         [row.id]: {
           deductions_idr: String(updated.deductions_idr),
           bonus_idr: String(updated.bonus_idr),
-          advance_deduction_idr: String(updated.advance_deduction_idr),
         },
       }))
       alert.success('Entri diperbarui.')
@@ -304,6 +302,15 @@ export function AdminPayrollPeriodDetailPage() {
             ) : null}
           </div>
 
+          {entries.length > 0 ? (
+            <PayrollPeriodTotals
+              period={period}
+              entries={entries}
+              busy={busy}
+              onPeriodUpdated={setPeriod}
+            />
+          ) : null}
+
           <section className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-on-surface text-sm font-semibold tracking-wide uppercase">
@@ -331,7 +338,7 @@ export function AdminPayrollPeriodDetailPage() {
                       <TableHead className="text-right">Telat</TableHead>
                       <TableHead className="text-right">Kotor</TableHead>
                       <TableHead>Bonus (TBH)</TableHead>
-                      <TableHead>Pinjam</TableHead>
+                      <TableHead>Pinjaman</TableHead>
                       <TableHead>Potongan</TableHead>
                       <TableHead className="text-right">Bersih</TableHead>
                       {isDraft ? <TableHead /> : <TableHead className="text-right">Slip</TableHead>}
@@ -391,25 +398,20 @@ export function AdminPayrollPeriodDetailPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {isDraft && d ? (
-                              <Input
-                                className="h-9 w-[100px]"
-                                inputMode="decimal"
-                                value={d.advance_deduction_idr}
-                                onChange={(e) =>
-                                  setDraft((prev) => ({
-                                    ...prev,
-                                    [row.id]: {
-                                      ...prev[row.id],
-                                      advance_deduction_idr: e.target.value,
-                                    },
-                                  }))
-                                }
-                                disabled={busy}
-                              />
-                            ) : (
-                              formatIdr(row.advance_deduction_idr)
-                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => setLoanEntry(row)}
+                            >
+                              {formatIdr(row.advance_deduction_idr)}
+                              {(row.loan_item_count ?? 0) > 0
+                                ? ` (${row.loan_item_count})`
+                                : isDraft
+                                  ? ' +'
+                                  : ''}
+                            </Button>
                           </TableCell>
                           <TableCell>
                             {isDraft && d ? (
@@ -459,6 +461,21 @@ export function AdminPayrollPeriodDetailPage() {
               </div>
             )}
           </section>
+
+          <PayrollLoanModal
+            open={!!loanEntry}
+            onOpenChange={(o) => {
+              if (!o) setLoanEntry(null)
+            }}
+            periodId={period.id}
+            payDate={period.pay_date}
+            entry={loanEntry}
+            canEdit={isDraft}
+            onEntryUpdated={(updated) => {
+              setEntries((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+              setLoanEntry(updated)
+            }}
+          />
         </>
       ) : null}
     </div>

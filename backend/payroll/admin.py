@@ -5,6 +5,7 @@ from payroll.models import (
     KupasItem,
     KupasProductionRecord,
     PayrollEntry,
+    PayrollLoanItem,
     PayrollPeriod,
 )
 
@@ -69,3 +70,9 @@ class PayrollEntryAdmin(admin.ModelAdmin):
     list_filter = ("pay_type_snapshot", "paid_out")
     raw_id_fields = ("period", "employee")
     list_select_related = ("period", "employee")
+
+
+@admin.register(PayrollLoanItem)
+class PayrollLoanItemAdmin(admin.ModelAdmin):
+    list_display = ("entry", "amount_idr", "occurred_on", "payment_method", "cash_entry")
+    raw_id_fields = ("entry", "cash_entry", "created_by")

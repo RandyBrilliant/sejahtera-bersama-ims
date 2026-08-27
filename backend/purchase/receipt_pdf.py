@@ -273,7 +273,7 @@ def _line_qty_display(line) -> str:
 
 
 def _line_name_display(line) -> str:
-    """Nama barang: ``ORIGINAL (40 KG)`` (variant + total kg; jenis only in Banyaknya)."""
+    """Nama barang: ``ORIGINAL (40 KG @ KEMASAN BESAR)``."""
     packaging = line.product_packaging
     variant = _variant_name(packaging)
     if packaging is None:
@@ -281,7 +281,11 @@ def _line_name_display(line) -> str:
     qty = Decimal(str(line.quantity))
     net = Decimal(str(packaging.net_mass_kg or 0))
     total_kg = _format_quantity(qty * net) if net > 0 else "0"
-    return f"{variant} ({total_kg} KG)"
+    label = (packaging.label or "").strip()
+    suffix = f"{total_kg} KG"
+    if label:
+        suffix = f"{suffix} @ {label}"
+    return f"{variant} ({suffix})"
 
 
 def _price_per_kg_idr(line) -> int:

@@ -9,6 +9,7 @@ from payroll.models import (
     KupasProductionRecord,
     PayCadence,
     PayrollEntry,
+    PayrollLoanItem,
     PayrollPeriod,
     PayType,
 )
@@ -131,6 +132,8 @@ class PayrollPeriodNotesSerializer(serializers.ModelSerializer):
 
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):
+    gaji_cash_entry_id = serializers.IntegerField(read_only=True, allow_null=True)
+
     class Meta:
         model = PayrollPeriod
         fields = (
@@ -143,6 +146,7 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
             "finalized_at",
             "finalized_by",
             "notes",
+            "gaji_cash_entry_id",
             "created_at",
             "updated_at",
         )
@@ -154,6 +158,7 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
             "status",
             "finalized_at",
             "finalized_by",
+            "gaji_cash_entry_id",
             "created_at",
             "updated_at",
         )
@@ -197,6 +202,7 @@ class PayrollPeriodCreateSerializer(serializers.Serializer):
 
 class PayrollEntrySerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    loan_item_count = serializers.SerializerMethodField()
 
     class Meta:
         model = PayrollEntry
@@ -218,6 +224,7 @@ class PayrollEntrySerializer(serializers.ModelSerializer):
             "notes",
             "paid_out",
             "paid_out_at",
+            "loan_item_count",
             "created_at",
             "updated_at",
         )
@@ -234,9 +241,13 @@ class PayrollEntrySerializer(serializers.ModelSerializer):
             "gross_idr",
             "paid_out",
             "paid_out_at",
+            "loan_item_count",
             "created_at",
             "updated_at",
         )
+
+    def get_loan_item_count(self, obj) -> int:
+        return obj.loan_items.count()
 
 
 class PayrollEntryPaidOutSerializer(serializers.Serializer):
@@ -244,11 +255,11 @@ class PayrollEntryPaidOutSerializer(serializers.Serializer):
 
 
 class PayrollEntryAdjustSerializer(serializers.ModelSerializer):
-    """Penyesuaian potongan, bonus, pinjaman (periode masih draft)."""
+    """Penyesuaian potongan dan bonus (periode masih draft). Pinjaman lewat loan items."""
 
     class Meta:
         model = PayrollEntry
-        fields = ("deductions_idr", "bonus_idr", "advance_deduction_idr", "notes")
+        fields = ("deductions_idr", "bonus_idr", "notes")
 
     def validate_deductions_idr(self, value: Decimal) -> Decimal:
         if value < 0:
@@ -260,23 +271,16 @@ class PayrollEntryAdjustSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Bonus tidak boleh negatif.")
         return value
 
-    def validate_advance_deduction_idr(self, value: Decimal) -> Decimal:
-        if value < 0:
-            raise serializers.ValidationError("Potongan pinjaman tidak boleh negatif.")
-        return value
-
     def update(self, instance, validated_data):  # type: ignore[override]
         gross = instance.gross_idr
         deductions = validated_data.get("deductions_idr", instance.deductions_idr)
         bonus = validated_data.get("bonus_idr", instance.bonus_idr)
-        advance = validated_data.get("advance_deduction_idr", instance.advance_deduction_idr)
+        advance = instance.advance_deduction_idr
 
         if "deductions_idr" in validated_data:
             instance.deductions_idr = deductions
         if "bonus_idr" in validated_data:
             instance.bonus_idr = bonus
-        if "advance_deduction_idr" in validated_data:
-            instance.advance_deduction_idr = advance
         if "notes" in validated_data:
             instance.notes = validated_data["notes"]
 
@@ -288,10 +292,37 @@ class PayrollEntryAdjustSerializer(serializers.ModelSerializer):
             update_fields=[
                 "deductions_idr",
                 "bonus_idr",
-                "advance_deduction_idr",
                 "net_pay_idr",
                 "notes",
                 "updated_at",
             ]
         )
         return instance
+
+
+class PayrollLoanItemSerializer(serializers.ModelSerializer):
+    cash_entry_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = PayrollLoanItem
+        fields = (
+            "id",
+            "amount_idr",
+            "occurred_on",
+            "payment_method",
+            "note",
+            "cash_entry_id",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "cash_entry_id", "created_at", "updated_at")
+
+    def validate_amount_idr(self, value: Decimal) -> Decimal:
+        if value < 1:
+            raise serializers.ValidationError("Nominal pinjaman minimal Rp 1.")
+        return value
+
+
+class PayrollPostGajiToCashSerializer(serializers.Serializer):
+    payment_method = serializers.ChoiceField(choices=[("CASH", "Cash"), ("TRANSFER", "Transfer")], default="CASH")
+

@@ -87,3 +87,20 @@ export type OperationalCashEntryCreateInput = {
 }
 
 export type OperationalCashEntryUpdateInput = Partial<OperationalCashEntryCreateInput>
+
+export type OperationalCashSaldoByMethod = {
+  payment_method: PaymentMethod
+  income_idr: number
+  expense_idr: number
+  saldo_idr: number
+  line_count: number
+}
+
+/** Saldo berjalan dari seluruh entri kas operasional. */
+export type OperationalCashSaldoPayload = {
+  income_idr: number
+  expense_idr: number
+  saldo_idr: number
+  line_count: number
+  by_payment_method: OperationalCashSaldoByMethod[]
+}

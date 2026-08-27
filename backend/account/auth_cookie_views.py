@@ -20,9 +20,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
 from .models import UserRole
-from .permissions import has_role
+from .permissions import has_role, user_is_owner
 from .throttles import AuthRateThrottle
 from .user_payload import build_user_payload
+
+KIOSK_USERNAME = "__attendance_kiosk__"
 
 User = get_user_model()
 
@@ -348,6 +350,8 @@ class ChangePasswordView(APIView):
 
 
 class AdminResetUserPasswordView(APIView):
+    """Admin and pimpinan set a chosen password for another user (not auto-generated)."""
+
     permission_classes = [IsAuthenticated]
     throttle_classes = [AuthRateThrottle]
 
@@ -355,6 +359,7 @@ class AdminResetUserPasswordView(APIView):
         from django.contrib.auth.password_validation import validate_password
         from django.core.exceptions import ValidationError
 
+        # has_role includes pimpinan (LEADERSHIP) via owner bypass.
         if not has_role(request.user, UserRole.ADMIN):
             return Response(
                 error_response(
@@ -384,7 +389,7 @@ class AdminResetUserPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        target_user = User.objects.filter(pk=user_id).first()
+        target_user = User.objects.filter(pk=user_id).exclude(username=KIOSK_USERNAME).first()
         if not target_user:
             return Response(
                 error_response(
@@ -394,6 +399,29 @@ class AdminResetUserPasswordView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 ),
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not user_is_owner(request.user) and target_user.role == UserRole.LEADERSHIP:
+            return Response(
+                error_response(
+                    detail=ApiMessage.PERMISSION_DENIED,
+                    code=ApiCode.PERMISSION_DENIED,
+                    status_code=status.HTTP_403_FORBIDDEN,
+                ),
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if new_password == target_user.username:
+            field_errors.setdefault("new_password", []).append(
+                "Password tidak boleh sama dengan username."
+            )
+            return Response(
+                error_response(
+                    detail=ApiMessage.VALIDATION_ERROR,
+                    code=ApiCode.VALIDATION_ERROR,
+                    errors=field_errors,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:

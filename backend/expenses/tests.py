@@ -2,8 +2,8 @@ from datetime import date
 
 from django.test import TestCase
 
-from expenses.models import EntryKind, OperationalCashEntry, OperationalCategory
-from expenses.reporting import opex_total_for_range
+from expenses.models import EntryKind, OperationalCashEntry, OperationalCategory, PaymentMethod
+from expenses.reporting import current_saldo, opex_total_for_range
 
 
 class OpexTotalForRangeTests(TestCase):
@@ -43,3 +43,83 @@ class OpexTotalForRangeTests(TestCase):
 
     def test_empty_range_returns_zero(self):
         self.assertEqual(opex_total_for_range(date(2026, 1, 1), date(2026, 1, 31)), 0)
+
+
+class CurrentSaldoTests(TestCase):
+    def setUp(self):
+        self.income_cat = OperationalCategory.objects.create(
+            name="Penjualan", entry_kind=EntryKind.INCOME
+        )
+        self.expense_cat = OperationalCategory.objects.create(
+            name="Listrik", entry_kind=EntryKind.EXPENSE
+        )
+
+    def _entry(self, amount, direction, payment_method, on=date(2026, 7, 10)):
+        category = self.income_cat if direction == EntryKind.INCOME else self.expense_cat
+        return OperationalCashEntry.objects.create(
+            direction=direction,
+            payment_method=payment_method,
+            category=category,
+            amount_idr=amount,
+            occurred_on=on,
+            description="x",
+        )
+
+    def test_empty_ledger_is_zero(self):
+        payload = current_saldo()
+        self.assertEqual(payload["saldo_idr"], 0)
+        self.assertEqual(payload["income_idr"], 0)
+        self.assertEqual(payload["expense_idr"], 0)
+        self.assertEqual(payload["line_count"], 0)
+        methods = {row["payment_method"]: row for row in payload["by_payment_method"]}
+        self.assertEqual(methods["CASH"]["saldo_idr"], 0)
+        self.assertEqual(methods["TRANSFER"]["saldo_idr"], 0)
+
+    def test_splits_saldo_by_payment_method(self):
+        self._entry(500_000, EntryKind.INCOME, PaymentMethod.CASH)
+        self._entry(200_000, EntryKind.EXPENSE, PaymentMethod.CASH)
+        self._entry(1_000_000, EntryKind.INCOME, PaymentMethod.TRANSFER)
+        self._entry(100_000, EntryKind.EXPENSE, PaymentMethod.TRANSFER)
+
+        payload = current_saldo()
+        self.assertEqual(payload["income_idr"], 1_500_000)
+        self.assertEqual(payload["expense_idr"], 300_000)
+        self.assertEqual(payload["saldo_idr"], 1_200_000)
+        self.assertEqual(payload["line_count"], 4)
+        methods = {row["payment_method"]: row for row in payload["by_payment_method"]}
+        self.assertEqual(methods["CASH"]["saldo_idr"], 300_000)
+        self.assertEqual(methods["TRANSFER"]["saldo_idr"], 900_000)
+
+
+class OperationalCashSaldoViewTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+
+        from account.models import UserRole
+
+        User = get_user_model()
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            "kas_admin", full_name="Admin Kas", role=UserRole.ADMIN, password="pass"
+        )
+        income_cat = OperationalCategory.objects.create(
+            name="Penjualan", entry_kind=EntryKind.INCOME
+        )
+        OperationalCashEntry.objects.create(
+            direction=EntryKind.INCOME,
+            payment_method=PaymentMethod.CASH,
+            category=income_cat,
+            amount_idr=250000,
+            occurred_on=date(2026, 7, 10),
+            description="setor",
+        )
+
+    def test_returns_current_saldo(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/expenses/saldo/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["saldo_idr"], 250000)
+        self.assertEqual(data["income_idr"], 250000)
+        self.assertEqual(data["line_count"], 1)

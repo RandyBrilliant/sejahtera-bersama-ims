@@ -8,6 +8,7 @@ import type {
   PayType,
   PayrollCompensationTableRow,
   PayrollEntryRow,
+  PayrollLoanItem,
   PayrollPeriod,
   PayrollSlipDetail,
 } from '@/types/payroll'
@@ -208,7 +209,6 @@ export async function patchPayrollEntry(
   patch: {
     deductions_idr?: string | number
     bonus_idr?: string | number
-    advance_deduction_idr?: string | number
     notes?: string
     paid_out?: boolean
   }
@@ -217,6 +217,72 @@ export async function patchPayrollEntry(
     `/api/payroll/periods/${periodId}/entries/${entryId}/`,
     patch
   )
+  return data.data
+}
+
+export async function fetchPayrollEntryLoans(
+  periodId: number,
+  entryId: number
+): Promise<PayrollLoanItem[]> {
+  const { data } = await api.get<Envelope<PayrollLoanItem[]>>(
+    `/api/payroll/periods/${periodId}/entries/${entryId}/loans/`
+  )
+  return data.data
+}
+
+export async function createPayrollEntryLoan(
+  periodId: number,
+  entryId: number,
+  body: {
+    amount_idr: string | number
+    occurred_on: string
+    payment_method: 'CASH' | 'TRANSFER'
+    note?: string
+  }
+): Promise<{ loan: PayrollLoanItem; entry: PayrollEntryRow }> {
+  const { data } = await api.post<Envelope<{ loan: PayrollLoanItem; entry: PayrollEntryRow }>>(
+    `/api/payroll/periods/${periodId}/entries/${entryId}/loans/`,
+    body
+  )
+  return data.data
+}
+
+export async function patchPayrollEntryLoan(
+  periodId: number,
+  entryId: number,
+  loanId: number,
+  body: Partial<{
+    amount_idr: string | number
+    occurred_on: string
+    payment_method: 'CASH' | 'TRANSFER'
+    note: string
+  }>
+): Promise<{ loan: PayrollLoanItem; entry: PayrollEntryRow }> {
+  const { data } = await api.patch<Envelope<{ loan: PayrollLoanItem; entry: PayrollEntryRow }>>(
+    `/api/payroll/periods/${periodId}/entries/${entryId}/loans/${loanId}/`,
+    body
+  )
+  return data.data
+}
+
+export async function deletePayrollEntryLoan(
+  periodId: number,
+  entryId: number,
+  loanId: number
+): Promise<PayrollEntryRow> {
+  const { data } = await api.delete<Envelope<{ entry: PayrollEntryRow }>>(
+    `/api/payroll/periods/${periodId}/entries/${entryId}/loans/${loanId}/`
+  )
+  return data.data.entry
+}
+
+export async function postPayrollPeriodToCash(
+  periodId: number,
+  paymentMethod: 'CASH' | 'TRANSFER'
+): Promise<{ period: PayrollPeriod; cash_entry_id: number; amount_idr: number }> {
+  const { data } = await api.post<
+    Envelope<{ period: PayrollPeriod; cash_entry_id: number; amount_idr: number }>
+  >(`/api/payroll/periods/${periodId}/post-to-cash/`, { payment_method: paymentMethod })
   return data.data
 }
 

@@ -13,6 +13,7 @@ DEFAULT_INCOME = [
 DEFAULT_EXPENSE = [
     ("Bahan baku & produksi", "Pembelian bahan untuk produksi."),
     ("Gaji & upah", "Gaji karyawan dan upah harian."),
+    ("Pinjaman karyawan", "Uang pinjaman yang diberikan ke pegawai (dipotong dari gaji)."),
     ("Sewa", "Sewa gedang, gudang, atau kendaraan."),
     ("Listrik & air", "Utilitas."),
     ("Transportasi & logistik", "Bahan bakar, kirim barang, dll."),

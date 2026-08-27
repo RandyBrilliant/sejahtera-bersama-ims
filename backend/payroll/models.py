@@ -130,6 +130,15 @@ class PayrollPeriod(models.Model):
         verbose_name=_("finalized by"),
     )
     notes = models.TextField(_("notes"), blank=True)
+    gaji_cash_entry = models.OneToOneField(
+        "expenses.OperationalCashEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payroll_period_gaji",
+        verbose_name=_("gaji kas entry"),
+        help_text=_("Entri kas operasional untuk total gaji bersih periode ini."),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -326,3 +335,60 @@ class PayrollEntry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.period_id}:{self.employee_id}"
+
+
+class PayrollLoanItem(models.Model):
+    """Satu baris pinjaman yang dipotong dari slip; bisa banyak per pegawai."""
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "CASH", _("Cash")
+        TRANSFER = "TRANSFER", _("Transfer")
+
+    entry = models.ForeignKey(
+        PayrollEntry,
+        on_delete=models.CASCADE,
+        related_name="loan_items",
+        verbose_name=_("payroll entry"),
+    )
+    amount_idr = models.DecimalField(
+        _("amount (IDR)"),
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    occurred_on = models.DateField(_("occurred on"), db_index=True)
+    payment_method = models.CharField(
+        _("payment method"),
+        max_length=10,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+    )
+    note = models.CharField(_("note"), max_length=255, blank=True)
+    cash_entry = models.OneToOneField(
+        "expenses.OperationalCashEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payroll_loan_item",
+        verbose_name=_("kas entry"),
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("created by"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("payroll loan item")
+        verbose_name_plural = _("payroll loan items")
+        ordering = ["occurred_on", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.entry_id} pinjam {self.amount_idr}"
+
