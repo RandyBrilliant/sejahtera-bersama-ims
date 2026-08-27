@@ -133,6 +133,8 @@ class PayrollPeriodNotesSerializer(serializers.ModelSerializer):
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):
     gaji_cash_entry_id = serializers.IntegerField(read_only=True, allow_null=True)
+    gaji_cash_amount_idr = serializers.SerializerMethodField()
+    gaji_cash_payment_method = serializers.SerializerMethodField()
 
     class Meta:
         model = PayrollPeriod
@@ -147,6 +149,8 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
             "finalized_by",
             "notes",
             "gaji_cash_entry_id",
+            "gaji_cash_amount_idr",
+            "gaji_cash_payment_method",
             "created_at",
             "updated_at",
         )
@@ -159,9 +163,19 @@ class PayrollPeriodSerializer(serializers.ModelSerializer):
             "finalized_at",
             "finalized_by",
             "gaji_cash_entry_id",
+            "gaji_cash_amount_idr",
+            "gaji_cash_payment_method",
             "created_at",
             "updated_at",
         )
+
+    def get_gaji_cash_amount_idr(self, obj: PayrollPeriod):
+        cash = obj.gaji_cash_entry
+        return cash.amount_idr if cash is not None else None
+
+    def get_gaji_cash_payment_method(self, obj: PayrollPeriod):
+        cash = obj.gaji_cash_entry
+        return cash.payment_method if cash is not None else None
 
 
 class PayrollPeriodCreateSerializer(serializers.Serializer):

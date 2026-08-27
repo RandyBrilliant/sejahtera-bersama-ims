@@ -134,9 +134,29 @@ def save_loan_item(*, entry: PayrollEntry, user, amount: Decimal, occurred_on, p
     return item
 
 
+def delete_period_gaji_cash_entry(period: PayrollPeriod) -> None:
+    """Remove the period's gaji kas line so saldo dana is restored."""
+    cash = period.gaji_cash_entry
+    if cash is None and not period.gaji_cash_entry_id:
+        return
+    period.gaji_cash_entry = None
+    period.save(update_fields=["gaji_cash_entry", "updated_at"])
+    if cash is not None:
+        cash.delete()
+
+
 @transaction.atomic
-def post_period_gaji_to_cash(period: PayrollPeriod, user, payment_method: str = PaymentMethod.CASH) -> OperationalCashEntry:
-    """Record total net pay as one kas pengeluaran (Gaji & upah)."""
+def post_period_gaji_to_cash(
+    period: PayrollPeriod,
+    user,
+    payment_method: str = PaymentMethod.CASH,
+    *,
+    allow_zero: bool = False,
+) -> OperationalCashEntry | None:
+    """Record total net pay as one kas pengeluaran (Gaji & upah) after tutup buku."""
+    if period.status != PayrollPeriod.Status.FINALIZED:
+        raise PayrollWorkflowError("Catat gaji ke kas hanya setelah tutup buku (periode dikunci).")
+
     entries = list(PayrollEntry.objects.filter(period=period))
     if not entries:
         raise PayrollWorkflowError("Belum ada entri payroll. Jalankan generate terlebih dahulu.")
@@ -144,6 +164,9 @@ def post_period_gaji_to_cash(period: PayrollPeriod, user, payment_method: str = 
     total_net = sum((e.net_pay_idr for e in entries), Decimal("0"))
     amount = _idr_int(total_net)
     if amount < 1:
+        if allow_zero:
+            delete_period_gaji_cash_entry(period)
+            return None
         raise PayrollWorkflowError("Total gaji bersih bernilai 0 — tidak ada yang dicatat ke kas.")
 
     category = _expense_category(

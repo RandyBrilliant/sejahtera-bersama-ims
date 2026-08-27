@@ -186,8 +186,13 @@ export async function generatePayrollPeriod(id: number): Promise<{
   return data.data
 }
 
-export async function finalizePayrollPeriod(id: number): Promise<PayrollPeriod> {
-  const { data } = await api.post<Envelope<PayrollPeriod>>(`/api/payroll/periods/${id}/finalize/`)
+export async function finalizePayrollPeriod(
+  id: number,
+  paymentMethod: 'CASH' | 'TRANSFER' = 'CASH'
+): Promise<PayrollPeriod> {
+  const { data } = await api.post<Envelope<PayrollPeriod>>(`/api/payroll/periods/${id}/finalize/`, {
+    payment_method: paymentMethod,
+  })
   return data.data
 }
 

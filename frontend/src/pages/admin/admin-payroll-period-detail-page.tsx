@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import {
   fetchPayrollEntries,
@@ -19,6 +20,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,7 +34,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { useAuth } from '@/hooks/use-auth'
+import { expensesKeys } from '@/hooks/use-expenses-query'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { formatKgAmount } from '@/lib/format-kg'
@@ -53,6 +63,7 @@ type EntryDraft = {
 export function AdminPayrollPeriodDetailPage() {
   const { periodId } = useParams<{ periodId: string }>()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const idNum = Number(periodId)
 
   const canFinalize = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
@@ -66,6 +77,7 @@ export function AdminPayrollPeriodDetailPage() {
   const [notes, setNotes] = useState('')
   const [draft, setDraft] = useState<Record<number, EntryDraft>>({})
   const [loanEntry, setLoanEntry] = useState<PayrollEntryRow | null>(null)
+  const [tutupBukuMethod, setTutupBukuMethod] = useState<'CASH' | 'TRANSFER'>('CASH')
 
   const isDraft = period?.status === 'DRAFT'
 
@@ -149,18 +161,24 @@ export function AdminPayrollPeriodDetailPage() {
     const ok =
       typeof window !== 'undefined'
         ? window.confirm(
-            `Kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}? Penyesuaian tidak bisa diubah setelah dikunci.`
+            `Tutup buku periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}?\n\nTotal gaji bersih akan dicatat ke transaksi operasional dan mengurangi saldo dana. Penyesuaian tidak bisa diubah setelah dikunci.`
           )
         : false
     if (!ok) return
     setBusy(true)
     try {
-      const p = await finalizePayrollPeriod(period.id)
+      const p = await finalizePayrollPeriod(period.id, tutupBukuMethod)
       setPeriod(p)
-      alert.success('Periode dikunci', 'Slip final siap bagi pegawai.')
+      void queryClient.invalidateQueries({ queryKey: expensesKeys.all })
+      alert.success(
+        'Tutup buku selesai',
+        p.gaji_cash_entry_id
+          ? 'Slip final siap. Total gaji bersih sudah masuk ke transaksi operasional.'
+          : 'Slip final siap bagi pegawai.'
+      )
       await loadAll()
     } catch (e) {
-      alert.error('Finalize gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
+      alert.error('Tutup buku gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -171,7 +189,7 @@ export function AdminPayrollPeriodDetailPage() {
     const ok =
       typeof window !== 'undefined'
         ? window.confirm(
-            `Buka kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}? Periode kembali draft agar bisa diubah, lalu kunci ulang setelah selesai.`
+            `Buka kunci periode ${formatPayrollWeekLabel(period.pay_date, period.period_start_date, period.period_end_date, period.cadence)}?\n\nEntri kas gaji periode ini akan dihapus (saldo dana dikembalikan). Periode kembali draft agar bisa diubah, lalu tutup buku ulang setelah selesai.`
           )
         : false
     if (!ok) return
@@ -179,6 +197,7 @@ export function AdminPayrollPeriodDetailPage() {
     try {
       const p = await unfinalizePayrollPeriod(period.id)
       setPeriod(p)
+      void queryClient.invalidateQueries({ queryKey: expensesKeys.all })
       alert.success('Kunci dibuka', 'Periode kembali draft.')
       await loadAll()
     } catch (e) {
@@ -286,14 +305,29 @@ export function AdminPayrollPeriodDetailPage() {
             </Button>
           </section>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" disabled={busy || !isDraft} onClick={() => void handleGenerate()}>
               Bangkitkan dari pekerjaan belum dibayar (presensi / kupas)
             </Button>
             {canFinalize && period.status === 'DRAFT' ? (
-              <Button type="button" disabled={busy} onClick={() => void handleFinalize()}>
-                Kunci periode gaji (finalize)
-              </Button>
+              <>
+                <Select
+                  value={tutupBukuMethod}
+                  onValueChange={(v) => setTutupBukuMethod(v as 'CASH' | 'TRANSFER')}
+                  disabled={busy}
+                >
+                  <SelectTrigger className="border-outline-variant w-[9.5rem]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">{PAYMENT_METHOD_LABEL.CASH}</SelectItem>
+                    <SelectItem value="TRANSFER">{PAYMENT_METHOD_LABEL.TRANSFER}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="button" disabled={busy || entries.length === 0} onClick={() => void handleFinalize()}>
+                  Tutup buku
+                </Button>
+              </>
             ) : null}
             {canUnlock && period.status === 'FINALIZED' ? (
               <Button type="button" variant="outline" disabled={busy} onClick={() => void handleUnfinalize()}>

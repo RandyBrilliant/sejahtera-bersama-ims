@@ -377,13 +377,43 @@ class PayrollLoanAndKasTests(TestCase):
         from expenses.models import OperationalCashEntry
         from payroll.kas_sync import post_period_gaji_to_cash
 
-        cash = post_period_gaji_to_cash(self.period, self.admin, "CASH")
+        finalize_payroll_period(self.period, self.admin, "CASH")
         self.period.refresh_from_db()
+        cash = self.period.gaji_cash_entry
+        self.assertIsNotNone(cash)
         self.assertEqual(self.period.gaji_cash_entry_id, cash.id)
         self.assertEqual(cash.amount_idr, 100000)
         self.assertEqual(OperationalCashEntry.objects.filter(reference=f"PAYROLL-GAJI-{self.period.pk}").count(), 1)
-        # Update in place
         cash2 = post_period_gaji_to_cash(self.period, self.admin, "TRANSFER")
         self.assertEqual(cash2.id, cash.id)
         self.assertEqual(cash2.payment_method, "TRANSFER")
+
+    def test_finalize_posts_gaji_to_kas_and_unfinalize_restores_saldo(self):
+        from expenses.models import OperationalCashEntry
+        from expenses.reporting import current_saldo
+
+        before = current_saldo()["saldo_idr"]
+        finalize_payroll_period(self.period, self.admin, "CASH")
+        self.period.refresh_from_db()
+        self.assertEqual(self.period.status, PayrollPeriod.Status.FINALIZED)
+        self.assertIsNotNone(self.period.gaji_cash_entry_id)
+        cash = self.period.gaji_cash_entry
+        self.assertEqual(cash.amount_idr, 100000)
+        self.assertEqual(cash.payment_method, "CASH")
+        self.assertEqual(cash.reference, f"PAYROLL-GAJI-{self.period.pk}")
+        self.assertEqual(current_saldo()["saldo_idr"], before - 100000)
+        self.assertEqual(OperationalCashEntry.objects.filter(reference=f"PAYROLL-GAJI-{self.period.pk}").count(), 1)
+
+        unfinalize_payroll_period(self.period)
+        self.period.refresh_from_db()
+        self.assertEqual(self.period.status, PayrollPeriod.Status.DRAFT)
+        self.assertIsNone(self.period.gaji_cash_entry_id)
+        self.assertEqual(current_saldo()["saldo_idr"], before)
+        self.assertEqual(OperationalCashEntry.objects.filter(reference=f"PAYROLL-GAJI-{self.period.pk}").count(), 0)
+
+    def test_post_gaji_to_cash_rejected_while_draft(self):
+        from payroll.kas_sync import post_period_gaji_to_cash
+
+        with self.assertRaises(PayrollWorkflowError):
+            post_period_gaji_to_cash(self.period, self.admin, "CASH")
 

@@ -1,5 +1,6 @@
 import { Banknote, Wallet } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { postPayrollPeriodToCash } from '@/api/payroll'
@@ -15,7 +16,6 @@ import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { expensesKeys } from '@/hooks/use-expenses-query'
 import { alert } from '@/lib/alert'
 import { formatIdr, toFiniteNumber } from '@/lib/format-idr'
-import { cn } from '@/lib/utils'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
@@ -34,8 +34,13 @@ function axiosDetail(err: unknown): string | undefined {
 
 export function PayrollPeriodTotals({ period, entries, busy, onPeriodUpdated }: Props) {
   const queryClient = useQueryClient()
-  const [method, setMethod] = useState<'CASH' | 'TRANSFER'>('CASH')
+  const postedMethod = period.gaji_cash_payment_method === 'TRANSFER' ? 'TRANSFER' : 'CASH'
+  const [method, setMethod] = useState<'CASH' | 'TRANSFER'>(postedMethod)
   const [posting, setPosting] = useState(false)
+
+  useEffect(() => {
+    setMethod(postedMethod)
+  }, [postedMethod])
 
   const totals = useMemo(() => {
     const sum = (key: keyof PayrollEntryRow) =>
@@ -56,10 +61,8 @@ export function PayrollPeriodTotals({ period, entries, busy, onPeriodUpdated }: 
       onPeriodUpdated(result.period)
       void queryClient.invalidateQueries({ queryKey: expensesKeys.all })
       alert.success(
-        result.period.gaji_cash_entry_id && period.gaji_cash_entry_id
-          ? 'Kas gaji diperbarui'
-          : 'Dicatat ke kas',
-        `Total gaji bersih ${formatIdr(result.amount_idr)} masuk ke kas operasional.`
+        period.gaji_cash_entry_id ? 'Kas gaji diperbarui' : 'Dicatat ke kas',
+        `Total gaji bersih ${formatIdr(result.amount_idr)} masuk ke transaksi operasional dan mengurangi saldo dana.`
       )
     } catch (err) {
       alert.error('Gagal mencatat ke kas', axiosDetail(err) ?? 'Coba lagi.')
@@ -69,6 +72,7 @@ export function PayrollPeriodTotals({ period, entries, busy, onPeriodUpdated }: 
   }
 
   const alreadyPosted = Boolean(period.gaji_cash_entry_id)
+  const isFinalized = period.status === 'FINALIZED'
 
   return (
     <section className="space-y-3">
@@ -112,43 +116,63 @@ export function PayrollPeriodTotals({ period, entries, busy, onPeriodUpdated }: 
           <p className="text-on-surface mt-1 font-heading text-xl font-semibold tabular-nums">
             {formatIdr(totals.net)}
           </p>
-          <p className="text-on-surface-variant mt-1 text-xs">Angka ini yang dimasukkan ke kas gaji</p>
+          <p className="text-on-surface-variant mt-1 text-xs">
+            {isFinalized
+              ? 'Nominal yang masuk ke transaksi operasional saat tutup buku'
+              : 'Nominal yang akan dicatat ke kas saat tutup buku'}
+          </p>
         </div>
       </div>
 
       <div className="border-outline-variant bg-surface-container-lowest flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-on-surface text-sm font-medium">Catat total gaji ke kas operasional</p>
+          <p className="text-on-surface text-sm font-medium">Kas operasional & saldo dana</p>
           <p className="text-on-surface-variant mt-0.5 text-xs">
-            {alreadyPosted
-              ? 'Sudah ada entri kas gaji untuk periode ini — tombol ini memperbarui nominalnya.'
-              : 'Satu pengeluaran kategori Gaji & upah sebesar total bersih di atas.'}
+            {alreadyPosted ? (
+              <>
+                Sudah tercatat di{' '}
+                <Link to="/admin/kas/entri" className="text-primary font-medium hover:underline">
+                  transaksi operasional
+                </Link>{' '}
+                (Gaji & upah
+                {period.gaji_cash_amount_idr != null
+                  ? ` ${formatIdr(toFiniteNumber(period.gaji_cash_amount_idr))}`
+                  : ''}
+                ) — saldo dana sudah dikurangi.
+              </>
+            ) : isFinalized ? (
+              'Periode sudah ditutup buku tapi belum ada entri kas. Catat sekarang agar saldo dana berkurang.'
+            ) : (
+              'Saat tutup buku, total gaji bersih dicatat sebagai pengeluaran Gaji & upah dan mengurangi saldo dana.'
+            )}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={method}
-            onValueChange={(v) => setMethod(v as 'CASH' | 'TRANSFER')}
-            disabled={busy || posting}
-          >
-            <SelectTrigger className="border-outline-variant w-[9.5rem]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CASH">{PAYMENT_METHOD_LABEL.CASH}</SelectItem>
-              <SelectItem value="TRANSFER">{PAYMENT_METHOD_LABEL.TRANSFER}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            disabled={busy || posting || entries.length === 0 || totals.net <= 0}
-            onClick={() => void handlePostToCash()}
-            className={cn('gap-2')}
-          >
-            <Banknote className="size-4" />
-            {posting ? 'Mencatat…' : alreadyPosted ? 'Perbarui kas gaji' : 'Catat ke kas'}
-          </Button>
-        </div>
+        {isFinalized ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={method}
+              onValueChange={(v) => setMethod(v as 'CASH' | 'TRANSFER')}
+              disabled={busy || posting}
+            >
+              <SelectTrigger className="border-outline-variant w-[9.5rem]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CASH">{PAYMENT_METHOD_LABEL.CASH}</SelectItem>
+                <SelectItem value="TRANSFER">{PAYMENT_METHOD_LABEL.TRANSFER}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              disabled={busy || posting || entries.length === 0 || totals.net <= 0}
+              onClick={() => void handlePostToCash()}
+              className="gap-2"
+            >
+              <Banknote className="size-4" />
+              {posting ? 'Mencatat…' : alreadyPosted ? 'Perbarui kas gaji' : 'Catat ke kas'}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </section>
   )

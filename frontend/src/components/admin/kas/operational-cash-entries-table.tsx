@@ -168,6 +168,24 @@ export function OperationalCashEntriesTable() {
         ),
       },
       {
+        accessorKey: 'reference',
+        header: 'Referensi',
+        cell: ({ row }) => {
+          const ref = row.original.reference?.trim()
+          const so = row.original.sales_order_code?.trim()
+          if (!ref && !so) {
+            return <span className="text-on-surface-variant">—</span>
+          }
+          return (
+            <span className="text-on-surface-variant max-w-[180px] font-mono text-xs">
+              {ref ? truncate(ref, 40) : null}
+              {ref && so ? ' · ' : null}
+              {so ? so : null}
+            </span>
+          )
+        },
+      },
+      {
         id: 'actions',
         header: '',
         cell: ({ row }) => (

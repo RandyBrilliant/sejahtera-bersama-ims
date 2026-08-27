@@ -286,8 +286,16 @@ def generate_payroll_entries(period: PayrollPeriod) -> int:
     return count
 
 
+def _user_from_finalized_by(finalized_by):
+    from django.contrib.auth import get_user_model
+
+    if not isinstance(finalized_by, int):
+        return finalized_by
+    return get_user_model().objects.get(pk=finalized_by)
+
+
 @transaction.atomic
-def finalize_payroll_period(period: PayrollPeriod, finalized_by_user_id: int) -> PayrollPeriod:
+def finalize_payroll_period(period: PayrollPeriod, finalized_by, payment_method: str = "CASH") -> PayrollPeriod:
     if period.status == PayrollPeriod.Status.FINALIZED:
         raise PayrollWorkflowError("Periode sudah dikunci.")
 
@@ -295,6 +303,7 @@ def finalize_payroll_period(period: PayrollPeriod, finalized_by_user_id: int) ->
     if not entries:
         raise PayrollWorkflowError("Belum ada entri payroll. Jalankan Generate terlebih dahulu.")
 
+    user = _user_from_finalized_by(finalized_by)
     cutoff = period_cutoff(period)
     from attendance.models import AttendanceDailyCheckIn
 
@@ -320,8 +329,13 @@ def finalize_payroll_period(period: PayrollPeriod, finalized_by_user_id: int) ->
 
     period.status = PayrollPeriod.Status.FINALIZED
     period.finalized_at = timezone.now()
-    period.finalized_by_id = finalized_by_user_id
+    period.finalized_by_id = user.pk
     period.save(update_fields=["status", "finalized_at", "finalized_by_id", "updated_at"])
+
+    from payroll.kas_sync import post_period_gaji_to_cash
+
+    post_period_gaji_to_cash(period, user, payment_method, allow_zero=True)
+    period.refresh_from_db()
     return period
 
 
@@ -342,9 +356,11 @@ def unfinalize_payroll_period(period: PayrollPeriod) -> PayrollPeriod:
         )
 
     from attendance.models import AttendanceDailyCheckIn
+    from payroll.kas_sync import delete_period_gaji_cash_entry
 
     AttendanceDailyCheckIn.objects.filter(paid_in_period=period).update(paid_in_period=None)
     KupasProductionRecord.objects.filter(paid_in_period=period).update(paid_in_period=None)
+    delete_period_gaji_cash_entry(period)
 
     period.status = PayrollPeriod.Status.DRAFT
     period.finalized_at = None

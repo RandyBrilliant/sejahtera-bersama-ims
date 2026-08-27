@@ -75,6 +75,8 @@ export type PayrollPeriod = {
   finalized_by: number | null
   notes: string
   gaji_cash_entry_id?: number | null
+  gaji_cash_amount_idr?: number | string | null
+  gaji_cash_payment_method?: 'CASH' | 'TRANSFER' | null
   created_at: string
   updated_at: string
 }

@@ -277,7 +277,7 @@ class PayrollPeriodListCreateView(APIView):
                 status=400,
             )
 
-        qs = PayrollPeriod.objects.order_by("-pay_date")
+        qs = PayrollPeriod.objects.select_related("gaji_cash_entry").order_by("-pay_date")
         total = qs.count()
         start = (page - 1) * page_size
         slice_qs = qs[start : start + page_size]
@@ -307,7 +307,7 @@ class PayrollPeriodDetailView(APIView):
     permission_classes = [PayrollManageAccess]
 
     def get(self, request, pk: int):
-        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        p = get_object_or_404(PayrollPeriod.objects.select_related("gaji_cash_entry"), pk=pk)
         return Response(success_response(data=PayrollPeriodSerializer(p).data), status=200)
 
     def patch(self, request, pk: int):
@@ -350,15 +350,18 @@ class PayrollPeriodFinalizeView(APIView):
     permission_classes = [PayrollFinalizeAccess]
 
     def post(self, request, pk: int):
-        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
+        p = get_object_or_404(PayrollPeriod.objects.select_related("gaji_cash_entry"), pk=pk)
+        ser = PayrollPostGajiToCashSerializer(data=request.data or {})
+        ser.is_valid(raise_exception=True)
         try:
-            p = finalize_payroll_period(p, request.user.pk)
+            p = finalize_payroll_period(p, request.user, ser.validated_data["payment_method"])
         except PayrollWorkflowError as e:
             return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
+        p = PayrollPeriod.objects.select_related("gaji_cash_entry").get(pk=p.pk)
         return Response(
             success_response(
                 data=PayrollPeriodSerializer(p).data,
-                detail="Periode digaji dikunci.",
+                detail="Tutup buku selesai. Total gaji bersih dicatat ke kas operasional.",
             ),
             status=200,
         )
@@ -378,7 +381,7 @@ class PayrollPeriodUnfinalizeView(APIView):
         return Response(
             success_response(
                 data=PayrollPeriodSerializer(p).data,
-                detail="Kunci periode dibuka. Periode kembali draft.",
+                detail="Kunci periode dibuka. Entri kas gaji dihapus dan periode kembali draft.",
             ),
             status=200,
         )
@@ -399,14 +402,19 @@ class PayrollPeriodPostGajiToCashView(APIView):
     permission_classes = [PayrollManageAccess]
 
     def post(self, request, pk: int):
-        p = get_object_or_404(PayrollPeriod.objects.all(), pk=pk)
-        ser = PayrollPostGajiToCashSerializer(data=request.data)
+        p = get_object_or_404(PayrollPeriod.objects.select_related("gaji_cash_entry"), pk=pk)
+        ser = PayrollPostGajiToCashSerializer(data=request.data or {})
         ser.is_valid(raise_exception=True)
         try:
             cash = post_period_gaji_to_cash(p, request.user, ser.validated_data["payment_method"])
         except PayrollWorkflowError as e:
             return Response(error_response(detail=e.detail, code=ApiCode.BAD_REQUEST), status=400)
-        p.refresh_from_db()
+        if cash is None:
+            return Response(
+                error_response(detail="Total gaji bersih bernilai 0 — tidak ada yang dicatat ke kas.", code=ApiCode.BAD_REQUEST),
+                status=400,
+            )
+        p = PayrollPeriod.objects.select_related("gaji_cash_entry").get(pk=p.pk)
         return Response(
             success_response(
                 data={
