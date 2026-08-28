@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.test import APIClient
+from rest_framework.request import Request
+from rest_framework.test import APIClient, APIRequestFactory
 
+from account.filters import PhraseSearchFilter
 from account.models import UserRole
 
 User = get_user_model()
@@ -79,3 +81,15 @@ class AdminResetUserPasswordTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.staff.refresh_from_db()
         self.assertTrue(self.staff.check_password("StaffPass1!"))
+
+
+class PhraseSearchFilterTests(TestCase):
+    def test_keeps_multi_word_query_as_one_term(self):
+        wsgi = APIRequestFactory().get("/", {"search": "bakar kayu"})
+        terms = PhraseSearchFilter().get_search_terms(Request(wsgi))
+        self.assertEqual(terms, ["bakar kayu"])
+
+    def test_blank_search_is_empty(self):
+        wsgi = APIRequestFactory().get("/", {"search": "   "})
+        terms = PhraseSearchFilter().get_search_terms(Request(wsgi))
+        self.assertEqual(terms, [])

@@ -29,6 +29,7 @@ import {
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
@@ -102,12 +103,6 @@ function fmtKgLabel(netMassKg: string): string {
   return Number.isFinite(kg)
     ? `${kg.toLocaleString('id-ID', { maximumFractionDigits: 6 })} kg`
     : netMassKg
-}
-
-function fmtStock(v: string): string {
-  const n = Number(v)
-  if (Number.isNaN(n)) return v
-  return n.toLocaleString('id-ID', { maximumFractionDigits: 1 })
 }
 
 function fmtKg(kg: number): string {
@@ -298,6 +293,28 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
   const totalKgLabel = totalKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })
 
+  const variantMassWarnings = useMemo(() => {
+    const byProduct = new Map<
+      number,
+      { name: string; availableG: number; cartG: number }
+    >()
+    for (const it of cart) {
+      const pkg = packagingById.get(it.product_packaging)
+      if (!pkg) continue
+      const qty = Number(it.quantity) || 0
+      const lineG = qty * massKgOf(pkg) * 1000
+      const availableG = Number(pkg.product_remaining_mass_grams)
+      const cur = byProduct.get(pkg.product) ?? {
+        name: pkg.product_variant_name,
+        availableG: Number.isFinite(availableG) ? availableG : 0,
+        cartG: 0,
+      }
+      cur.cartG += lineG
+      byProduct.set(pkg.product, cur)
+    }
+    return [...byProduct.values()].filter((v) => v.cartG > v.availableG + 0.5)
+  }, [cart, packagingById])
+
   function addToCart(id: number) {
     setCart((prev) => {
       const found = prev.find((it) => it.product_packaging === id)
@@ -469,13 +486,14 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle className="text-base">Katalog produk</CardTitle>
               <span className="text-on-surface-variant text-xs">
-                Ketuk produk untuk menambah ke keranjang
+                Stok mengikuti stok utama varian (kg), bukan sisa kemasan
               </span>
             </div>
             <div className="relative">
               <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
               <Input
                 value={catalogSearch}
+                autoComplete="off"
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 placeholder="Cari varian, kemasan, atau SKU…"
                 className="border-outline-variant pr-3 pl-10"
@@ -553,7 +571,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                         {formatIdr(p.total_price_idr)}
                       </span>
                       <span className="text-on-surface-variant mt-0.5 text-[11px]">
-                        Stok: {fmtStock(p.remaining_stock)}
+                        Stok utama:{' '}
+                        {formatProductMassKgFromGrams(p.product_remaining_mass_grams, 3)} kg
                       </span>
                     </button>
                   )
@@ -613,6 +632,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                     <Input
                       id="so-customer-search"
                       value={customerSearch}
+                      autoComplete="off"
                       onChange={(e) => setCustomerSearch(e.target.value)}
                       placeholder="Cari pelanggan…"
                       className="border-outline-variant"
@@ -689,6 +709,17 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               </span>
             </CardHeader>
             <CardContent className="p-0">
+              {variantMassWarnings.length > 0 ? (
+                <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 border-b px-4 py-2 text-xs">
+                  {variantMassWarnings.map((w) => (
+                    <p key={w.name}>
+                      Stok utama «{w.name}» tidak cukup: keranjang{' '}
+                      {formatProductMassKgFromGrams(w.cartG, 3)} kg, tersedia{' '}
+                      {formatProductMassKgFromGrams(w.availableG, 3)} kg.
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               {cart.length === 0 ? (
                 <p className="text-on-surface-variant px-4 py-10 text-center text-sm">
                   Belum ada item. Ketuk produk di katalog untuk menambah.

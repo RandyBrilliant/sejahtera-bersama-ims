@@ -389,6 +389,10 @@ class PayrollLoanItem(models.Model):
         verbose_name_plural = _("payroll loan items")
         ordering = ["occurred_on", "id"]
 
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.entry_id} pinjam {self.amount_idr}"
 

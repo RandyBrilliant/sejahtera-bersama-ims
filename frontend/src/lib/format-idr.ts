@@ -8,7 +8,15 @@ export function formatIdr(amount: number | string | null | undefined): string {
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(n)
+  }).format(Math.round(n))
+}
+
+/** Digits-only whole rupiah for CurrencyInput (drops API `.00`). */
+export function idrToDigits(value: string | number | null | undefined): string {
+  if (value == null || value === '') return ''
+  const n = Number(value)
+  if (!Number.isFinite(n)) return ''
+  return String(Math.trunc(n))
 }
 
 /** Angka aman dari respons API (string Decimal / number). */

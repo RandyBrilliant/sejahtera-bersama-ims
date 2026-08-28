@@ -308,6 +308,10 @@ class IngredientStockMovement(AuditModel):
             models.Index(fields=["created_at"]),
         ]
 
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.ingredient_inventory.ingredient.name} {self.movement_type} {self.quantity}"
 
@@ -379,6 +383,10 @@ class ProductStockMovement(AuditModel):
             models.Index(fields=["created_at"]),
         ]
 
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         pkg = ""
         if self.product_packaging_id:
@@ -414,6 +422,11 @@ class ProductionBatch(AuditModel):
             models.Index(fields=["updated_by"]),
             models.Index(fields=["created_at"]),
         ]
+
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip().upper()
+        self.shift_label = (self.shift_label or "").strip().upper()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"Batch {self.production_date} #{self.id}"

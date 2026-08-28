@@ -1,4 +1,4 @@
-import type { IngredientInventory, ProductPackaging } from '@/types/inventory'
+import type { IngredientInventory, Product } from '@/types/inventory'
 import type { OrderStatus } from '@/types/purchase'
 
 export type DashboardDateRange = {
@@ -82,7 +82,7 @@ export type AdminDashboardPayload = {
     cash_by_day: DashboardCashDayRow[]
   }
   inventory_summary: InventorySummaryPayload
-  top_packaging: { results: ProductPackaging[] }
+  top_products: { results: Product[] }
   low_ingredient_stock: { results: IngredientInventory[] }
   recent_activity: { results: DashboardActivityRow[] }
   users: {

@@ -372,6 +372,10 @@ class PayrollLoanAndKasTests(TestCase):
         self.assertEqual(self.entry.advance_deduction_idr, Decimal("40000.00"))
         self.assertEqual(self.entry.net_pay_idr, Decimal("60000.00"))
         self.assertEqual(OperationalCashEntry.objects.filter(reference__startswith="PAYROLL-LOAN-").count(), 2)
+        loan = self.entry.loan_items.order_by("id").first()
+        self.assertEqual(loan.note, "PINJAM 1")
+        self.assertEqual(loan.cash_entry.description, "PINJAMAN WH LOAN — PINJAM 1")
+        self.assertEqual(loan.cash_entry.description, loan.cash_entry.description.upper())
 
     def test_post_period_gaji_to_cash(self):
         from expenses.models import OperationalCashEntry
@@ -401,6 +405,8 @@ class PayrollLoanAndKasTests(TestCase):
         self.assertEqual(cash.amount_idr, 100000)
         self.assertEqual(cash.payment_method, "CASH")
         self.assertEqual(cash.reference, f"PAYROLL-GAJI-{self.period.pk}")
+        self.assertEqual(cash.description, cash.description.upper())
+        self.assertTrue(cash.description.startswith("GAJI "))
         self.assertEqual(current_saldo()["saldo_idr"], before - 100000)
         self.assertEqual(OperationalCashEntry.objects.filter(reference=f"PAYROLL-GAJI-{self.period.pk}").count(), 1)
 

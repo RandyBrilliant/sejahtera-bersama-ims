@@ -4,14 +4,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .api_responses import ApiCode, ApiMessage, error_response, success_response
 from .dashboard import build_admin_dashboard_payload
-from .filters import UserListFilterSet
+from .filters import PhraseSearchFilter, UserListFilterSet
 from .models import EmployeeProfile, UserRole
 from .permissions import AdminDashboardAccess, IsAdminOrOwner, user_is_owner
 from .serializers import EmployeeProfileSerializer, UserSerializer
@@ -81,7 +81,7 @@ class MeView(APIView):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsAdminOrOwner]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     filterset_class = UserListFilterSet
     search_fields = ["username", "full_name", "phone_number"]
     ordering_fields = [
@@ -148,7 +148,7 @@ class UserViewSet(viewsets.ModelViewSet):
 class EmployeeProfileViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeProfileSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [SearchFilter, OrderingFilter]
+    filter_backends = [PhraseSearchFilter, OrderingFilter]
     search_fields = ["employee_code", "user__username", "user__full_name"]
     ordering_fields = ["employee_code", "joined_date", "resigned_date", "created_at", "updated_at"]
     ordering = ["employee_code"]

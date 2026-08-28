@@ -71,9 +71,9 @@ def sync_loan_cash_entry(item: PayrollLoanItem, user) -> OperationalCashEntry | 
         "Uang pinjaman yang diberikan ke pegawai (dipotong dari gaji).",
         15,
     )
-    employee_name = item.entry.employee.full_name or item.entry.employee.username
+    employee_name = (item.entry.employee.full_name or item.entry.employee.username).strip()
     note = (item.note or "").strip()
-    description = f"Pinjaman {employee_name}" + (f" — {note}" if note else "")
+    description = f"PINJAMAN {employee_name}" + (f" — {note}" if note else "")
     reference = f"PAYROLL-LOAN-{item.pk}"
     method = item.payment_method if item.payment_method in PaymentMethod.values else PaymentMethod.CASH
 
@@ -127,7 +127,7 @@ def save_loan_item(*, entry: PayrollEntry, user, amount: Decimal, occurred_on, p
     item.amount_idr = _quantize_idr(amount)
     item.occurred_on = occurred_on
     item.payment_method = payment_method
-    item.note = (note or "").strip()
+    item.note = (note or "").strip().upper()
     item.save()
     refresh_entry_advance_from_loans(entry)
     sync_loan_cash_entry(item, user)
@@ -177,7 +177,7 @@ def post_period_gaji_to_cash(
     )
     method = payment_method if payment_method in PaymentMethod.values else PaymentMethod.CASH
     label = f"{period.get_cadence_display()} {period.pay_date.isoformat()}"
-    description = f"Gaji {label} — total bersih {len(entries)} pegawai"
+    description = f"GAJI {label} — TOTAL BERSIH {len(entries)} PEGAWAI"
     reference = f"PAYROLL-GAJI-{period.pk}"
 
     if period.gaji_cash_entry_id:

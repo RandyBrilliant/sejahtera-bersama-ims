@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import { alert } from '@/lib/alert'
+import { idrToDigits } from '@/lib/format-idr'
 import { cn } from '@/lib/utils'
 import type { EmployeeCompensation, PayCadence, PayType } from '@/types/payroll'
 import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
@@ -28,14 +29,6 @@ function axiosDetail(err: unknown): string | undefined {
   const d = err.response?.data as { detail?: unknown } | undefined
   const detail = d?.detail
   return typeof detail === 'string' ? detail : undefined
-}
-
-/** Normalize API decimal/string amounts to digits-only for CurrencyInput. */
-function idrToDigits(value: string | number | null | undefined): string {
-  if (value == null || value === '') return ''
-  const n = Number(value)
-  if (!Number.isFinite(n)) return ''
-  return String(Math.trunc(n))
 }
 
 function draftFromSnap(snap: EmployeeCompensation | null): Draft {

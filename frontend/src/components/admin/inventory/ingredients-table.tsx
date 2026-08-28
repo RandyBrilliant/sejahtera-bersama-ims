@@ -154,6 +154,7 @@ export function IngredientsTable() {
             <Input
               placeholder="Cari nama bahan…"
               value={searchInput}
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               className="border-outline-variant pr-3 pl-10"

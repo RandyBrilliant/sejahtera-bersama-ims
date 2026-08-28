@@ -5,7 +5,7 @@ from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from account.models import UserRole
-from inventory.models import Ingredient, StockUnit
+from inventory.models import Ingredient, Product, ProductPackaging, ProductStockMovement, StockUnit
 from inventory.product_stock import weighted_moving_average
 
 User = get_user_model()
@@ -94,3 +94,84 @@ class IngredientMutasiCostingTests(TestCase):
         self.assertEqual(self.inv.remaining_stock, Decimal("8"))
         self.assertEqual(self.inv.avg_cost_idr, Decimal("20000"))
         self.assertEqual(Decimal(resp.json()["unit_cost_idr"]), Decimal("20000"))
+
+
+class ProductMutasiPackagingBookkeepingTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+
+        self.timezone = timezone
+        self.admin = User.objects.create_user(
+            "admin_mutasi", full_name="Admin", role=UserRole.ADMIN, password="pass"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        self.product = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Original",
+            price_per_kg_idr=100000,
+            remaining_mass_grams=Decimal("0"),
+        )
+        self.pkg = ProductPackaging.objects.create(
+            product=self.product,
+            label="250g",
+            net_mass_kg=Decimal("0.25"),
+        )
+
+    def test_in_with_kemasan_updates_stok_utama_and_keeps_sku_on_ledger(self):
+        resp = self.client.post(
+            "/api/inventory/product-stock-movements/",
+            {
+                "product": self.product.id,
+                "product_packaging": self.pkg.id,
+                "movement_type": "IN",
+                "mass_grams": "10000",
+                "bonus_mass_grams": "0",
+                "unit_cost_per_kg_idr": "60000",
+                "movement_at": self.timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("10000"))
+        row = ProductStockMovement.objects.get(pk=resp.json()["id"])
+        self.assertEqual(row.product_packaging_id, self.pkg.id)
+
+    def test_note_is_stored_uppercase(self):
+        resp = self.client.post(
+            "/api/inventory/product-stock-movements/",
+            {
+                "product": self.product.id,
+                "movement_type": "IN",
+                "mass_grams": "1000",
+                "unit_cost_per_kg_idr": "60000",
+                "note": "Koreksi stok gudang",
+                "movement_at": self.timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.json()["note"], "KOREKSI STOK GUDANG")
+        row = ProductStockMovement.objects.get(pk=resp.json()["id"])
+        self.assertEqual(row.note, "KOREKSI STOK GUDANG")
+
+    def test_rejects_kemasan_from_other_variant(self):
+        other = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Pedas",
+            price_per_kg_idr=100000,
+        )
+        resp = self.client.post(
+            "/api/inventory/product-stock-movements/",
+            {
+                "product": other.id,
+                "product_packaging": self.pkg.id,
+                "movement_type": "IN",
+                "mass_grams": "10000",
+                "unit_cost_per_kg_idr": "60000",
+                "movement_at": self.timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)

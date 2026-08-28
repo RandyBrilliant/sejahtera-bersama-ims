@@ -17,7 +17,7 @@ import { PayrollPeriodTotals } from '@/components/admin/payroll/payroll-period-t
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -38,7 +38,7 @@ import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { useAuth } from '@/hooks/use-auth'
 import { expensesKeys } from '@/hooks/use-expenses-query'
 import { alert } from '@/lib/alert'
-import { formatIdr } from '@/lib/format-idr'
+import { formatIdr, idrToDigits } from '@/lib/format-idr'
 import { formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
@@ -93,8 +93,8 @@ export function AdminPayrollPeriodDetailPage() {
       const next: Record<number, EntryDraft> = {}
       for (const row of e) {
         next[row.id] = {
-          deductions_idr: String(row.deductions_idr ?? '0'),
-          bonus_idr: String(row.bonus_idr ?? '0'),
+          deductions_idr: idrToDigits(row.deductions_idr ?? '0'),
+          bonus_idr: idrToDigits(row.bonus_idr ?? '0'),
         }
       }
       setDraft(next)
@@ -208,7 +208,7 @@ export function AdminPayrollPeriodDetailPage() {
   }
 
   function parseAmount(raw: string): number | null {
-    const n = Number(String(raw).replace(/\s/g, '').replace(',', '.'))
+    const n = Number(raw)
     if (!Number.isFinite(n) || n < 0) return null
     return n
   }
@@ -226,15 +226,15 @@ export function AdminPayrollPeriodDetailPage() {
     setBusy(true)
     try {
       const updated = await patchPayrollEntry(period.id, row.id, {
-        deductions_idr: d.deductions_idr,
-        bonus_idr: d.bonus_idr,
+        deductions_idr: d.deductions_idr || '0',
+        bonus_idr: d.bonus_idr || '0',
       })
       setEntries((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
       setDraft((prev) => ({
         ...prev,
         [row.id]: {
-          deductions_idr: String(updated.deductions_idr),
-          bonus_idr: String(updated.bonus_idr),
+          deductions_idr: idrToDigits(updated.deductions_idr),
+          bonus_idr: idrToDigits(updated.bonus_idr),
         },
       }))
       alert.success('Entri diperbarui.')
@@ -415,14 +415,13 @@ export function AdminPayrollPeriodDetailPage() {
                           </TableCell>
                           <TableCell>
                             {isDraft && d ? (
-                              <Input
-                                className="h-9 w-[100px]"
-                                inputMode="decimal"
+                              <CurrencyInput
+                                className="h-9 min-w-[8rem]"
                                 value={d.bonus_idr}
-                                onChange={(e) =>
+                                onChange={(bonus_idr) =>
                                   setDraft((prev) => ({
                                     ...prev,
-                                    [row.id]: { ...prev[row.id], bonus_idr: e.target.value },
+                                    [row.id]: { ...prev[row.id], bonus_idr },
                                   }))
                                 }
                                 disabled={busy}
@@ -449,14 +448,13 @@ export function AdminPayrollPeriodDetailPage() {
                           </TableCell>
                           <TableCell>
                             {isDraft && d ? (
-                              <Input
-                                className="h-9 w-[100px]"
-                                inputMode="decimal"
+                              <CurrencyInput
+                                className="h-9 min-w-[8rem]"
                                 value={d.deductions_idr}
-                                onChange={(e) =>
+                                onChange={(deductions_idr) =>
                                   setDraft((prev) => ({
                                     ...prev,
-                                    [row.id]: { ...prev[row.id], deductions_idr: e.target.value },
+                                    [row.id]: { ...prev[row.id], deductions_idr },
                                   }))
                                 }
                                 disabled={busy}

@@ -281,7 +281,7 @@ export function ProductionBatchWizard({ onCancel, onSaved }: Props) {
       const batch = await mutation.mutateAsync({
         production_date: productionDate,
         shift_label: shiftLabel.trim() || undefined,
-        note: note.trim() || undefined,
+        note: note.trim().toUpperCase() || undefined,
         ingredient_usages_input: usages,
         packaging_outputs_input: outputs,
       })
@@ -735,12 +735,12 @@ export function ProductionBatchWizard({ onCancel, onSaved }: Props) {
                   <textarea
                     id="prod-note"
                     value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    onChange={(e) => setNote(e.target.value.toUpperCase())}
                     disabled={pending}
                     rows={3}
                     placeholder="Contoh: produksi sisa kemarin…"
                     className={cn(
-                      'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[88px] w-full rounded-xl border px-4 py-3 text-base outline-none',
+                      'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[88px] w-full rounded-xl border px-4 py-3 text-base uppercase outline-none',
                       'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
                       'disabled:pointer-events-none disabled:opacity-50'
                     )}

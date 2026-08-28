@@ -79,6 +79,12 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
     price_per_kg_idr = serializers.IntegerField(source="product.price_per_kg_idr", read_only=True)
+    product_remaining_mass_grams = serializers.DecimalField(
+        source="product.remaining_mass_grams",
+        read_only=True,
+        max_digits=14,
+        decimal_places=3,
+    )
     remaining_stock = serializers.SerializerMethodField(read_only=True)
     total_price_idr = serializers.SerializerMethodField(read_only=True)
     stock_value_idr = serializers.SerializerMethodField(read_only=True)
@@ -94,6 +100,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "label",
             "packaging_type",
             "net_mass_kg",
+            "product_remaining_mass_grams",
             "remaining_stock",
             "total_price_idr",
             "stock_value_idr",
@@ -109,6 +116,7 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "product_name",
             "product_variant_name",
             "price_per_kg_idr",
+            "product_remaining_mass_grams",
             "remaining_stock",
             "total_price_idr",
             "stock_value_idr",
@@ -235,6 +243,9 @@ class IngredientStockMovementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
 
+    def validate_note(self, value: str) -> str:
+        return (value or "").strip().upper()
+
     def validate(self, attrs):
         mt = attrs.get("movement_type") or getattr(self.instance, "movement_type", None)
         unit_cost = attrs.get("unit_cost_idr", serializers.empty)
@@ -255,7 +266,11 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
     created_by = AuditUserMiniSerializer(read_only=True)
     updated_by = AuditUserMiniSerializer(read_only=True)
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
-    product_packaging = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    product_packaging = serializers.PrimaryKeyRelatedField(
+        queryset=ProductPackaging.objects.select_related("product"),
+        required=False,
+        allow_null=True,
+    )
     product_packaging_label = serializers.SerializerMethodField(read_only=True)
     product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
     total_mass_grams = serializers.SerializerMethodField(read_only=True)
@@ -282,7 +297,6 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "product_packaging",
             "product_packaging_label",
             "product_variant_name",
             "total_mass_grams",
@@ -291,6 +305,9 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
             "created_by",
             "updated_by",
         ]
+
+    def validate_note(self, value: str) -> str:
+        return (value or "").strip().upper()
 
     def get_product_packaging_label(self, obj):
         if obj.product_packaging_id:
@@ -329,6 +346,12 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
                         "HPP per kg harus lebih dari nol untuk mutasi masuk."
                     )
                 }
+            )
+        pkg = attrs.get("product_packaging")
+        prod = attrs.get("product") or getattr(self.instance, "product", None)
+        if pkg is not None and prod is not None and pkg.product_id != prod.pk:
+            raise serializers.ValidationError(
+                {"product_packaging": "Kemasan harus milik varian yang dipilih."}
             )
         return attrs
 
@@ -417,6 +440,12 @@ class ProductionBatchSerializer(serializers.ModelSerializer):
             "created_by",
             "updated_by",
         ]
+
+    def validate_note(self, value: str) -> str:
+        return (value or "").strip().upper()
+
+    def validate_shift_label(self, value: str) -> str:
+        return (value or "").strip().upper()
 
     def validate(self, attrs):
         ingredient_usages = attrs.get("ingredient_usages_input") or []

@@ -15,12 +15,13 @@ import {
 } from 'recharts'
 
 import { formatIdr } from '@/lib/format-idr'
+import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type {
   DashboardCashDayRow,
   DashboardRevenueDayRow,
 } from '@/types/account-dashboard'
-import type { ProductPackaging } from '@/types/inventory'
+import type { Product } from '@/types/inventory'
 
 const COMPACT = new Intl.NumberFormat('id-ID', {
   notation: 'compact',
@@ -334,23 +335,24 @@ export function DashboardTrendChart({
   )
 }
 
-type PackagingStockChartProps = {
-  rows: ProductPackaging[]
+type ProductStockChartProps = {
+  rows: Product[]
   loading?: boolean
 }
 
-export function PackagingStockChart({ rows, loading }: PackagingStockChartProps) {
-  const [activeSku, setActiveSku] = useState<number | null>(null)
+export function ProductStockChart({ rows, loading }: ProductStockChartProps) {
+  const [activeId, setActiveId] = useState<number | null>(null)
 
   const data = useMemo(
     () =>
       rows.slice(0, 8).map((row) => {
-        const qty = Number(row.remaining_stock)
+        const grams = Number(row.remaining_mass_grams)
+        const kg = Number.isNaN(grams) ? 0 : grams / 1000
         return {
           id: row.id,
-          name: row.label || row.sku,
-          fullName: `${row.product_variant_name} · ${row.label}`,
-          qty: Number.isNaN(qty) ? 0 : qty,
+          name: row.variant_name,
+          fullName: `${row.name} · ${row.variant_name}`,
+          qty: kg,
         }
       }),
     [rows]
@@ -365,7 +367,7 @@ export function PackagingStockChart({ rows, loading }: PackagingStockChartProps)
   if (data.length === 0) {
     return (
       <div className="text-on-surface-variant flex h-[260px] items-center justify-center text-sm">
-        Belum ada kemasan aktif.
+        Belum ada produk aktif.
       </div>
     )
   }
@@ -380,10 +382,10 @@ export function PackagingStockChart({ rows, loading }: PackagingStockChartProps)
           onMouseMove={(state) => {
             const idx = state?.activeTooltipIndex
             if (idx != null && data[Number(idx)]) {
-              setActiveSku(data[Number(idx)].id)
+              setActiveId(data[Number(idx)].id)
             }
           }}
-          onMouseLeave={() => setActiveSku(null)}
+          onMouseLeave={() => setActiveId(null)}
         >
           <XAxis
             type="number"
@@ -412,7 +414,7 @@ export function PackagingStockChart({ rows, loading }: PackagingStockChartProps)
                     {p.fullName}
                   </p>
                   <p className="text-primary mt-1 text-sm font-semibold tabular-nums">
-                    {p.qty.toLocaleString('id-ID')} unit
+                    {formatProductMassKgFromGrams(p.qty * 1000, 3)} kg
                   </p>
                 </div>
               )
@@ -423,7 +425,7 @@ export function PackagingStockChart({ rows, loading }: PackagingStockChartProps)
               <Cell
                 key={entry.id}
                 fill={
-                  activeSku === entry.id || activeSku == null ? PRIMARY : MUTED_BAR
+                  activeId === entry.id || activeId == null ? PRIMARY : MUTED_BAR
                 }
                 style={{ transition: 'fill 180ms ease' }}
               />

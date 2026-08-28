@@ -79,7 +79,7 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
         movement_type: movementType,
         quantity: quantity.trim(),
         unit_cost_idr: movementType === 'IN' ? unitCost.trim() : undefined,
-        note: note.trim() || undefined,
+        note: note.trim().toUpperCase() || undefined,
         movement_at: datetimeLocalValueToIso(movementAtLocal),
       })
       alert.success('Berhasil', 'Mutasi bahan dicatat.')
@@ -213,11 +213,11 @@ export function IngredientStockMovementForm({ onCancel, onSaved }: Props) {
             <textarea
               id="ing-mov-note"
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => setNote(e.target.value.toUpperCase())}
               disabled={pending}
               rows={3}
               className={cn(
-                'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[88px] w-full rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+                'border-outline-variant bg-field placeholder:text-muted-foreground min-h-[88px] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none transition-[color,box-shadow] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
                 'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
               )}
             />

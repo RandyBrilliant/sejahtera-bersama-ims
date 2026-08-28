@@ -4,6 +4,7 @@ import { fetchIngredients } from '@/api/inventory'
 import { createKupasItem, fetchKupasItems, patchKupasItem } from '@/api/payroll'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -15,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { alert } from '@/lib/alert'
-import { formatKg } from '@/lib/format-kg'
+import { idrToDigits } from '@/lib/format-idr'
 import type { Ingredient } from '@/types/inventory'
 import type { KupasItem } from '@/types/payroll'
 import { isAxiosError } from 'axios'
@@ -48,7 +49,7 @@ export function AdminPayrollKupasItemsPage() {
       setItems(list)
       setIngredients(ing.results)
       const rates: Record<number, string> = {}
-      for (const item of list) rates[item.id] = formatKg(item.rate_per_kg_idr)
+      for (const item of list) rates[item.id] = idrToDigits(item.rate_per_kg_idr)
       setDraftRates(rates)
     } catch (e) {
       alert.error('Jenis kupas', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -71,7 +72,7 @@ export function AdminPayrollKupasItemsPage() {
     try {
       const updated = await patchKupasItem(item.id, { rate_per_kg_idr: raw })
       setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-      setDraftRates((d) => ({ ...d, [item.id]: formatKg(updated.rate_per_kg_idr) }))
+      setDraftRates((d) => ({ ...d, [item.id]: idrToDigits(updated.rate_per_kg_idr) }))
       alert.success('Tarif diperbarui.')
     } catch (e) {
       alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
@@ -105,7 +106,7 @@ export function AdminPayrollKupasItemsPage() {
         resulting_ingredient: newIngredientId ? Number(newIngredientId) : null,
       })
       setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-      setDraftRates((d) => ({ ...d, [created.id]: formatKg(created.rate_per_kg_idr) }))
+      setDraftRates((d) => ({ ...d, [created.id]: idrToDigits(created.rate_per_kg_idr) }))
       setNewName('')
       setNewRate('')
       setNewIngredientId('')
@@ -145,12 +146,11 @@ export function AdminPayrollKupasItemsPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ki-rate">Tarif per kg (IDR)</Label>
-            <Input
+            <CurrencyInput
               id="ki-rate"
-              forceUppercase={false}
-              inputMode="decimal"
+              placeholder="Mis. 2.500"
               value={newRate}
-              onChange={(e) => setNewRate(e.target.value)}
+              onChange={setNewRate}
               disabled={savingId === 'new'}
             />
           </div>
@@ -199,13 +199,11 @@ export function AdminPayrollKupasItemsPage() {
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-sm">{item.resulting_ingredient_name ?? '—'}</TableCell>
                   <TableCell>
-                    <Input
-                      forceUppercase={false}
-                      inputMode="decimal"
-                      className="h-9 w-[120px]"
+                    <CurrencyInput
+                      className="h-9 min-w-[8rem]"
                       value={draftRates[item.id] ?? ''}
-                      onChange={(e) =>
-                        setDraftRates((d) => ({ ...d, [item.id]: e.target.value }))
+                      onChange={(rate) =>
+                        setDraftRates((d) => ({ ...d, [item.id]: rate }))
                       }
                       disabled={savingId === item.id}
                     />

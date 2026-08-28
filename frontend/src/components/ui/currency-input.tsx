@@ -13,7 +13,10 @@ function formatIdNumber(value: string): string {
   if (!value) return ''
   const n = Number(value)
   if (!Number.isFinite(n)) return ''
-  return new Intl.NumberFormat('id-ID').format(n)
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.trunc(n))
 }
 
 export function CurrencyInput({

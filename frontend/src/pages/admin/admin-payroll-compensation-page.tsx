@@ -21,6 +21,7 @@ import {
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
 import { useAuth } from '@/hooks/use-auth'
 import { alert } from '@/lib/alert'
+import { idrToDigits } from '@/lib/format-idr'
 import type { PayCadence, PayType, PayrollCompensationTableRow } from '@/types/payroll'
 import { PAY_CADENCE_LABEL, PAY_TYPE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
@@ -29,14 +30,6 @@ function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
   const d = err.response?.data as { detail?: unknown } | undefined
   return typeof d?.detail === 'string' ? d.detail : undefined
-}
-
-/** Normalize API decimal/string amounts to digits-only for CurrencyInput. */
-function idrToDigits(value: string | number | null | undefined): string {
-  if (value == null || value === '') return ''
-  const n = Number(value)
-  if (!Number.isFinite(n)) return ''
-  return String(Math.trunc(n))
 }
 
 const LIST_PATH = '/admin/gaji'
@@ -182,6 +175,7 @@ export function AdminPayrollCompensationPage() {
         <Input
           id="comp-search"
           forceUppercase={false}
+          autoComplete="off"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Ketikan untuk menyaring baris…"

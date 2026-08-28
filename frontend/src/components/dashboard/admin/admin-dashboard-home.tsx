@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom'
 
 import {
   DashboardTrendChart,
-  PackagingStockChart,
+  ProductStockChart,
 } from '@/components/dashboard/admin/admin-dashboard-charts'
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { Button } from '@/components/ui/button'
@@ -352,10 +352,10 @@ export function AdminDashboardHome() {
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h2 className="text-on-surface font-heading text-lg font-semibold">
-                Stok kemasan teratas
+                Stok utama teratas
               </h2>
               <p className="text-on-surface-variant mt-0.5 text-xs">
-                Unit tersisa (hover untuk detail)
+                Massa varian (kg), bukan sisa kemasan
               </p>
             </div>
             <Link
@@ -365,9 +365,9 @@ export function AdminDashboardHome() {
               Semua
             </Link>
           </div>
-          <PackagingStockChart
-            rows={dash.topPackagingRows}
-            loading={dash.topPackagingPending}
+          <ProductStockChart
+            rows={dash.topProductRows}
+            loading={dash.topProductsPending}
           />
         </section>
       </div>

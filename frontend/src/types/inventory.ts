@@ -35,6 +35,9 @@ export type ProductPackaging = {
   packaging_type: PackagingType
   /** Berat bersih per kemasan (kg). */
   net_mass_kg: string
+  /** Stok utama varian (gram), dibagi semua kemasan. */
+  product_remaining_mass_grams?: string
+  /** Setara unit kemasan dari stok utama; bukan stok fisik per SKU. */
   remaining_stock: string
   /** Harga total per kemasan = price_per_kg_idr × net_mass_kg. */
   total_price_idr: number
@@ -236,6 +239,7 @@ export type IngredientStockMovementCreateInput = {
 
 export type ProductStockMovementCreateInput = {
   product: number
+  product_packaging?: number | null
   movement_type: StockMovementType
   mass_grams: string | number
   bonus_mass_grams?: string | number

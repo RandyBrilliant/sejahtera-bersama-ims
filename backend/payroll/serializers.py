@@ -331,6 +331,9 @@ class PayrollLoanItemSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "cash_entry_id", "created_at", "updated_at")
 
+    def validate_note(self, value: str) -> str:
+        return (value or "").strip().upper()
+
     def validate_amount_idr(self, value: Decimal) -> Decimal:
         if value < 1:
             raise serializers.ValidationError("Nominal pinjaman minimal Rp 1.")

@@ -158,6 +158,7 @@ export function ProductionBatchesTable() {
             <Search className="text-on-surface-variant absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               value={searchInput}
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') runSearch()

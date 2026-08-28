@@ -7,11 +7,12 @@ from django.db.models.functions import Cast, Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import success_response
+from account.filters import PhraseSearchFilter
 from account.pagination import StandardResultsSetPagination
 from account.permissions import IngredientInventoryAccess, InventoryAccess
 
@@ -135,7 +136,7 @@ class ProductViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
     ordering_fields = ["name", "variant_name", "price_per_kg_idr", "remaining_mass_grams"]
     ordering = ["variant_name"]
@@ -161,7 +162,7 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductPackagingFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
     ordering_fields = ["label", "packaging_type", "net_mass_kg"]
     ordering = ["product__variant_name", "net_mass_kg"]
@@ -176,7 +177,7 @@ class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name"]
     ordering_fields = ["name"]
     ordering = ["name"]
@@ -190,7 +191,7 @@ class IngredientInventoryViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientInventoryFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["ingredient__name"]
     ordering_fields = ["ingredient__name"]
     ordering = ["ingredient__name"]
@@ -439,7 +440,7 @@ class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin
     permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = IngredientStockMovementFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["ingredient_inventory__ingredient__name", "note"]
     ordering_fields = [
         "ingredient_inventory__ingredient__name",
@@ -516,7 +517,7 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
     permission_classes = [IngredientInventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductStockMovementFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = [
         "product__variant_name",
         "product_packaging__label",
@@ -595,7 +596,6 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
                 ]
             )
             serializer.save(
-                product_packaging=None,
                 unit_cost_per_kg_idr=unit_cost_per_kg,
                 created_by=self.request.user,
                 updated_by=self.request.user,
@@ -606,7 +606,6 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
             product.updated_by = self.request.user
             product.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
             serializer.save(
-                product_packaging=None,
                 unit_cost_per_kg_idr=unit_cost_per_kg,
                 created_by=self.request.user,
                 updated_by=self.request.user,
@@ -628,7 +627,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
     permission_classes = [InventoryAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = ProductionBatchFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["shift_label", "note"]
     ordering_fields = ["production_date", "created_at", "updated_at"]
     ordering = ["-production_date", "-id"]
@@ -688,7 +687,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     movement_type=StockMovementType.OUT,
                     quantity=quantity_used,
                     unit_cost_idr=unit_cost,
-                    note=f"Pemakaian produksi batch #{batch.id}",
+                    note=f"PEMAKAIAN PRODUKSI BATCH #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,
                     updated_by=request.user,
@@ -764,7 +763,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     mass_grams=mass_main,
                     bonus_mass_grams=mass_bonus,
                     unit_cost_per_kg_idr=batch_cost_per_kg_by_pid.get(packaging.product_id),
-                    note=f"Hasil produksi batch #{batch.id}",
+                    note=f"HASIL PRODUKSI BATCH #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,
                     updated_by=request.user,

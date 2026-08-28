@@ -128,4 +128,7 @@ class OperationalCashEntrySerializer(serializers.ModelSerializer):
         cleaned = (value or "").strip()
         if not cleaned:
             raise serializers.ValidationError("Deskripsi wajib diisi.")
-        return cleaned
+        return cleaned.upper()
+
+    def validate_reference(self, value: str):
+        return (value or "").strip().upper()

@@ -6,12 +6,13 @@ from django.http import FileResponse, HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import success_response
+from account.filters import PhraseSearchFilter
 from account.pagination import StandardResultsSetPagination
 from account.permissions import FinanceAccess
 from account.upload_validation import upload_validation_error_response, validate_uploaded_file
@@ -76,7 +77,7 @@ class OperationalCategoryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     permission_classes = [FinanceAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = OperationalCategoryFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name", "slug", "description"]
     ordering_fields = ["name", "sort_order", "entry_kind", "is_active", "created_at", "updated_at"]
     ordering = ["entry_kind", "sort_order", "name"]
@@ -90,7 +91,7 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
     permission_classes = [FinanceAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = OperationalCashEntryFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = [
         "description",
         "reference",

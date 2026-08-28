@@ -11,12 +11,13 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from account.api_responses import success_response
+from account.filters import PhraseSearchFilter
 from account.models import UserRole
 from account.pagination import StandardResultsSetPagination
 from account.permissions import (
@@ -70,7 +71,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [CustomerAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = CustomerFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name", "phone", "address", "notes", "wilayah__name"]
     ordering_fields = ["name", "wilayah__name"]
     ordering = ["name"]
@@ -89,7 +90,7 @@ class WilayahViewSet(viewsets.ModelViewSet):
     serializer_class = WilayahSerializer
     permission_classes = [CustomerAccess]
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
@@ -133,7 +134,7 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [PurchaseInOrderAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = PurchaseInOrderFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["order_code", "invoice_number", "notes"]
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
@@ -239,7 +240,7 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
                 movement_type=StockMovementType.IN,
                 quantity=line.quantity,
                 unit_cost_idr=line.unit_cost_idr,
-                note=f"Terima pembelian {order.order_code}",
+                note=f"TERIMA PEMBELIAN {order.order_code}",
                 movement_at=now,
                 created_by=request.user,
                 updated_by=request.user,
@@ -507,7 +508,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [SalesOrderAccess]
     pagination_class = StandardResultsSetPagination
     filterset_class = SalesOrderFilter
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["order_code", "invoice_number", "notes", "customer__name"]
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
@@ -691,7 +692,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 mass_grams=line_mass,
                 bonus_mass_grams=Decimal("0"),
                 unit_cost_per_kg_idr=avg_cost_per_kg,
-                note=f"Pengiriman penjualan {order.order_code}",
+                note=f"PENGIRIMAN PENJUALAN {order.order_code}",
                 movement_at=now,
                 created_by=request.user,
                 updated_by=request.user,

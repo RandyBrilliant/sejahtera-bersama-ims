@@ -71,8 +71,13 @@ export function ProductPackagingInlineTable({ productId }: Props) {
         row={deleteRow}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-on-surface font-heading text-lg font-semibold">Kemasan (SKU)</h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-on-surface font-heading text-lg font-semibold">Kemasan (SKU)</h2>
+          <p className="text-on-surface-variant mt-0.5 text-xs">
+            Setara unit hanya kalkulator dari stok utama, bukan stok fisik per kemasan.
+          </p>
+        </div>
         <Button
           type="button"
           size="sm"

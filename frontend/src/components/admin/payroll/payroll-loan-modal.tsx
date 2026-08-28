@@ -8,6 +8,7 @@ import {
   patchPayrollEntryLoan,
 } from '@/api/payroll'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import {
   Dialog,
@@ -28,7 +29,7 @@ import {
 import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { expensesKeys } from '@/hooks/use-expenses-query'
 import { alert } from '@/lib/alert'
-import { formatIdr, toFiniteNumber } from '@/lib/format-idr'
+import { formatIdr, idrToDigits, toFiniteNumber } from '@/lib/format-idr'
 import type { PayrollEntryRow, PayrollLoanItem } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
@@ -91,7 +92,7 @@ export function PayrollLoanModal({
 
   async function handleSaveNew() {
     if (!entry) return
-    const n = Number(String(amount).replace(/\s/g, '').replace(',', '.'))
+    const n = Number(amount)
     if (!Number.isFinite(n) || n < 1) {
       alert.error('Validasi', 'Nominal pinjaman minimal Rp 1.')
       return
@@ -106,7 +107,7 @@ export function PayrollLoanModal({
         amount_idr: n,
         occurred_on: occurredOn,
         payment_method: method,
-        note: note.trim() || undefined,
+        note: note.trim().toUpperCase() || undefined,
       })
       setItems((prev) => [...prev, result.loan])
       applyEntry(result.entry)
@@ -122,7 +123,7 @@ export function PayrollLoanModal({
 
   async function handleSaveEdit(item: PayrollLoanItem) {
     if (!entry) return
-    const n = Number(String(amount).replace(/\s/g, '').replace(',', '.'))
+    const n = Number(amount)
     if (!Number.isFinite(n) || n < 1) {
       alert.error('Validasi', 'Nominal pinjaman minimal Rp 1.')
       return
@@ -133,7 +134,7 @@ export function PayrollLoanModal({
         amount_idr: n,
         occurred_on: occurredOn,
         payment_method: method,
-        note: note.trim(),
+        note: note.trim().toUpperCase(),
       })
       setItems((prev) => prev.map((x) => (x.id === result.loan.id ? result.loan : x)))
       applyEntry(result.entry)
@@ -175,7 +176,7 @@ export function PayrollLoanModal({
 
   function startEdit(item: PayrollLoanItem) {
     setEditingId(item.id)
-    setAmount(String(item.amount_idr))
+    setAmount(idrToDigits(item.amount_idr))
     setOccurredOn(item.occurred_on)
     setMethod(item.payment_method)
     setNote(item.note ?? '')
@@ -256,13 +257,13 @@ export function PayrollLoanModal({
                 </p>
                 <div className="grid gap-2">
                   <Label htmlFor="loan-amount">Nominal (IDR)</Label>
-                  <Input
+                  <CurrencyInput
                     id="loan-amount"
-                    inputMode="decimal"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={setAmount}
                     disabled={busy}
                     className="border-outline-variant"
+                    placeholder="Mis. 100.000"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -297,7 +298,6 @@ export function PayrollLoanModal({
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     disabled={busy}
-                    forceUppercase={false}
                     className="border-outline-variant"
                   />
                 </div>

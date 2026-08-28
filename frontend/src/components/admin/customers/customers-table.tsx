@@ -192,6 +192,7 @@ export function CustomersTable() {
             <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               value={searchInput}
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Cari nama, wilayah, telepon, alamat…"

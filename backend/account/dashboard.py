@@ -9,9 +9,8 @@ from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from expenses.reporting import aggregate_summary, by_day_rows, entries_queryset_for_range
-from inventory.models import IngredientInventory, ProductPackaging
-from inventory.product_stock import annotate_packaging_derived_remaining
-from inventory.serializers import IngredientInventorySerializer, ProductPackagingSerializer
+from inventory.models import IngredientInventory, Product
+from inventory.serializers import IngredientInventorySerializer, ProductSerializer
 from inventory.summary import get_inventory_summary_cached
 from purchase.models import OrderStatus, PurchaseInOrder, SalesOrder
 
@@ -180,13 +179,7 @@ def build_admin_dashboard_payload() -> dict:
         OrderStatus.CANCELLED,
     )
 
-    top_qs = annotate_packaging_derived_remaining(
-        ProductPackaging.objects.filter(is_active=True).select_related(
-            "product",
-            "created_by",
-            "updated_by",
-        )
-    ).order_by("-remaining_stock")[:8]
+    top_qs = Product.objects.filter(is_active=True).order_by("-remaining_mass_grams")[:8]
 
     low_qs = (
         IngredientInventory.objects.select_related(
@@ -237,8 +230,8 @@ def build_admin_dashboard_payload() -> dict:
             "cash_by_day": _cash_by_day(*range_current),
         },
         "inventory_summary": get_inventory_summary_cached(),
-        "top_packaging": {
-            "results": ProductPackagingSerializer(top_qs, many=True).data,
+        "top_products": {
+            "results": ProductSerializer(top_qs, many=True).data,
         },
         "low_ingredient_stock": {
             "results": IngredientInventorySerializer(low_qs, many=True).data,

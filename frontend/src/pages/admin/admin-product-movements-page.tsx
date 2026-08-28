@@ -18,8 +18,8 @@ export function AdminProductMovementsPage() {
           </h1>
           <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
             {canCreate
-              ? 'Riwayat masuk/keluar per kemasan (SKU). Masuk dapat mencakup bonus; keluar hanya memakai kuantitas utama.'
-              : 'Riwayat masuk/keluar per kemasan (SKU). Staf gudang hanya dapat melihat daftar mutasi.'}
+              ? 'Riwayat masuk/keluar stok utama (kg). Kemasan opsional pada mutasi baru untuk mencatat jumlah unit SKU (pembukuan), bukan stok terpisah.'
+              : 'Riwayat masuk/keluar stok utama (kg). Staf gudang hanya dapat melihat daftar mutasi.'}
           </p>
         </div>
         {canCreate ? (

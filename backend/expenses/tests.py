@@ -123,3 +123,87 @@ class OperationalCashSaldoViewTests(TestCase):
         self.assertEqual(data["saldo_idr"], 250000)
         self.assertEqual(data["income_idr"], 250000)
         self.assertEqual(data["line_count"], 1)
+
+
+class OperationalCashEntryUppercaseTests(TestCase):
+    def test_save_uppercases_description_and_reference(self):
+        cat = OperationalCategory.objects.create(name="Listrik", entry_kind=EntryKind.EXPENSE)
+        entry = OperationalCashEntry.objects.create(
+            direction=EntryKind.EXPENSE,
+            payment_method=PaymentMethod.CASH,
+            category=cat,
+            amount_idr=10000,
+            occurred_on=date(2026, 8, 1),
+            description="Bakar kayu",
+            reference="inv-12",
+        )
+        self.assertEqual(entry.description, "BAKAR KAYU")
+        self.assertEqual(entry.reference, "INV-12")
+
+
+class OperationalCashEntrySearchTests(TestCase):
+    """Phrase search must not treat 'bakar kayu' as two independent tokens."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+
+        from account.models import UserRole
+
+        User = get_user_model()
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            "kas_search", full_name="Admin Kas", role=UserRole.ADMIN, password="pass"
+        )
+        self.client.force_authenticate(self.admin)
+        self.cat_kayu = OperationalCategory.objects.create(
+            name="Kayu", entry_kind=EntryKind.EXPENSE
+        )
+        self.cat_ops = OperationalCategory.objects.create(
+            name="Operasional", entry_kind=EntryKind.EXPENSE
+        )
+        self.kayu = OperationalCashEntry.objects.create(
+            direction=EntryKind.EXPENSE,
+            payment_method=PaymentMethod.CASH,
+            category=self.cat_ops,
+            amount_idr=10000,
+            occurred_on=date(2026, 8, 1),
+            description="Bakar kayu",
+        )
+        self.mobil = OperationalCashEntry.objects.create(
+            direction=EntryKind.EXPENSE,
+            payment_method=PaymentMethod.CASH,
+            category=self.cat_kayu,
+            amount_idr=20000,
+            occurred_on=date(2026, 8, 2),
+            description="Bakar mobil",
+        )
+        self.kayu_long = OperationalCashEntry.objects.create(
+            direction=EntryKind.EXPENSE,
+            payment_method=PaymentMethod.CASH,
+            category=self.cat_ops,
+            amount_idr=15000,
+            occurred_on=date(2026, 8, 3),
+            description="Beli bakar kayu 10 ikat",
+        )
+
+    def test_phrase_does_not_match_bakar_mobil_via_other_fields(self):
+        response = self.client.get(
+            "/api/expenses/entries/",
+            {"search": "bakar kayu", "page_size": 50},
+        )
+        self.assertEqual(response.status_code, 200)
+        descriptions = {row["description"] for row in response.json()["results"]}
+        self.assertEqual(descriptions, {"BAKAR KAYU", "BELI BAKAR KAYU 10 IKAT"})
+
+    def test_category_phrase_does_not_match_sibling_name(self):
+        OperationalCategory.objects.create(name="Bakar Kayu", entry_kind=EntryKind.EXPENSE)
+        OperationalCategory.objects.create(name="Bakar Mobil", entry_kind=EntryKind.EXPENSE)
+        response = self.client.get(
+            "/api/expenses/categories/",
+            {"search": "bakar kayu", "page_size": 50},
+        )
+        self.assertEqual(response.status_code, 200)
+        names = {row["name"] for row in response.json()["results"]}
+        self.assertIn("Bakar Kayu", names)
+        self.assertNotIn("Bakar Mobil", names)

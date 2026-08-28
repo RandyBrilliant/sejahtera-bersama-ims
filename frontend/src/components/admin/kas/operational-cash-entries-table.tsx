@@ -10,7 +10,10 @@ import { useNavigate } from 'react-router-dom'
 
 import { ENTRY_KIND_LABEL, PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { OperationalCashEntryDeleteModal } from '@/components/admin/kas/operational-cash-entry-delete-modal'
-import { useOperationalCashEntriesQuery } from '@/hooks/use-expenses-query'
+import {
+  useOperationalCashEntriesQuery,
+  useOperationalCategoriesQuery,
+} from '@/hooks/use-expenses-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
@@ -21,7 +24,9 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -37,6 +42,7 @@ import type {
   EntryKind,
   OperationalCashEntry,
   OperationalCashEntryListParams,
+  OperationalCategory,
   PaymentMethod,
 } from '@/types/expenses'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
@@ -60,6 +66,10 @@ function truncate(s: string, n: number) {
   return `${s.slice(0, n)}…`
 }
 
+function categoryOptionLabel(c: OperationalCategory) {
+  return c.is_active ? c.name : `${c.name} (nonaktif)`
+}
+
 export function OperationalCashEntriesTable() {
   const navigate = useNavigate()
   const [params, setParams] = useState<OperationalCashEntryListParams>({
@@ -69,10 +79,29 @@ export function OperationalCashEntriesTable() {
   })
   const [searchInput, setSearchInput] = useState('')
   const [dirFilter, setDirFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<OperationalCashEntry | null>(null)
+
+  const categoriesQuery = useOperationalCategoriesQuery({
+    page_size: 100,
+    ordering: 'entry_kind,sort_order,name',
+  })
+  const categories = categoriesQuery.data?.results ?? []
+  const visibleCategories = useMemo(() => {
+    if (dirFilter === 'all') return categories
+    return categories.filter((c) => c.entry_kind === dirFilter)
+  }, [categories, dirFilter])
+  const incomeCategories = useMemo(
+    () => visibleCategories.filter((c) => c.entry_kind === 'INCOME'),
+    [visibleCategories]
+  )
+  const expenseCategories = useMemo(
+    () => visibleCategories.filter((c) => c.entry_kind === 'EXPENSE'),
+    [visibleCategories]
+  )
 
   const listParams = useMemo(() => {
     const p: OperationalCashEntryListParams = { ...params }
@@ -80,6 +109,13 @@ export function OperationalCashEntriesTable() {
       p.direction = dirFilter as EntryKind
     } else {
       delete p.direction
+    }
+    if (categoryFilter !== 'all') {
+      const id = Number(categoryFilter)
+      if (Number.isFinite(id) && id > 0) p.category = id
+      else delete p.category
+    } else {
+      delete p.category
     }
     if (paymentFilter !== 'all') {
       p.payment_method = paymentFilter as PaymentMethod
@@ -91,7 +127,7 @@ export function OperationalCashEntriesTable() {
     if (toDate.trim()) p.occurred_on_to = toDate.trim()
     else delete p.occurred_on_to
     return p
-  }, [params, dirFilter, paymentFilter, fromDate, toDate])
+  }, [params, dirFilter, categoryFilter, paymentFilter, fromDate, toDate])
 
   const { data, isLoading, isError, error, isFetching } =
     useOperationalCashEntriesQuery(listParams)
@@ -234,6 +270,7 @@ export function OperationalCashEntriesTable() {
             <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               value={searchInput}
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Cari deskripsi, referensi, kode order…"
@@ -259,10 +296,16 @@ export function OperationalCashEntriesTable() {
           value={dirFilter}
           onValueChange={(v) => {
             setDirFilter(v)
+            setCategoryFilter((prev) => {
+              if (prev === 'all' || v === 'all') return prev
+              const cat = categories.find((c) => String(c.id) === prev)
+              if (!cat || cat.entry_kind !== v) return 'all'
+              return prev
+            })
             setParams((p) => ({ ...p, page: 1 }))
           }}
         >
-          <SelectTrigger className="border-outline-variant w-[160px]">
+          <SelectTrigger className="border-outline-variant w-[160px]" aria-label="Filter jenis">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -271,6 +314,50 @@ export function OperationalCashEntriesTable() {
                 {o.label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={categoryFilter}
+          onValueChange={(v) => {
+            setCategoryFilter(v)
+            setParams((p) => ({ ...p, page: 1 }))
+          }}
+        >
+          <SelectTrigger className="border-outline-variant w-[220px]" aria-label="Filter kategori">
+            <SelectValue placeholder="Semua kategori" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua kategori</SelectItem>
+            {dirFilter === 'all' ? (
+              <>
+                {incomeCategories.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>{ENTRY_KIND_LABEL.INCOME}</SelectLabel>
+                    {incomeCategories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {categoryOptionLabel(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : null}
+                {expenseCategories.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>{ENTRY_KIND_LABEL.EXPENSE}</SelectLabel>
+                    {expenseCategories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {categoryOptionLabel(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : null}
+              </>
+            ) : (
+              visibleCategories.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {categoryOptionLabel(c)}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
         <Select

@@ -130,5 +130,10 @@ class OperationalCashEntry(AuditModel):
             models.Index(fields=["sales_order"]),
         ]
 
+    def save(self, *args, **kwargs):
+        self.description = (self.description or "").strip().upper()
+        self.reference = (self.reference or "").strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.occurred_on} {self.direction} {self.amount_idr}"
