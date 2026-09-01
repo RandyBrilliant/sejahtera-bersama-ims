@@ -52,7 +52,8 @@ const warehouseNavItems: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dasbor gudang', icon: LayoutDashboard, end: true },
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan', icon: Package },
   { to: '/admin/gudang/produksi', label: 'Produksi', icon: Boxes },
-  { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan', icon: ShoppingCart },
+  { to: '/admin/pesanan/penjualan', label: 'Penjualan', icon: ShoppingCart },
+  { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan', icon: Truck },
   { to: '/admin/gudang/mutasi-produk', label: 'Mutasi produk', icon: BarChart3 },
 ]
 

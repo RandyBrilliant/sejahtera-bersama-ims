@@ -89,7 +89,7 @@ export function SalesOrdersTable() {
   const { user } = useAuth()
   const isOwner = user?.role === 'LEADERSHIP'
   const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
-  const canCreateSalesOrder = !isFinanceReadOnly
+  const canCreateSalesOrder = !isFinanceReadOnly && user?.role !== 'WAREHOUSE_STAFF'
   const [params, setParams] = useState<SalesOrdersListParams>({
     page: 1,
     page_size: DEFAULT_TABLE_PAGE_SIZE,

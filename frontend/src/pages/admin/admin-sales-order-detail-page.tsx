@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
+import { WarehouseSalesOrderPackingDetail } from '@/components/admin/orders/warehouse-sales-order-packing-detail'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +36,7 @@ import {
   formatSalesOrderLineMassKg,
   salesOrderLinesTotalMassKg,
 } from '@/lib/format-number-id'
+import { formatOneKemasanMass } from '@/lib/format-packaging-mass'
 import type { SalesOrderLine } from '@/types/purchase'
 
 function fmtDt(iso: string | null | undefined) {
@@ -80,7 +82,8 @@ export function AdminSalesOrderDetailPage() {
   const isOwner = user?.role === 'LEADERSHIP'
   const isFinanceReadOnly = user?.role === 'FINANCE_STAFF'
   const isSalesStaff = user?.role === 'SALES_STAFF'
-  const canCancelOrder = !isFinanceReadOnly && !isSalesStaff
+  const isWarehouseStaff = user?.role === 'WAREHOUSE_STAFF'
+  const canCancelOrder = !isFinanceReadOnly && !isSalesStaff && !isWarehouseStaff
 
   const { data: order, isLoading, isError, refetch } = useSalesOrderQuery(validId ? id : null)
   const uploadMut = useUploadSalesPaymentProofMutation(id)
@@ -186,6 +189,10 @@ export function AdminSalesOrderDetailPage() {
     )
   }
 
+  if (isWarehouseStaff) {
+    return <WarehouseSalesOrderPackingDetail order={order} />
+  }
+
   const canEdit = canEditOrderLines(order.status)
   const canVerify =
     isOwner &&
@@ -285,7 +292,7 @@ export function AdminSalesOrderDetailPage() {
               <span className="font-medium text-foreground">Total berat (order):</span>{' '}
               <span className="tabular-nums">{formatDecimalId(totalMassKg)} kg</span>
               <span className="text-on-surface-variant block text-xs leading-relaxed">
-                Jumlah kemasan × berat bersih per kemasan (kg).
+                Total kilogram yang dipesan (dari berat per kemasan).
               </span>
             </p>
           </CardContent>
@@ -368,7 +375,6 @@ export function AdminSalesOrderDetailPage() {
               <TableRow className="border-outline-variant">
                 <TableHead>Produk</TableHead>
                 <TableHead>Kemasan</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Berat (kg)</TableHead>
                 <TableHead className="text-right">Harga (kg)</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
@@ -381,9 +387,13 @@ export function AdminSalesOrderDetailPage() {
                 return (
                   <TableRow key={line.id} className="border-outline-variant">
                     <TableCell>{line.product_variant_name}</TableCell>
-                    <TableCell>{line.packaging_label}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDecimalId(line.quantity)}
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <span>{line.packaging_label}</span>
+                        <span className="text-on-surface-variant text-xs">
+                          {formatOneKemasanMass(line.net_mass_kg)}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatSalesOrderLineMassKg(line)}

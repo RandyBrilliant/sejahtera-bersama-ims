@@ -29,6 +29,13 @@ import {
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { formatDecimalId, parseDecimalLike } from '@/lib/format-number-id'
+import {
+  formatKgInputValue,
+  formatOneKemasanMass,
+  kgFromPackageQty,
+  packageQtyFromKg,
+} from '@/lib/format-packaging-mass'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
@@ -80,7 +87,8 @@ function nextSalesOrderCode(existingCodes: string[], stem: string): string {
 /** Cart line, keyed by product_packaging id (duplicates always merge). */
 type CartItem = {
   product_packaging: number
-  quantity: string
+  /** Berat yang dipesan (kg). Dikonversi ke jumlah kemasan saat simpan. */
+  massKg: string
   /** Optional custom price per kg (IDR) for this order; blank = product default. */
   unit_price_per_kg_idr: string
 }
@@ -123,10 +131,13 @@ function RequiredAsterisk() {
 function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): CartItem[] {
   if (!order?.lines?.length) return []
   return order.lines.map((l) => {
+    const qty = parseDecimalLike(l.quantity)
+    const unitKg = parseDecimalLike(l.net_mass_kg ?? '0')
+    const massKg = formatKgInputValue(kgFromPackageQty(qty, unitKg))
     if (!allowCustomPrice) {
       return {
         product_packaging: l.product_packaging,
-        quantity: String(l.quantity),
+        massKg,
         unit_price_per_kg_idr: '',
       }
     }
@@ -139,7 +150,7 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
     const isCustom = defaultUnit == null || l.unit_price_idr !== defaultUnit
     return {
       product_packaging: l.product_packaging,
-      quantity: String(l.quantity),
+      massKg,
       unit_price_per_kg_idr: isCustom ? perKgFromLine(l.unit_price_idr, l.net_mass_kg) : '',
     }
   })
@@ -253,42 +264,36 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     })
   }, [activePackaging, catalogSearch, variantFilter])
 
-  const cartQtyById = useMemo(() => {
+  const cartKgById = useMemo(() => {
     const map = new Map<number, number>()
-    for (const it of cart) map.set(it.product_packaging, Number(it.quantity) || 0)
+    for (const it of cart) map.set(it.product_packaging, parseDecimalLike(it.massKg) || 0)
     return map
   }, [cart])
 
-  function unitTotalFor(item: CartItem): number {
-    const pkg = packagingById.get(item.product_packaging)
-    if (!pkg) return 0
+  function pricePerKgFor(item: CartItem): number {
     const custom = item.unit_price_per_kg_idr.trim()
     if (custom) {
       const perKg = Number(custom)
-      const mass = massKgOf(pkg)
-      if (Number.isFinite(perKg) && perKg > 0 && mass > 0) return Math.round(perKg * mass)
+      if (Number.isFinite(perKg) && perKg > 0) return perKg
     }
-    return pkg.total_price_idr
+    return packagingById.get(item.product_packaging)?.price_per_kg_idr ?? 0
+  }
+
+  function lineTotalFor(item: CartItem): number {
+    const kg = parseDecimalLike(item.massKg) || 0
+    const perKg = pricePerKgFor(item)
+    if (kg <= 0 || perKg <= 0) return 0
+    return Math.round(kg * perKg)
   }
 
   const grandTotal = useMemo(() => {
-    return cart.reduce((sum, it) => sum + (Number(it.quantity) || 0) * unitTotalFor(it), 0)
+    return cart.reduce((sum, it) => sum + lineTotalFor(it), 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart, packagingById])
 
-  const totalItems = useMemo(
-    () => cart.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0),
-    [cart]
-  )
-
   const totalKg = useMemo(
-    () =>
-      cart.reduce(
-        (sum, it) =>
-          sum + (Number(it.quantity) || 0) * massKgOf(packagingById.get(it.product_packaging)),
-        0
-      ),
-    [cart, packagingById]
+    () => cart.reduce((sum, it) => sum + (parseDecimalLike(it.massKg) || 0), 0),
+    [cart]
   )
 
   const totalKgLabel = totalKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })
@@ -301,8 +306,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     for (const it of cart) {
       const pkg = packagingById.get(it.product_packaging)
       if (!pkg) continue
-      const qty = Number(it.quantity) || 0
-      const lineG = qty * massKgOf(pkg) * 1000
+      const lineG = (parseDecimalLike(it.massKg) || 0) * 1000
       const availableG = Number(pkg.product_remaining_mass_grams)
       const cur = byProduct.get(pkg.product) ?? {
         name: pkg.product_variant_name,
@@ -316,34 +320,37 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   }, [cart, packagingById])
 
   function addToCart(id: number) {
+    const unitKg = massKgOf(packagingById.get(id))
+    const step = unitKg > 0 ? unitKg : 0.1
     setCart((prev) => {
       const found = prev.find((it) => it.product_packaging === id)
       if (found) {
+        const next = (parseDecimalLike(found.massKg) || 0) + step
         return prev.map((it) =>
-          it.product_packaging === id
-            ? { ...it, quantity: String((Number(it.quantity) || 0) + 1) }
-            : it
+          it.product_packaging === id ? { ...it, massKg: formatKgInputValue(next) } : it
         )
       }
-      return [...prev, { product_packaging: id, quantity: '1', unit_price_per_kg_idr: '' }]
+      return [...prev, { product_packaging: id, massKg: formatKgInputValue(step), unit_price_per_kg_idr: '' }]
     })
   }
 
-  function stepQty(id: number, delta: number) {
+  function stepMassKg(id: number, deltaPacks: number) {
+    const unitKg = massKgOf(packagingById.get(id))
+    const step = unitKg > 0 ? unitKg : 0.1
     setCart((prev) =>
       prev.flatMap((it) => {
         if (it.product_packaging !== id) return [it]
-        const next = (Number(it.quantity) || 0) + delta
-        if (next < 1) return []
-        return [{ ...it, quantity: String(next) }]
+        const next = (parseDecimalLike(it.massKg) || 0) + deltaPacks * step
+        if (next <= 1e-9) return []
+        return [{ ...it, massKg: formatKgInputValue(next) }]
       })
     )
   }
 
-  function setQty(id: number, raw: string) {
-    const cleaned = raw.replace(/[^0-9.]/g, '')
+  function setMassKg(id: number, raw: string) {
+    const cleaned = raw.replace(/[^\d.,]/g, '')
     setCart((prev) =>
-      prev.map((it) => (it.product_packaging === id ? { ...it, quantity: cleaned } : it))
+      prev.map((it) => (it.product_packaging === id ? { ...it, massKg: cleaned } : it))
     )
   }
 
@@ -419,18 +426,20 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     }
     const payloadLines: SalesOrderLineInput[] = []
     for (const it of cart) {
-      const qtyNum = Number(it.quantity)
-      if (!it.quantity.trim() || !Number.isFinite(qtyNum) || qtyNum <= 0) {
-        const pkg = packagingById.get(it.product_packaging)
+      const pkg = packagingById.get(it.product_packaging)
+      const massNum = parseDecimalLike(it.massKg)
+      const unitKg = massKgOf(pkg)
+      const qtyNum = packageQtyFromKg(massNum, unitKg)
+      if (!it.massKg.trim() || !Number.isFinite(massNum) || massNum <= 0 || !Number.isFinite(qtyNum) || qtyNum < 0.001) {
         alert.error(
           'Validasi',
-          `Kuantitas tidak valid untuk ${pkg?.product_variant_name ?? 'produk'} ${pkg?.label ?? ''}.`
+          `Berat (kg) tidak valid untuk ${pkg?.product_variant_name ?? 'produk'} ${pkg?.label ?? ''}.`
         )
         return
       }
       const line: SalesOrderLineInput = {
         product_packaging: it.product_packaging,
-        quantity: it.quantity.trim(),
+        quantity: String(qtyNum),
       }
       if (canSetCustomPrice) {
         const priceRaw = it.unit_price_per_kg_idr.trim()
@@ -486,7 +495,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle className="text-base">Katalog produk</CardTitle>
               <span className="text-on-surface-variant text-xs">
-                Stok mengikuti stok utama varian (kg), bukan sisa kemasan
+                Ketuk untuk menambah. Isi berat dalam kg di keranjang
               </span>
             </div>
             <div className="relative">
@@ -542,7 +551,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:max-h-[64vh] lg:overflow-y-auto xl:grid-cols-4">
                 {filteredPackaging.map((p) => {
-                  const inCart = cartQtyById.get(p.id) ?? 0
+                  const inCartKg = cartKgById.get(p.id) ?? 0
                   return (
                     <button
                       key={p.id}
@@ -552,11 +561,13 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       className={cn(
                         'group border-outline-variant bg-surface-container-lowest relative flex flex-col rounded-xl border p-3 text-left transition',
                         'hover:border-primary/60 hover:bg-primary/5 focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px] focus-visible:outline-none',
-                        inCart > 0 && 'border-primary/50 bg-primary/5'
+                        inCartKg > 0 && 'border-primary/50 bg-primary/5'
                       )}
                     >
-                      {inCart > 0 ? (
-                        <Badge className="absolute top-2 right-2 tabular-nums">{inCart}</Badge>
+                      {inCartKg > 0 ? (
+                        <Badge className="absolute top-2 right-2 tabular-nums">
+                          {fmtKg(inCartKg)} kg
+                        </Badge>
                       ) : null}
                       <span className="text-on-surface-variant truncate text-xs">
                         {p.product_variant_name}
@@ -705,7 +716,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
             <CardHeader className="border-outline-variant flex flex-row items-center justify-between gap-2 border-b pb-3">
               <CardTitle className="text-base">Keranjang</CardTitle>
               <span className="text-on-surface-variant text-xs tabular-nums">
-                {totalItems > 0 ? `${totalItems} item · ${totalKgLabel} kg` : 'Kosong'}
+                {totalKg > 0 ? `${totalKgLabel} kg` : 'Kosong'}
               </span>
             </CardHeader>
             <CardContent className="p-0">
@@ -728,13 +739,13 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                 <ul className="divide-outline-variant divide-y">
                   {cart.map((it) => {
                     const pkg = packagingById.get(it.product_packaging)
-                    const unit = unitTotalFor(it)
-                    const qtyNum = Number(it.quantity) || 0
+                    const massNum = parseDecimalLike(it.massKg) || 0
                     const isCustom = canSetCustomPrice && it.unit_price_per_kg_idr.trim() !== ''
                     const expanded =
                       canSetCustomPrice &&
                       (expandedCustom.has(it.product_packaging) || isCustom)
-                    const lineKg = qtyNum * massKgOf(pkg)
+                    const unitKg = massKgOf(pkg)
+                    const qtyEq = packageQtyFromKg(massNum, unitKg)
                     const pricePerKg = isCustom
                       ? Number(it.unit_price_per_kg_idr) || 0
                       : pkg?.price_per_kg_idr ?? 0
@@ -747,8 +758,11 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                                 ? `${pkg.product_variant_name} · ${pkg.label} · ${PACKAGING_TYPE_LABEL[pkg.packaging_type] ?? pkg.packaging_type}`
                                 : `#${it.product_packaging}`}
                             </p>
-                            <p className="text-on-surface text-xs font-medium tabular-nums">
-                              {fmtKg(lineKg)} kg
+                            <p className="text-on-surface-variant text-xs leading-relaxed">
+                              {formatOneKemasanMass(pkg?.net_mass_kg)}
+                              {Number.isFinite(qtyEq) && qtyEq > 0
+                                ? ` · setara ${formatDecimalId(qtyEq)} kemasan`
+                                : ''}
                             </p>
                             <p className="text-on-surface-variant text-xs tabular-nums">
                               {formatIdr(pricePerKg)} / kg
@@ -769,34 +783,37 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                           <div className="border-outline-variant flex items-center rounded-lg border">
                             <button
                               type="button"
-                              onClick={() => stepQty(it.product_packaging, -1)}
+                              onClick={() => stepMassKg(it.product_packaging, -1)}
                               disabled={pending}
                               className="text-on-surface-variant hover:bg-surface-container-low flex size-8 items-center justify-center rounded-l-lg"
-                              aria-label="Kurangi"
+                              aria-label="Kurangi satu kemasan"
                             >
                               <Minus className="size-4" />
                             </button>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={it.quantity}
-                              onChange={(e) => setQty(it.product_packaging, e.target.value)}
-                              disabled={pending}
-                              className="w-12 bg-transparent text-center text-sm tabular-nums outline-none"
-                              aria-label="Kuantitas"
-                            />
+                            <div className="flex min-w-[5.5rem] items-center justify-center gap-1">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={it.massKg}
+                                onChange={(e) => setMassKg(it.product_packaging, e.target.value)}
+                                disabled={pending}
+                                className="w-14 bg-transparent text-center text-sm tabular-nums outline-none"
+                                aria-label="Berat kilogram"
+                              />
+                              <span className="text-on-surface-variant text-xs">kg</span>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => stepQty(it.product_packaging, 1)}
+                              onClick={() => stepMassKg(it.product_packaging, 1)}
                               disabled={pending}
                               className="text-on-surface-variant hover:bg-surface-container-low flex size-8 items-center justify-center rounded-r-lg"
-                              aria-label="Tambah"
+                              aria-label="Tambah satu kemasan"
                             >
                               <Plus className="size-4" />
                             </button>
                           </div>
                           <span className="text-on-surface text-sm font-semibold tabular-nums">
-                            {formatIdr(qtyNum * unit)}
+                            {formatIdr(lineTotalFor(it))}
                           </span>
                         </div>
                         {canSetCustomPrice ? (
@@ -969,7 +986,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
       <div className="border-outline-variant bg-card fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t p-3 lg:hidden">
         <div className="min-w-0 flex-1">
           <p className="text-on-surface-variant text-xs">
-            {totalItems > 0 ? `${totalItems} item · ${totalKgLabel} kg` : 'Keranjang kosong'}
+            {totalKg > 0 ? `${totalKgLabel} kg` : 'Keranjang kosong'}
           </p>
           <p className="text-on-surface font-semibold tabular-nums">{formatIdr(grandTotal)}</p>
         </div>

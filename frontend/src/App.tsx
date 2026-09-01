@@ -489,7 +489,13 @@ export default function App() {
                 <Route
                   element={
                     <InAppRoleRoute
-                      allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF', 'FINANCE_STAFF']}
+                      allowedRoles={[
+                        'ADMIN',
+                        'LEADERSHIP',
+                        'WAREHOUSE_STAFF',
+                        'SALES_STAFF',
+                        'FINANCE_STAFF',
+                      ]}
                     />
                   }
                 >

@@ -41,9 +41,14 @@ export function WarehouseDashboardHome() {
             Ringkasan operasional gudang: stok bahan, stok produk, dan peringatan minimum.
           </p>
         </div>
-        <Button asChild className="shrink-0 gap-2">
-          <Link to="/admin/gudang/produksi/baru">Catat produksi</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild className="shrink-0 gap-2">
+            <Link to="/admin/gudang/produksi/baru">Catat produksi</Link>
+          </Button>
+          <Button asChild variant="outline" className="shrink-0 gap-2">
+            <Link to="/admin/pesanan/penjualan">Penjualan packing</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">

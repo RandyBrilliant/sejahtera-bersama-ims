@@ -368,8 +368,10 @@ def _resolve_sales_unit_price(
 
 
 class SalesOrderLineSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product_packaging.product.name", read_only=True)
     product_variant_name = serializers.CharField(source="product_packaging.product.variant_name", read_only=True)
     packaging_label = serializers.CharField(source="product_packaging.label", read_only=True)
+    packaging_type = serializers.CharField(source="product_packaging.packaging_type", read_only=True)
     net_mass_kg = serializers.DecimalField(
         max_digits=14,
         decimal_places=6,
@@ -390,8 +392,10 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "product_packaging",
+            "product_name",
             "product_variant_name",
             "packaging_label",
+            "packaging_type",
             "net_mass_kg",
             "price_per_kg_idr",
             "quantity",
@@ -403,8 +407,10 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "product_name",
             "product_variant_name",
             "packaging_label",
+            "packaging_type",
             "net_mass_kg",
             "price_per_kg_idr",
             "unit_price_idr",

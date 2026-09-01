@@ -105,6 +105,14 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
     allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
   },
   {
+    id: 'sales-packing',
+    label: 'Penjualan packing',
+    description: 'Produk, kemasan, total kg',
+    to: '/admin/pesanan/penjualan',
+    icon: Box,
+    allowedRoles: ['WAREHOUSE_STAFF'],
+  },
+  {
     id: 'analytics',
     label: 'Analitik',
     description: 'Laporan & rentang tanggal',

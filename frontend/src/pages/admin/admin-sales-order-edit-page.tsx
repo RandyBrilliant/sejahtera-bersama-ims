@@ -24,6 +24,9 @@ export function AdminSalesOrderEditPage() {
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
           Ubah order penjualan
         </h2>
+        <p className="text-on-surface-variant mt-1 text-sm">
+          Isi keranjang dalam kilogram. Tombol ± menambah atau mengurangi satu kemasan.
+        </p>
       </div>
 
       <SalesOrderForm

@@ -102,6 +102,9 @@ class SalesCancelVerifyTests(TestCase):
         self.sales = User.objects.create_user(
             "sales2", full_name="Sales", role=UserRole.SALES_STAFF, password="pass"
         )
+        self.warehouse = User.objects.create_user(
+            "wh2", full_name="WH", role=UserRole.WAREHOUSE_STAFF, password="pass"
+        )
         self.client = APIClient()
 
         self.product = Product.objects.create(
@@ -112,7 +115,10 @@ class SalesCancelVerifyTests(TestCase):
             avg_cost_per_kg_idr=Decimal("60000"),
         )
         self.pkg = ProductPackaging.objects.create(
-            product=self.product, label="250g", net_mass_kg=Decimal("0.25")
+            product=self.product,
+            label="250g",
+            packaging_type="KTK",
+            net_mass_kg=Decimal("0.25"),
         )
         self.customer = Customer.objects.create(name="Toko B", address="Jl. B")
         self.order = SalesOrder.objects.create(
@@ -152,3 +158,28 @@ class SalesCancelVerifyTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, OrderStatus.CANCELLED)
+
+    def test_warehouse_can_read_packing_fields_but_not_write(self):
+        self.client.force_authenticate(self.warehouse)
+        detail = self.client.get(f"/api/purchase/sales-orders/{self.order.pk}/")
+        self.assertEqual(detail.status_code, 200)
+        line = detail.data["lines"][0]
+        self.assertEqual(line["product_name"], "Bawang Goreng")
+        self.assertEqual(line["product_variant_name"], "Original")
+        self.assertEqual(line["packaging_label"], "250g")
+        self.assertEqual(line["packaging_type"], "KTK")
+        self.assertEqual(Decimal(str(line["net_mass_kg"])), Decimal("0.25"))
+        self.assertEqual(Decimal(str(line["quantity"])), Decimal("4"))
+
+        listing = self.client.get("/api/purchase/sales-orders/")
+        self.assertEqual(listing.status_code, 200)
+
+        create = self.client.post(
+            "/api/purchase/sales-orders/",
+            {
+                "customer": self.customer.pk,
+                "lines": [{"product_packaging": self.pkg.pk, "quantity": "1"}],
+            },
+            format="json",
+        )
+        self.assertEqual(create.status_code, 403)

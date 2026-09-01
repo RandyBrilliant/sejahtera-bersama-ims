@@ -1,4 +1,4 @@
-import type { AuditUserMini } from '@/types/inventory'
+import type { AuditUserMini, PackagingType } from '@/types/inventory'
 
 export type OrderStatus =
   | 'DRAFT'
@@ -74,8 +74,12 @@ export type PurchaseInOrder = {
 export type SalesOrderLine = {
   id: number
   product_packaging: number
+  /** Nama produk induk (mis. Bawang Goreng). */
+  product_name?: string
   product_variant_name: string
   packaging_label: string
+  /** Jenis kemasan luar: BAL atau KTK. */
+  packaging_type?: PackagingType
   /** Berat bersih per kemasan (kg), untuk menghitung total kg order. */
   net_mass_kg?: string
   /** Harga tetap per kg (IDR) dari produk induk. */

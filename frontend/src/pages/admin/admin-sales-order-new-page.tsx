@@ -17,6 +17,9 @@ export function AdminSalesOrderNewPage() {
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
           Order penjualan baru
         </h2>
+        <p className="text-on-surface-variant mt-1 text-sm">
+          Isi keranjang dalam kilogram. Tombol ± menambah atau mengurangi satu kemasan.
+        </p>
       </div>
 
       <SalesOrderForm
