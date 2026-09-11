@@ -117,6 +117,18 @@ export function WarehouseSalesPackingTable() {
         ),
       },
       {
+        accessorKey: 'customer_name',
+        header: 'Pelanggan',
+        cell: ({ row }) => (
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{row.original.customer_name}</span>
+            <span className="text-on-surface-variant truncate text-xs">
+              {row.original.customer_wilayah_name ?? '—'}
+            </span>
+          </div>
+        ),
+      },
+      {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
@@ -296,7 +308,7 @@ export function WarehouseSalesPackingTable() {
         <div className="relative max-w-md flex-1">
           <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
-            placeholder="Cari kode order…"
+            placeholder="Cari kode order atau nama pelanggan…"
             value={searchInput}
             autoComplete="off"
             onChange={(e) => setSearchInput(e.target.value)}

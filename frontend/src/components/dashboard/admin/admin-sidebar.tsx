@@ -49,7 +49,6 @@ const navItems: NavItem[] = [
 const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: TrendingUp }
 
 const warehouseNavItems: NavItem[] = [
-  { to: '/admin/dashboard', label: 'Dasbor gudang', icon: LayoutDashboard, end: true },
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan', icon: Package },
   { to: '/admin/gudang/produksi', label: 'Produksi', icon: Boxes },
   { to: '/admin/pesanan/penjualan', label: 'Penjualan', icon: ShoppingCart },

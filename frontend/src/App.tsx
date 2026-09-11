@@ -21,6 +21,9 @@ const AdminAppShell = lazy(() =>
 const AdminHomePage = lazy(() =>
   import('@/pages/admin/admin-home-page').then((m) => ({ default: m.AdminHomePage }))
 )
+const AdminIndexRedirect = lazy(() =>
+  import('@/pages/admin/admin-home-page').then((m) => ({ default: m.AdminIndexRedirect }))
+)
 const AdminProfilePage = lazy(() =>
   import('@/pages/admin/admin-profile-page').then((m) => ({ default: m.AdminProfilePage }))
 )
@@ -352,8 +355,16 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AdminHomePage />} />
+              <Route index element={<AdminIndexRedirect />} />
+              <Route
+                element={
+                  <InAppRoleRoute
+                    allowedRoles={['ADMIN', 'LEADERSHIP', 'SALES_STAFF', 'FINANCE_STAFF']}
+                  />
+                }
+              >
+                <Route path="dashboard" element={<AdminHomePage />} />
+              </Route>
               <Route path="profil" element={<AdminProfileLayout />}>
                 <Route index element={<AdminProfilePage />} />
                 <Route path="presensi" element={<AdminMyAttendancePage />} />
@@ -552,7 +563,7 @@ export default function App() {
               path="/warehouse/dashboard"
               element={
                 <ProtectedRoute allowedRoles={['WAREHOUSE_STAFF']}>
-                  <Navigate to="/admin/dashboard" replace />
+                  <Navigate to="/admin/gudang/stok-bahan" replace />
                 </ProtectedRoute>
               }
             />

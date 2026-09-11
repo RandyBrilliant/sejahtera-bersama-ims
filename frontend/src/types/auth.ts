@@ -24,7 +24,7 @@ export interface User {
 export const ROLE_DASHBOARD_ROUTE: Record<UserRole, string> = {
   ADMIN: '/admin/dashboard',
   LEADERSHIP: '/admin/dashboard',
-  WAREHOUSE_STAFF: '/admin/dashboard',
+  WAREHOUSE_STAFF: '/admin/gudang/stok-bahan',
   SALES_STAFF: '/admin/dashboard',
   FINANCE_STAFF: '/admin/dashboard',
   KUPAS_STAFF: '/admin/dashboard',

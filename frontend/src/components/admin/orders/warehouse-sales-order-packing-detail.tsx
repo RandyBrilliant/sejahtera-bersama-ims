@@ -36,6 +36,15 @@ export function WarehouseSalesOrderPackingDetail({ order }: Props) {
         <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
           {order.order_code}
         </h2>
+        <p className="text-on-surface mt-1 text-sm font-medium">
+          {order.customer_name}
+          {order.customer_wilayah_name ? (
+            <span className="text-on-surface-variant font-normal">
+              {' '}
+              · {order.customer_wilayah_name}
+            </span>
+          ) : null}
+        </p>
         <p className="text-on-surface-variant mt-1 text-sm">
           Packing: jenis produk, kemasan, dan total berat. 1 ons = 0,1 kg.
         </p>

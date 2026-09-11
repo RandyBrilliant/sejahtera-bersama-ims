@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
+import { getDashboardRouteForRole } from '@/types/auth'
 
 export function NotFoundPage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const home = isAuthenticated && user ? getDashboardRouteForRole(user.role) : '/login'
 
   return (
     <div className="page-enter flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
@@ -13,8 +15,8 @@ export function NotFoundPage() {
         URL yang Anda buka tidak ada atau sudah dipindahkan.
       </p>
       <Button asChild variant="outline">
-        <Link to={isAuthenticated ? '/admin/dashboard' : '/login'}>
-          {isAuthenticated ? 'Kembali ke dasbor' : 'Ke halaman login'}
+        <Link to={home}>
+          {isAuthenticated ? 'Kembali ke beranda' : 'Ke halaman login'}
         </Link>
       </Button>
     </div>
