@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutGrid, LogOut, Menu, Search, Settings, User } from 'lucide-react'
+import { LayoutGrid, LogOut, Menu, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { LogoutConfirmModal } from '@/components/auth/logout-confirm-modal'
@@ -54,19 +54,6 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
         >
           <Menu className="size-6" />
         </button>
-      </div>
-
-      <div className="flex max-w-md flex-1 items-center">
-        <div className="relative w-full transition-shadow focus-within:ring-primary focus-within:ring-2 focus-within:ring-offset-1 rounded-lg">
-          <Search className="text-on-surface-variant absolute top-1/2 left-3 size-5 -translate-y-1/2" />
-          <input
-            type="search"
-            placeholder="Cari inventaris, pesanan..."
-            className="border-outline-variant bg-surface-app placeholder:text-on-surface-variant w-full rounded-lg border py-2 pr-4 pl-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-            readOnly
-            aria-readonly
-          />
-        </div>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">

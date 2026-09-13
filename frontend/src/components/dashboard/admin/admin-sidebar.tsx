@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import {
+  ArrowDownToLine,
   Banknote,
   BarChart3,
   Boxes,
@@ -51,8 +52,8 @@ const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: Tre
 const warehouseNavItems: NavItem[] = [
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan', icon: Package },
   { to: '/admin/gudang/produksi', label: 'Produksi', icon: Boxes },
+  { to: '/admin/gudang/mutasi-bahan', label: 'Penerimaan bahan', icon: ArrowDownToLine },
   { to: '/admin/pesanan/penjualan', label: 'Penjualan', icon: ShoppingCart },
-  { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan', icon: Truck },
   { to: '/admin/gudang/mutasi-produk', label: 'Mutasi produk', icon: BarChart3 },
 ]
 

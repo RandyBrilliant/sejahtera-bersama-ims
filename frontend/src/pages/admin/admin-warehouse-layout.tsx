@@ -3,16 +3,21 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { WarehouseSubnav } from '@/components/admin/warehouse/warehouse-subnav'
 import { useAuth } from '@/hooks/use-auth'
 
-/** Full shop-floor catat produksi — no Gudang chrome for any role. */
-function isShopFloorProductionPath(pathname: string) {
-  return pathname === '/admin/gudang/produksi/baru' || pathname.endsWith('/gudang/produksi/baru')
+/** Full shop-floor catat produksi / penerimaan bahan — no Gudang chrome for any role. */
+function isShopFloorWarehousePath(pathname: string) {
+  return (
+    pathname === '/admin/gudang/produksi/baru' ||
+    pathname.endsWith('/gudang/produksi/baru') ||
+    pathname === '/admin/gudang/mutasi-bahan/baru' ||
+    pathname.endsWith('/gudang/mutasi-bahan/baru')
+  )
 }
 
 export function AdminWarehouseLayout() {
   const { user } = useAuth()
   const { pathname } = useLocation()
   const showSubnav = user?.role === 'ADMIN' || user?.role === 'LEADERSHIP'
-  const shopFloorMode = isShopFloorProductionPath(pathname)
+  const shopFloorMode = isShopFloorWarehousePath(pathname)
 
   if (shopFloorMode) {
     return <Outlet />

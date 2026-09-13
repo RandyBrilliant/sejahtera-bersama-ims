@@ -15,7 +15,7 @@ export function AdminIngredientInventoryPage() {
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
           {canEdit
             ? 'Stok sisa dan ambang minimum per bahan. Ubah nilai manual atau gunakan mutasi bahan untuk riwayat masuk/keluar.'
-            : 'Stok sisa dan ambang minimum per bahan. Untuk masuk/keluar stok gunakan mutasi bahan.'}
+            : 'Stok sisa dan ambang minimum per bahan. Untuk masuk/keluar stok gunakan penerimaan bahan.'}
         </p>
       </div>
 

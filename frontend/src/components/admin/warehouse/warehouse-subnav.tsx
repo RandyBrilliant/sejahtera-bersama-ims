@@ -7,7 +7,7 @@ const tabs: { to: string; label: string; end?: boolean }[] = [
   { to: '/admin/gudang/bahan-baku', label: 'Bahan baku' },
   { to: '/admin/gudang/stok-bahan', label: 'Stok bahan' },
   { to: '/admin/gudang/produksi', label: 'Produksi' },
-  { to: '/admin/gudang/mutasi-bahan', label: 'Mutasi bahan' },
+  { to: '/admin/gudang/mutasi-bahan', label: 'Penerimaan bahan' },
   { to: '/admin/gudang/mutasi-produk', label: 'Mutasi produk' },
 ]
 

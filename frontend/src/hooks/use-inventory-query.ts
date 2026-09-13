@@ -8,6 +8,7 @@ import {
 import {
   createIngredient,
   createIngredientStockMovement,
+  createIngredientStockMovementsBulk,
   createProduct,
   createProductPackaging,
   createProductStockMovement,
@@ -304,6 +305,15 @@ export function useCreateIngredientStockMovementMutation() {
   return useMutation({
     mutationFn: (input: IngredientStockMovementCreateInput) =>
       createIngredientStockMovement(input),
+    onSuccess: () => invalidateAllInventory(qc),
+  })
+}
+
+export function useCreateIngredientStockMovementsBulkMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (lines: IngredientStockMovementCreateInput[]) =>
+      createIngredientStockMovementsBulk(lines),
     onSuccess: () => invalidateAllInventory(qc),
   })
 }

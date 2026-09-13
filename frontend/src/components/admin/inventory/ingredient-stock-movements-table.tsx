@@ -241,7 +241,7 @@ export function IngredientStockMovementsTable() {
                     colSpan={columns.length}
                     className="text-on-surface-variant py-10 text-center text-sm"
                   >
-                    Belum ada mutasi bahan.
+                    Belum ada penerimaan atau pengeluaran bahan.
                   </TableCell>
                 </TableRow>
               ) : (

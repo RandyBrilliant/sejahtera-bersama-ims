@@ -398,12 +398,12 @@ export default function App() {
                   <Route path="produksi/baru" element={<AdminProductionBatchNewPage />} />
                   <Route path="produksi/:batchId" element={<AdminProductionBatchDetailPage />} />
                   <Route path="produksi" element={<AdminProductionBatchesPage />} />
+                  <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
                   <Route
                     element={
                       <InAppRoleRoute allowedRoles={['ADMIN', 'LEADERSHIP']} />
                     }
                   >
-                    <Route path="mutasi-bahan/baru" element={<AdminIngredientMovementNewPage />} />
                     <Route path="mutasi-produk/baru" element={<AdminProductMovementNewPage />} />
                   </Route>
                   <Route path="mutasi-bahan" element={<AdminIngredientMovementsPage />} />

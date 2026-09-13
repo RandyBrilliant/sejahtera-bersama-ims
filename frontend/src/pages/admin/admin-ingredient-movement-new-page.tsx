@@ -1,4 +1,4 @@
-import { IngredientStockMovementForm } from '@/components/admin/inventory/ingredient-stock-movement-form'
+import { IngredientStockMovementWizard } from '@/components/admin/inventory/ingredient-stock-movement-wizard'
 import { PageBackLink } from '@/components/navigation/page-back-link'
 import { useGoBack } from '@/hooks/use-go-back'
 
@@ -8,18 +8,19 @@ export function AdminIngredientMovementNewPage() {
   const goBack = useGoBack()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <PageBackLink fallback={LIST_PATH}>← Kembali ke mutasi bahan</PageBackLink>
-        <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
-          Catat mutasi bahan
+        <PageBackLink fallback={LIST_PATH}>← Kembali ke penerimaan bahan</PageBackLink>
+        <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[28px] md:leading-9">
+          Catat penerimaan bahan
         </h1>
-        <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Pilih baris stok bahan, arah mutasi, dan kuantitas. Stok keluar ditolak jika tidak cukup.
+        <p className="text-on-surface-variant mt-2 max-w-2xl text-base leading-relaxed">
+          Isi penerimaan (masuk) atau pengeluaran (keluar) langkah demi langkah, seperti catat
+          produksi.
         </p>
       </div>
 
-      <IngredientStockMovementForm
+      <IngredientStockMovementWizard
         onCancel={() => goBack(LIST_PATH)}
         onSaved={() => goBack(LIST_PATH)}
       />

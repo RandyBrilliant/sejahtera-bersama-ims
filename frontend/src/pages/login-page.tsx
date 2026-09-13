@@ -51,8 +51,10 @@ export function LoginPage() {
             try {
               const route = await login(values.username, values.password)
               navigate(route, { replace: true })
+              return true
             } catch (error: unknown) {
               alert.error('Login gagal', getErrorMessage(error))
+              return false
             } finally {
               setIsSubmitting(false)
             }

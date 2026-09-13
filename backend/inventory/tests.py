@@ -95,6 +95,51 @@ class IngredientMutasiCostingTests(TestCase):
         self.assertEqual(self.inv.avg_cost_idr, Decimal("20000"))
         self.assertEqual(Decimal(resp.json()["unit_cost_idr"]), Decimal("20000"))
 
+    def test_warehouse_staff_can_create_out_movement(self):
+        warehouse = User.objects.create_user(
+            "wh_mutasi", full_name="WH", role=UserRole.WAREHOUSE_STAFF, password="pass"
+        )
+        self.client.force_authenticate(warehouse)
+        resp = self.client.post(
+            "/api/inventory/ingredient-stock-movements/",
+            {
+                "ingredient_inventory": self.inv.pk,
+                "movement_type": "OUT",
+                "quantity": "1",
+                "movement_at": "2026-07-26T10:00:00+07:00",
+                "note": "PENGELUARAN BAHAN",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.remaining_stock, Decimal("9"))
+
+    def test_warehouse_staff_can_bulk_create_in_movements(self):
+        warehouse = User.objects.create_user(
+            "wh_mutasi_bulk", full_name="WH", role=UserRole.WAREHOUSE_STAFF, password="pass"
+        )
+        self.client.force_authenticate(warehouse)
+        resp = self.client.post(
+            "/api/inventory/ingredient-stock-movements/bulk/",
+            {
+                "lines": [
+                    {
+                        "ingredient_inventory": self.inv.pk,
+                        "movement_type": "IN",
+                        "quantity": "2",
+                        "unit_cost_idr": "21000",
+                        "movement_at": "2026-07-26T10:00:00+07:00",
+                        "note": "PENERIMAAN BAHAN",
+                    }
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.remaining_stock, Decimal("12"))
+
 
 class ProductMutasiPackagingBookkeepingTests(TestCase):
     def setUp(self):

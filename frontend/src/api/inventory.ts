@@ -275,6 +275,16 @@ export async function createIngredientStockMovement(
   return data
 }
 
+export async function createIngredientStockMovementsBulk(
+  lines: IngredientStockMovementCreateInput[]
+): Promise<IngredientStockMovement[]> {
+  const { data } = await api.post<IngredientStockMovement[]>(
+    '/api/inventory/ingredient-stock-movements/bulk/',
+    { lines }
+  )
+  return data
+}
+
 export async function fetchProductStockMovements(
   params: ProductStockMovementListParams
 ): Promise<Paginated<ProductStockMovement>> {

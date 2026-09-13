@@ -30,7 +30,7 @@ export function AdminIngredientInventoryEditPage() {
           Edit stok bahan
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Sesuaikan stok sisa atau minimum. Untuk penyesuaian bercatatan gunakan mutasi bahan.
+          Sesuaikan stok sisa atau minimum. Untuk penyesuaian bercatatan gunakan penerimaan bahan.
         </p>
       </div>
 

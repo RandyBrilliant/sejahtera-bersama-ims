@@ -147,9 +147,10 @@ class InventoryAccess(permissions.BasePermission):
 
 class IngredientInventoryAccess(permissions.BasePermission):
     """
-    Bahan baku master, stok bahan rows, and mutasi endpoints:
-    - Owner/Admin: write (create mutasi, edit minimum, manage master)
-    - Warehouse/Finance/Sales: read only (staff gudang lists stock/mutasi; adjusts stock via produksi)
+    Bahan baku master and stok bahan rows:
+    - Owner/Admin: write (edit minimum, manage master)
+    - Warehouse/Finance/Sales: read only (staff gudang lists stock; stok masuk/keluar via
+      produksi or mutasi bahan)
     """
 
     message = ApiMessage.PERMISSION_DENIED
@@ -171,6 +172,33 @@ class IngredientInventoryAccess(permissions.BasePermission):
         if user_is_owner(request.user):
             return True
         return has_role(request.user, UserRole.ADMIN)
+
+
+class IngredientStockMovementAccess(permissions.BasePermission):
+    """
+    Ingredient goods receipt / goods issue (mutasi bahan):
+    - Read: all internal roles + owner
+    - Write (create only): Admin, Owner, Warehouse
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            if user_is_owner(request.user):
+                return True
+            return has_role(
+                request.user,
+                UserRole.ADMIN,
+                UserRole.WAREHOUSE_STAFF,
+                UserRole.FINANCE_STAFF,
+                UserRole.SALES_STAFF,
+            )
+        if request.method == "DELETE":
+            return has_role(request.user, UserRole.ADMIN)
+        return has_role(request.user, UserRole.ADMIN, UserRole.WAREHOUSE_STAFF)
 
 
 class FinanceAccess(permissions.BasePermission):

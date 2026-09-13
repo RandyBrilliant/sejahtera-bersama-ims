@@ -1,5 +1,5 @@
 import { ArrowRight, Box, Lock, User } from 'lucide-react'
-import { type FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 
 import { APP_FULL_NAME } from '@/constants/brand'
 import { Button } from '@/components/ui/button'
@@ -11,18 +11,48 @@ type LoginFormProps = {
   onSubmit?: (values: {
     username: string
     password: string
-  }) => void | Promise<void>
+  }) => boolean | void | Promise<boolean | void>
 }
 
 export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
+  const usernameRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
+  const focusPasswordAfterSubmit = useRef(false)
+
+  useEffect(() => {
+    usernameRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (isSubmitting || !focusPasswordAfterSubmit.current) return
+    focusPasswordAfterSubmit.current = false
+    const passwordInput = passwordRef.current
+    if (!passwordInput) return
+    passwordInput.value = ''
+    passwordInput.focus()
+  }, [isSubmitting])
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const formData = new FormData(event.currentTarget)
-    await onSubmit?.({
-      username: String(formData.get('username') ?? ''),
-      password: String(formData.get('password') ?? ''),
-    })
+    let succeeded = false
+    try {
+      const result = await onSubmit?.({
+        username: String(formData.get('username') ?? ''),
+        password: String(formData.get('password') ?? ''),
+      })
+      succeeded = result !== false
+    } catch {
+      succeeded = false
+    }
+
+    if (!succeeded) {
+      if (passwordRef.current) {
+        passwordRef.current.value = ''
+      }
+      focusPasswordAfterSubmit.current = true
+    }
   }
 
   return (
@@ -47,6 +77,7 @@ export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
           <div className="relative">
             <User className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
+              ref={usernameRef}
               id="username"
               name="username"
               forceUppercase={false}
@@ -64,6 +95,7 @@ export function LoginForm({ isSubmitting = false, onSubmit }: LoginFormProps) {
           <div className="relative">
             <Lock className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
+              ref={passwordRef}
               id="password"
               name="password"
               type="password"

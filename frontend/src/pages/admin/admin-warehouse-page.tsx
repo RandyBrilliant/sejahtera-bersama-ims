@@ -19,8 +19,12 @@ export function AdminWarehousePage() {
             kemasan).
           </li>
           <li>
-            <span className="text-on-surface font-medium">Mutasi bahan / mutasi produk</span> — riwayat
-            masuk-keluar yang memperbarui stok.
+            <span className="text-on-surface font-medium">Penerimaan bahan</span> — goods receipt
+            dan goods issue yang memperbarui stok.
+          </li>
+          <li>
+            <span className="text-on-surface font-medium">Mutasi produk</span> — riwayat masuk-keluar
+            kemasan jadi.
           </li>
         </ul>
       </div>

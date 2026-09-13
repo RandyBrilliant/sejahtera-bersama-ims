@@ -90,11 +90,11 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
   },
   {
     id: 'ingredient-movement-new',
-    label: 'Mutasi bahan',
-    description: 'Stok bahan baku',
+    label: 'Penerimaan bahan',
+    description: 'Goods receipt / issue',
     to: '/admin/gudang/mutasi-bahan/baru',
     icon: Box,
-    allowedRoles: ['ADMIN', 'LEADERSHIP'],
+    allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF'],
   },
   {
     id: 'production-batch-new',

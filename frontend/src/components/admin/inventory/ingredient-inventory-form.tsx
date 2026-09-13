@@ -77,8 +77,9 @@ function IngredientInventoryFormFields({
         <CardHeader className="border-outline-variant border-b pb-4">
           <CardTitle className="text-base">{row.ingredient_name}</CardTitle>
           <CardDescription>
-            Satuan: {unitLabel}. Penyesuaian stok sisa di sini mengubah nilai tersimpan; riwayat mutasi
-            tetap berdiri sendiri. Untuk alur masuk/keluar gunakan halaman mutasi bahan.
+            Satuan: {unitLabel}. Penyesuaian stok sisa di sini mengubah nilai tersimpan; riwayat
+            penerimaan tetap berdiri sendiri. Untuk alur masuk/keluar gunakan halaman penerimaan
+            bahan.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
