@@ -569,31 +569,6 @@ class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin
             )
         return Response(created, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["post"], url_path="bulk")
-    @transaction.atomic
-    def bulk(self, request):
-        """Create several goods movements in one request (one GR/GI document)."""
-        payload = request.data
-        items = payload if isinstance(payload, list) else payload.get("lines")
-        if not isinstance(items, list) or len(items) == 0:
-            return Response(
-                {"detail": "Kirim minimal 1 baris mutasi.", "code": "validation_error"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        created = []
-        try:
-            for row in items:
-                serializer = self.get_serializer(data=row)
-                serializer.is_valid(raise_exception=True)
-                self.perform_create(serializer)
-                created.append(serializer.data)
-        except ValueError as exc:
-            return Response(
-                {"detail": str(exc), "code": "validation_error"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(created, status=status.HTTP_201_CREATED)
-
 
 class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, viewsets.ModelViewSet):
     serializer_class = ProductStockMovementSerializer
