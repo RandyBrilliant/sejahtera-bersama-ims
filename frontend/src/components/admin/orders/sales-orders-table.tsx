@@ -46,6 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
+import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { useAuth } from '@/hooks/use-auth'
 import {
   useSalesOrdersQuery,
@@ -56,6 +57,13 @@ import { useTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
+import { formatDecimalId } from '@/lib/format-number-id'
+import {
+  formatKgId,
+  formatOneKemasanMass,
+  orderTotalMassKg,
+  productDisplayName,
+} from '@/lib/format-packaging-mass'
 import { resolveMediaUrl } from '@/lib/media-url'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, SalesOrder, SalesOrdersListParams } from '@/types/purchase'
@@ -82,6 +90,11 @@ function canVerifyOrder(order: SalesOrder): boolean {
 /** Staff/owner may still attach proof while the order is open. */
 function canUploadProof(order: SalesOrder): boolean {
   return order.status !== 'VERIFIED' && order.status !== 'CANCELLED'
+}
+
+function packagingTypeLabel(type: string | undefined) {
+  if (!type) return null
+  return PACKAGING_TYPE_LABEL[type as keyof typeof PACKAGING_TYPE_LABEL] ?? type
 }
 
 export function SalesOrdersTable() {
@@ -165,15 +178,24 @@ export function SalesOrdersTable() {
   const columns = useMemo<ColumnDef<SalesOrder>[]>(
     () => [
       {
+        accessorKey: 'created_at',
+        header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),
+        cell: ({ row }) => (
+          <span className="text-on-surface-variant text-sm whitespace-nowrap">
+            {fmtShort(row.original.created_at)}
+          </span>
+        ),
+      },
+      {
         accessorKey: 'order_code',
-        header: 'Kode',
+        header: () => sortHeader('Kode', 'order_code'),
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.order_code}</span>
         ),
       },
       {
         accessorKey: 'customer_name',
-        header: 'Pelanggan',
+        header: () => sortHeader('Pelanggan', 'customer__name'),
         cell: ({ row }) => (
           <div className="flex min-w-0 flex-col">
             <span className="truncate font-medium">{row.original.customer_name}</span>
@@ -184,33 +206,51 @@ export function SalesOrdersTable() {
         ),
       },
       {
+        id: 'kemasan',
+        header: 'Kemasan',
+        cell: ({ row }) => {
+          const lines = row.original.lines ?? []
+          if (lines.length === 0) {
+            return <span className="text-on-surface-variant text-sm">—</span>
+          }
+          return (
+            <ul className="space-y-1.5">
+              {lines.map((line) => (
+                <li key={line.id} className="min-w-[11rem]">
+                  <p className="text-on-surface text-sm font-medium">{productDisplayName(line)}</p>
+                  <p className="text-on-surface-variant text-xs leading-relaxed">
+                    {formatDecimalId(line.quantity)}×{' '}
+                    {packagingTypeLabel(line.packaging_type)
+                      ? `${packagingTypeLabel(line.packaging_type)} · `
+                      : ''}
+                    {line.packaging_label}
+                    <span className="block">{formatOneKemasanMass(line.net_mass_kg)}</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )
+        },
+      },
+      {
+        id: 'total_kg',
+        header: () => <span className="block text-right">Total berat</span>,
+        cell: ({ row }) => (
+          <span className="block text-right text-sm font-semibold tabular-nums">
+            {formatKgId(orderTotalMassKg(row.original))}
+          </span>
+        ),
+      },
+      {
         accessorKey: 'status',
-        header: 'Status',
+        header: () => sortHeader('Status', 'status'),
         cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
       },
       {
         accessorKey: 'total_idr',
-        header: 'Total',
+        header: () => sortHeader('Total', 'total_idr'),
         cell: ({ row }) => (
           <span className="tabular-nums">{formatIdr(row.original.total_idr)}</span>
-        ),
-      },
-      {
-        accessorKey: 'created_at',
-        header: () => sortHeader('Tgl. transaksi', 'created_at', { preferDesc: true }),
-        cell: ({ row }) => (
-          <span className="text-on-surface-variant text-sm whitespace-nowrap">
-            {fmtShort(row.original.created_at)}
-          </span>
-        ),
-      },
-      {
-        id: 'payment_date',
-        header: 'Tgl. pembayaran',
-        cell: ({ row }) => (
-          <span className="text-on-surface-variant text-sm whitespace-nowrap">
-            {fmtShort(row.original.payment_proof_uploaded_at)}
-          </span>
         ),
       },
       {

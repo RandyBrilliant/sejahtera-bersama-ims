@@ -19,7 +19,7 @@ export function AdminOrdersLayout() {
         </h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
           {isWarehousePenjualan
-            ? 'Tampilan packing: jenis produk, jenis kemasan, dan total berat dalam kg. Satu ons = 0,1 kg.'
+            ? 'Daftar order penjualan untuk packing: tanggal, kode, pelanggan, kemasan, dan total berat.'
             : 'Order penjualan ke pelanggan dan order pembelian bahan dari supplier. Verifikasi pembayaran & stok untuk penjualan hanya dapat dilakukan oleh pemilik (owner).'}
         </p>
       </div>

@@ -94,7 +94,7 @@ export function ProductStockMovementsTable() {
       },
       {
         accessorKey: 'movement_type',
-        header: 'Jenis',
+        header: () => sortHeader('Jenis', 'movement_type'),
         cell: ({ row }) =>
           row.original.movement_type === 'IN' ? (
             <Badge variant="default">Masuk</Badge>
@@ -104,7 +104,7 @@ export function ProductStockMovementsTable() {
       },
       {
         accessorKey: 'mass_grams',
-        header: 'Massa utama (kg)',
+        header: () => sortHeader('Massa utama (kg)', 'mass_grams'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {formatProductMassKgFromGrams(row.original.mass_grams)} kg
@@ -113,7 +113,7 @@ export function ProductStockMovementsTable() {
       },
       {
         accessorKey: 'bonus_mass_grams',
-        header: 'Bonus (kg)',
+        header: () => sortHeader('Bonus (kg)', 'bonus_mass_grams'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {formatProductMassKgFromGrams(row.original.bonus_mass_grams)} kg
@@ -122,7 +122,7 @@ export function ProductStockMovementsTable() {
       },
       {
         accessorKey: 'total_mass_grams',
-        header: 'Total baris (kg)',
+        header: () => sortHeader('Total baris (kg)', 'total_mass_grams'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {formatProductMassKgFromGrams(row.original.total_mass_grams)} kg
@@ -131,7 +131,7 @@ export function ProductStockMovementsTable() {
       },
       {
         accessorKey: 'note',
-        header: 'Catatan',
+        header: () => sortHeader('Catatan', 'note'),
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[160px] truncate text-sm">
             {row.original.note || '—'}

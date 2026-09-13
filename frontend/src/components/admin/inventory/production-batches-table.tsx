@@ -90,7 +90,7 @@ export function ProductionBatchesTable() {
       },
       {
         accessorKey: 'shift_label',
-        header: 'Shift',
+        header: () => sortHeader('Shift', 'shift_label'),
         cell: ({ row }) => row.original.shift_label || '—',
       },
       {
@@ -114,7 +114,7 @@ export function ProductionBatchesTable() {
       },
       {
         accessorKey: 'note',
-        header: 'Catatan',
+        header: () => sortHeader('Catatan', 'note'),
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[180px] truncate text-sm">
             {row.original.note || '—'}

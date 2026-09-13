@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import { USER_ROLE_LABEL } from '@/constants/user-roles'
 import { useAuth } from '@/hooks/use-auth'
+import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { idrToDigits } from '@/lib/format-idr'
 import type { PayCadence, PayType, PayrollCompensationTableRow } from '@/types/payroll'
@@ -88,6 +89,25 @@ export function AdminPayrollCompensationPage() {
         r.employee_code.toLowerCase().includes(q)
     )
   }, [rows, query])
+
+  const compensationSortGetters = useMemo(
+    () => ({
+      full_name: (r: PayrollCompensationTableRow) => r.full_name,
+      role: (r: PayrollCompensationTableRow) => r.role,
+      pay_type: (r: PayrollCompensationTableRow) => r.pay_type,
+      pay_cadence: (r: PayrollCompensationTableRow) => r.pay_cadence,
+      daily_rate_idr: (r: PayrollCompensationTableRow) => Number(r.daily_rate_idr ?? 0),
+      monthly_base_salary_idr: (r: PayrollCompensationTableRow) =>
+        Number(r.monthly_base_salary_idr ?? 0),
+    }),
+    []
+  )
+
+  const { sortHeader, sortedRows } = useLocalTableSorting({
+    rows: filtered,
+    defaultOrdering: 'full_name',
+    getters: compensationSortGetters,
+  })
 
   async function saveRow(uid: number) {
     const d = draft[uid]
@@ -191,17 +211,17 @@ export function AdminPayrollCompensationPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Peran</TableHead>
-                <TableHead>Tipe gaji</TableHead>
-                <TableHead>Periode bayar</TableHead>
-                <TableHead>Tarif harian (IDR)</TableHead>
-                <TableHead>Gaji pokok bln (ops.)</TableHead>
+                <TableHead>{sortHeader('Nama', 'full_name')}</TableHead>
+                <TableHead>{sortHeader('Peran', 'role')}</TableHead>
+                <TableHead>{sortHeader('Tipe gaji', 'pay_type')}</TableHead>
+                <TableHead>{sortHeader('Periode bayar', 'pay_cadence')}</TableHead>
+                <TableHead>{sortHeader('Tarif harian (IDR)', 'daily_rate_idr')}</TableHead>
+                <TableHead>{sortHeader('Gaji pokok bln (ops.)', 'monthly_base_salary_idr')}</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((r) => {
+              {sortedRows.map((r) => {
                 const d = draft[r.user_id]
                 const showDaily = d?.pay_type === 'DAILY'
                 return (

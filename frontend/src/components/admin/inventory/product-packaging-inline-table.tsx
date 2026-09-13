@@ -118,10 +118,18 @@ export function ProductPackagingInlineTable({ productId }: Props) {
                 <TableHead className="text-on-surface-variant">
                   {sortHeader('Berat (kg)', 'net_mass_kg')}
                 </TableHead>
-                <TableHead className="text-on-surface-variant">Setara unit kemasan</TableHead>
-                <TableHead className="text-on-surface-variant">Harga total</TableHead>
-                <TableHead className="text-on-surface-variant">SKU</TableHead>
-                <TableHead className="text-on-surface-variant">Status</TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Setara unit kemasan', 'remaining_stock')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Harga total', 'total_price_idr')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('SKU', 'sku')}
+                </TableHead>
+                <TableHead className="text-on-surface-variant">
+                  {sortHeader('Status', 'is_active')}
+                </TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>

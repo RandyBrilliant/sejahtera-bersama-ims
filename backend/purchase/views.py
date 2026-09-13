@@ -73,7 +73,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     filterset_class = CustomerFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name", "phone", "address", "notes", "wilayah__name"]
-    ordering_fields = ["name", "wilayah__name"]
+    ordering_fields = ["name", "wilayah__name", "phone", "address", "is_active"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -111,7 +111,15 @@ class CustomerProductPriceViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filterset_class = CustomerProductPriceFilter
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    ordering_fields = ["updated_at", "selling_price_idr", "customer__name"]
+    ordering_fields = [
+        "updated_at",
+        "selling_price_idr",
+        "customer__name",
+        "product_packaging__product__variant_name",
+        "product_packaging__label",
+        "note",
+        "is_active",
+    ]
     ordering = ["-updated_at"]
 
     def get_queryset(self):
@@ -136,7 +144,7 @@ class PurchaseInOrderViewSet(viewsets.ModelViewSet):
     filterset_class = PurchaseInOrderFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["order_code", "invoice_number", "notes"]
-    ordering_fields = ["created_at"]
+    ordering_fields = ["created_at", "order_code", "status", "total_idr"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
@@ -510,7 +518,14 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     filterset_class = SalesOrderFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["order_code", "invoice_number", "notes", "customer__name"]
-    ordering_fields = ["created_at"]
+    ordering_fields = [
+        "created_at",
+        "order_code",
+        "customer__name",
+        "status",
+        "total_idr",
+        "payment_proof_uploaded_at",
+    ]
     ordering = ["-created_at"]
 
     def get_queryset(self):

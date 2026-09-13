@@ -87,6 +87,8 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering_fields = [
         "full_name",
         "role",
+        "phone_number",
+        "is_active",
         "employee_profile__employee_code",
         "employee_profile__joined_date",
     ]

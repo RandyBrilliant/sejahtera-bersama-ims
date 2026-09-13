@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/constants/table-pagination'
 import type { AttendanceReportEnvelope, AttendanceReportRow } from '@/types/attendance'
@@ -47,7 +48,13 @@ function fmtDt(iso: string | null | undefined) {
   return d.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function ReportTable({ rows }: { rows: AttendanceReportRow[] }) {
+function ReportTable({
+  rows,
+  sortHeader,
+}: {
+  rows: AttendanceReportRow[]
+  sortHeader: ReturnType<typeof useTableSorting>['sortHeader']
+}) {
   if (rows.length === 0) {
     return (
       <p className="text-on-surface-variant border-outline-variant rounded-xl border px-4 py-8 text-center text-sm">
@@ -60,13 +67,13 @@ function ReportTable({ rows }: { rows: AttendanceReportRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Tanggal</TableHead>
-            <TableHead>Karyawan</TableHead>
-            <TableHead>Masuk</TableHead>
-            <TableHead>Terlambat</TableHead>
-            <TableHead>Pulang</TableHead>
-            <TableHead>Verifikator masuk</TableHead>
-            <TableHead>Verifikator pulang</TableHead>
+            <TableHead>{sortHeader('Tanggal', 'work_date', { preferDesc: true })}</TableHead>
+            <TableHead>{sortHeader('Karyawan', 'employee_name')}</TableHead>
+            <TableHead>{sortHeader('Masuk', 'checked_in_at', { preferDesc: true })}</TableHead>
+            <TableHead>{sortHeader('Terlambat', 'is_late')}</TableHead>
+            <TableHead>{sortHeader('Pulang', 'checked_out_at', { preferDesc: true })}</TableHead>
+            <TableHead>{sortHeader('Verifikator masuk', 'verified_in_by')}</TableHead>
+            <TableHead>{sortHeader('Verifikator pulang', 'verified_out_by')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -111,10 +118,20 @@ export function AdminAttendanceReportPage() {
   const [dateTo, setDateTo] = useState(defaultTo)
   const [employeeFilter, setEmployeeFilter] = useState<string>('__all')
   const [page, setPage] = useState(1)
+  const [ordering, setOrdering] = useState('-work_date')
   const [staff, setStaff] = useState<SystemUser[]>([])
   const [envelope, setEnvelope] = useState<AttendanceReportEnvelope | null>(null)
   const [loading, setLoading] = useState(false)
   const pageSize = DEFAULT_TABLE_PAGE_SIZE
+
+  const { sortHeader } = useTableSorting({
+    ordering,
+    defaultOrdering: '-work_date',
+    onOrderingChange: (next) => {
+      setPage(1)
+      setOrdering((current) => (typeof next === 'function' ? next(current) : next))
+    },
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -143,6 +160,7 @@ export function AdminAttendanceReportPage() {
         employee_id: Number.isFinite(empId) && empId! > 0 ? empId : undefined,
         page: nextPage,
         page_size: pageSize,
+        ordering,
       })
       setEnvelope(env)
       setPage(env.page)
@@ -156,8 +174,8 @@ export function AdminAttendanceReportPage() {
 
   useEffect(() => {
     void runFetch(1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- jalankan ketika rentang utama berubah
-  }, [dateFrom, dateTo, employeeFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- jalankan ketika rentang/sort utama berubah
+  }, [dateFrom, dateTo, employeeFilter, ordering])
 
   const totalPages = envelope ? Math.max(1, Math.ceil(envelope.count / envelope.page_size)) : 1
 
@@ -217,7 +235,7 @@ export function AdminAttendanceReportPage() {
             Menampilkan {envelope.results.length} dari {envelope.count} baris (hal {envelope.page} /{' '}
             {totalPages}).
           </p>
-          <ReportTable rows={envelope.results} />
+          <ReportTable rows={envelope.results} sortHeader={sortHeader} />
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"

@@ -1,11 +1,13 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import {
   getSortDirection,
+  sortRowsByOrdering,
   toggleOrdering,
   type OrderingChangeHandler,
   type SortFieldConfig,
+  type SortValue,
 } from '@/lib/table-sorting'
 
 type UseTableSortingOptions = {
@@ -48,4 +50,35 @@ export function useTableSorting({
   )
 
   return { sortHeader, handleSort }
+}
+
+type UseLocalTableSortingOptions<T> = {
+  rows: T[]
+  defaultOrdering: string
+  getters: Record<string, (row: T) => SortValue>
+}
+
+export function useLocalTableSorting<T>({
+  rows,
+  defaultOrdering,
+  getters,
+}: UseLocalTableSortingOptions<T>) {
+  const [ordering, setOrdering] = useState(defaultOrdering)
+
+  const onOrderingChange = useCallback<OrderingChangeHandler>((next) => {
+    setOrdering((current) => (typeof next === 'function' ? next(current) : next))
+  }, [])
+
+  const { sortHeader } = useTableSorting({
+    ordering,
+    defaultOrdering,
+    onOrderingChange,
+  })
+
+  const sortedRows = useMemo(
+    () => sortRowsByOrdering(rows, ordering, getters, defaultOrdering),
+    [defaultOrdering, getters, ordering, rows]
+  )
+
+  return { sortHeader, sortedRows, ordering }
 }

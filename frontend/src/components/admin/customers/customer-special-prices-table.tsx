@@ -36,9 +36,11 @@ import {
   useDeleteCustomerProductPriceMutation,
   useUpdateCustomerProductPriceMutation,
 } from '@/hooks/use-purchase-query'
+import { useTableSorting } from '@/hooks/use-table-sorting'
+import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
-import type { CustomerProductPrice } from '@/types/purchase'
+import type { CustomerProductPrice, CustomerProductPricesListParams } from '@/types/purchase'
 
 const NO_PKG = '__none__' as const
 
@@ -85,14 +87,25 @@ export function CustomerSpecialPricesTable({ customerId, canWrite }: Props) {
   const [deleteRow, setDeleteRow] = useState<CustomerProductPrice | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
 
+  const [params, setParams] = useState<CustomerProductPricesListParams>({
+    customer: customerId,
+    page_size: DEFAULT_TABLE_PAGE_SIZE,
+    ordering: '-updated_at',
+  })
   const listParams = useMemo(
-    () => ({
-      customer: customerId,
-      page_size: DEFAULT_TABLE_PAGE_SIZE,
-      ordering: '-updated_at',
-    }),
-    [customerId]
+    () => ({ ...params, customer: customerId }),
+    [customerId, params]
   )
+
+  const onOrderingChange = useMemo(
+    () => createOrderingChangeHandler(setParams, { resetPage: false }),
+    []
+  )
+  const { sortHeader } = useTableSorting({
+    ordering: listParams.ordering,
+    defaultOrdering: '-updated_at',
+    onOrderingChange,
+  })
 
   const { data, isLoading, isError } = useCustomerProductPricesQuery(listParams)
   const { data: pkgPage } = useProductPackagingListQuery({
@@ -219,11 +232,11 @@ export function CustomerSpecialPricesTable({ customerId, canWrite }: Props) {
           <Table>
             <TableHeader>
               <TableRow className="border-outline-variant hover:bg-transparent">
-                <TableHead>Varian</TableHead>
-                <TableHead>Kemasan</TableHead>
-                <TableHead>Harga / kemasan</TableHead>
-                <TableHead>Catatan</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{sortHeader('Varian', 'product_packaging__product__variant_name')}</TableHead>
+                <TableHead>{sortHeader('Kemasan', 'product_packaging__label')}</TableHead>
+                <TableHead>{sortHeader('Harga / kemasan', 'selling_price_idr')}</TableHead>
+                <TableHead>{sortHeader('Catatan', 'note')}</TableHead>
+                <TableHead>{sortHeader('Status', 'is_active')}</TableHead>
                 {canWrite ? <TableHead className="w-24" /> : null}
               </TableRow>
             </TableHeader>

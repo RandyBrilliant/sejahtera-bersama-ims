@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
@@ -37,6 +37,7 @@ import {
 import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { useAuth } from '@/hooks/use-auth'
 import { expensesKeys } from '@/hooks/use-expenses-query'
+import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr, idrToDigits } from '@/lib/format-idr'
 import { formatKgAmount } from '@/lib/format-kg'
@@ -80,6 +81,29 @@ export function AdminPayrollPeriodDetailPage() {
   const [tutupBukuMethod, setTutupBukuMethod] = useState<'CASH' | 'TRANSFER'>('CASH')
 
   const isDraft = period?.status === 'DRAFT'
+
+  const entrySortGetters = useMemo(
+    () => ({
+      paid_out: (row: PayrollEntryRow) => row.paid_out,
+      employee_name: (row: PayrollEntryRow) => row.employee_name,
+      pay_type_snapshot: (row: PayrollEntryRow) => row.pay_type_snapshot,
+      hadir_kg: (row: PayrollEntryRow) =>
+        row.pay_type_snapshot === 'PIECE_RATE' ? Number(row.total_kg) : row.days_present,
+      late_count: (row: PayrollEntryRow) => row.late_count,
+      gross_idr: (row: PayrollEntryRow) => Number(row.gross_idr),
+      bonus_idr: (row: PayrollEntryRow) => Number(row.bonus_idr),
+      advance_deduction_idr: (row: PayrollEntryRow) => Number(row.advance_deduction_idr),
+      deductions_idr: (row: PayrollEntryRow) => Number(row.deductions_idr),
+      net_pay_idr: (row: PayrollEntryRow) => Number(row.net_pay_idr),
+    }),
+    []
+  )
+
+  const { sortHeader, sortedRows } = useLocalTableSorting({
+    rows: entries,
+    defaultOrdering: 'employee_name',
+    getters: entrySortGetters,
+  })
 
   async function loadAll() {
     if (!Number.isFinite(idNum) || idNum <= 0) return
@@ -365,21 +389,31 @@ export function AdminPayrollPeriodDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12 text-center">Bayar</TableHead>
-                      <TableHead>Nama</TableHead>
-                      <TableHead>Tipe</TableHead>
-                      <TableHead className="text-right">Hadir / kg</TableHead>
-                      <TableHead className="text-right">Telat</TableHead>
-                      <TableHead className="text-right">Kotor</TableHead>
-                      <TableHead>Bonus (TBH)</TableHead>
-                      <TableHead>Pinjaman</TableHead>
-                      <TableHead>Potongan</TableHead>
-                      <TableHead className="text-right">Bersih</TableHead>
+                      <TableHead className="w-12 text-center">
+                        {sortHeader('Bayar', 'paid_out')}
+                      </TableHead>
+                      <TableHead>{sortHeader('Nama', 'employee_name')}</TableHead>
+                      <TableHead>{sortHeader('Tipe', 'pay_type_snapshot')}</TableHead>
+                      <TableHead className="text-right">
+                        {sortHeader('Hadir / kg', 'hadir_kg', { className: 'justify-end' })}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {sortHeader('Telat', 'late_count', { className: 'justify-end' })}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {sortHeader('Kotor', 'gross_idr', { className: 'justify-end' })}
+                      </TableHead>
+                      <TableHead>{sortHeader('Bonus (TBH)', 'bonus_idr')}</TableHead>
+                      <TableHead>{sortHeader('Pinjaman', 'advance_deduction_idr')}</TableHead>
+                      <TableHead>{sortHeader('Potongan', 'deductions_idr')}</TableHead>
+                      <TableHead className="text-right">
+                        {sortHeader('Bersih', 'net_pay_idr', { className: 'justify-end' })}
+                      </TableHead>
                       {isDraft ? <TableHead /> : <TableHead className="text-right">Slip</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entries.map((row) => {
+                    {sortedRows.map((row) => {
                       const isKupas = row.pay_type_snapshot === 'PIECE_RATE'
                       const d = draft[row.id]
                       return (

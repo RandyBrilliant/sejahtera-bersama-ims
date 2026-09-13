@@ -125,19 +125,19 @@ export function PurchaseInOrdersTable() {
     () => [
       {
         accessorKey: 'order_code',
-        header: 'Kode',
+        header: () => sortHeader('Kode', 'order_code'),
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.order_code}</span>
         ),
       },
       {
         accessorKey: 'status',
-        header: 'Status',
+        header: () => sortHeader('Status', 'status'),
         cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
       },
       {
         accessorKey: 'total_idr',
-        header: 'Total',
+        header: () => sortHeader('Total', 'total_idr'),
         cell: ({ row }) => (
           <span className="tabular-nums">{formatIdr(row.original.total_idr)}</span>
         ),

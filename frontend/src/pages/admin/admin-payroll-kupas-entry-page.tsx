@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 
 import {
@@ -14,7 +14,6 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -68,7 +67,8 @@ type KupasCellProps = {
   lines: CellLine[]
   disabled?: boolean
   onLinesChange: (employeeId: number, itemId: number, lines: CellLine[]) => void
-  onRecordsChange: () => void
+  onSaved: (employeeId: number, itemId: number, localKey: string, rec: KupasProductionRecord) => void
+  onDeleted: (recordId: number) => void
 }
 
 function KupasCell({
@@ -78,9 +78,11 @@ function KupasCell({
   lines,
   disabled = false,
   onLinesChange,
-  onRecordsChange,
+  onSaved,
+  onDeleted,
 }: KupasCellProps) {
   const [busy, setBusy] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
   const inactive = disabled || busy
   const totalKg = lines.reduce((sum, line) => {
     const n = Number(line.kg)
@@ -97,7 +99,15 @@ function KupasCell({
   }
 
   function addLine() {
-    onLinesChange(employeeId, item.id, [...lines, newDraftLine()])
+    const line = newDraftLine()
+    onLinesChange(employeeId, item.id, [...lines, line])
+    requestAnimationFrame(() => {
+      const el = rootRef.current?.querySelector<HTMLInputElement>(
+        `input[data-line-key="${line.localKey}"]`
+      )
+      el?.focus()
+      el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
   }
 
   async function removeLine(line: CellLine) {
@@ -106,7 +116,7 @@ function KupasCell({
       setBusy(true)
       try {
         await deleteKupasRecord(line.recordId)
-        onRecordsChange()
+        onDeleted(line.recordId)
       } catch (e) {
         alert.error('Gagal', axiosDetail(e) ?? String((e as Error)?.message ?? e))
         return
@@ -130,17 +140,15 @@ function KupasCell({
 
     try {
       setBusy(true)
-      if (line.recordId) {
-        await patchKupasRecord(line.recordId, { kg: raw })
-      } else {
-        await createKupasRecord({
-          employee: employeeId,
-          work_date: workDate,
-          kupas_item: item.id,
-          kg: raw,
-        })
-      }
-      onRecordsChange()
+      const rec = line.recordId
+        ? await patchKupasRecord(line.recordId, { kg: raw })
+        : await createKupasRecord({
+            employee: employeeId,
+            work_date: workDate,
+            kupas_item: item.id,
+            kg: raw,
+          })
+      onSaved(employeeId, item.id, line.localKey, rec)
     } catch (e) {
       alert.error('Gagal menyimpan', axiosDetail(e) ?? String((e as Error)?.message ?? e))
     } finally {
@@ -149,12 +157,13 @@ function KupasCell({
   }
 
   return (
-    <div className="flex min-w-[108px] flex-col gap-1 py-1">
+    <div ref={rootRef} className="flex min-w-[108px] flex-col gap-1 py-1">
       {lines.map((line) => (
         <div key={line.localKey} className="flex items-center gap-0.5">
           <Input
             forceUppercase={false}
             inputMode="decimal"
+            data-line-key={line.localKey}
             className="h-8 w-[72px] px-2 text-center text-sm"
             value={line.kg}
             onChange={(e) => updateLine(line.localKey, e.target.value)}
@@ -270,52 +279,96 @@ export function AdminPayrollKupasEntryPage() {
     setCellLines((prev) => ({ ...prev, [k]: lines }))
   }
 
+  function handleSaved(
+    employeeId: number,
+    itemId: number,
+    localKey: string,
+    rec: KupasProductionRecord
+  ) {
+    const k = cellKey(employeeId, itemId)
+    setCellLines((prev) => ({
+      ...prev,
+      [k]: (prev[k] ?? []).map((line) =>
+        line.localKey === localKey
+          ? {
+              ...line,
+              recordId: rec.id,
+              kg: formatKg(rec.kg),
+              locked: rec.paid_in_period != null,
+            }
+          : line
+      ),
+    }))
+    setRecords((prev) => {
+      const idx = prev.findIndex((row) => row.id === rec.id)
+      if (idx === -1) return [...prev, rec]
+      const next = [...prev]
+      next[idx] = rec
+      return next
+    })
+  }
+
+  function handleDeleted(recordId: number) {
+    setRecords((prev) => prev.filter((row) => row.id !== recordId))
+  }
+
   const dayTotalKg = useMemo(
     () => records.reduce((sum, r) => sum + Number(r.kg), 0),
     [records]
   )
 
+  const initialLoad = loading && kupasWorkers.length === 0 && kupasItems.length === 0
+
   return (
-    <div className="space-y-8">
+    <div className="flex min-h-0 flex-col gap-4">
       <div>
         <PageBackLink fallback={LIST_PATH}>← Kembali ke periode payroll</PageBackLink>
         <h1 className="text-on-surface font-heading text-2xl font-semibold tracking-tight md:text-[24px] md:leading-8">
           Input hasil kupas harian
         </h1>
-        <p className="text-on-surface-variant mt-2 max-w-2xl text-sm leading-relaxed">
-          Catat kg kupas per pekerja per jenis barang. Gunakan <strong>Tambah</strong> pada sel yang
-          sama untuk memisahkan beberapa kali kupas dalam sehari (mis. 101 + 34 kg).
+        <p className="text-on-surface-variant mt-1 max-w-2xl text-sm leading-relaxed">
+          Isi kg per pekerja per jenis. Gulir di dalam tabel ke kanan atau bawah — header dan nama
+          pekerja tetap terlihat. <strong>Tambah</strong> di sel yang sama untuk beberapa kali kupas
+          (mis. 101 + 34 kg).
         </p>
       </div>
 
-      <div className="border-outline-variant flex flex-wrap items-end gap-4 rounded-xl border p-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="kupas-date">Tanggal kerja</Label>
-          <DatePickerInput id="kupas-date" value={workDate} onChange={setWorkDate} disabled={loading} />
+      <div className="bg-surface-app sticky top-0 z-10 flex flex-col gap-3 pb-1">
+        <div className="border-outline-variant flex flex-wrap items-end gap-4 rounded-xl border p-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="kupas-date">Tanggal kerja</Label>
+            <DatePickerInput id="kupas-date" value={workDate} onChange={setWorkDate} disabled={loading} />
+          </div>
+          <p className="text-on-surface-variant text-sm">
+            Total tercatat: <strong>{formatKgAmount(dayTotalKg, true)}</strong>
+          </p>
         </div>
-        <p className="text-on-surface-variant text-sm">
-          Total tercatat: <strong>{formatKgAmount(dayTotalKg, true)}</strong>
-        </p>
-      </div>
 
-      {kupasWorkers.length === 0 ? (
-        <p className="text-on-surface-variant text-sm">
-          Belum ada pegawai bertipe borongan kupas. Atur di halaman kompensasi.
-        </p>
-      ) : kupasItems.length === 0 ? (
-        <p className="text-on-surface-variant text-sm">
-          Belum ada jenis kupas. Tambahkan di halaman Jenis Kupas.
-        </p>
-      ) : loading ? (
-        <p className="text-on-surface-variant text-sm">Memuat…</p>
-      ) : (
-        <div className="border-outline-variant bg-surface-container-lowest overflow-x-auto rounded-xl border">
-          <Table>
+        {initialLoad ? (
+          <p className="text-on-surface-variant text-sm">Memuat…</p>
+        ) : kupasWorkers.length === 0 ? (
+          <p className="text-on-surface-variant text-sm">
+            Belum ada pegawai bertipe borongan kupas. Atur di halaman kompensasi.
+          </p>
+        ) : kupasItems.length === 0 ? (
+          <p className="text-on-surface-variant text-sm">
+            Belum ada jenis kupas. Tambahkan di halaman Jenis Kupas.
+          </p>
+        ) : (
+          <div className="border-outline-variant bg-surface-container-lowest max-h-[calc(100dvh-22rem)] min-h-[16rem] overflow-auto rounded-xl border lg:max-h-[calc(100dvh-24rem)]">
+          <table className="bg-surface-container-lowest w-full caption-bottom text-sm">
             <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 z-10 bg-surface-container-lowest">Pekerja</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead
+                  className="sticky top-0 left-0 z-30 min-w-[10rem] border-r border-outline-variant"
+                >
+                  Pekerja
+                </TableHead>
                 {kupasItems.map((item) => (
-                  <TableHead key={item.id} className="min-w-[108px] text-center text-xs">
+                  <TableHead
+                    key={item.id}
+                    className="sticky top-0 z-20 min-w-[108px] text-center text-xs"
+                  >
                     <div>{item.name}</div>
                     <div className="text-on-surface-variant font-normal">
                       {formatIdr(item.rate_per_kg_idr)}/kg
@@ -327,7 +380,7 @@ export function AdminPayrollKupasEntryPage() {
             <TableBody>
               {kupasWorkers.map((worker) => (
                 <TableRow key={worker.user_id}>
-                  <TableCell className="sticky left-0 z-10 bg-surface-container-lowest font-medium whitespace-nowrap">
+                  <TableCell className="sticky left-0 z-10 min-w-[10rem] border-r border-outline-variant font-medium whitespace-nowrap">
                     {worker.full_name}
                   </TableCell>
                   {kupasItems.map((item) => {
@@ -342,7 +395,8 @@ export function AdminPayrollKupasEntryPage() {
                           lines={lines}
                           disabled={loading}
                           onLinesChange={handleLinesChange}
-                          onRecordsChange={() => void loadRecords()}
+                          onSaved={handleSaved}
+                          onDeleted={handleDeleted}
                         />
                       </TableCell>
                     )
@@ -350,9 +404,10 @@ export function AdminPayrollKupasEntryPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
-      )}
+          </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

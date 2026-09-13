@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { fetchIngredients } from '@/api/inventory'
 import { createKupasItem, fetchKupasItems, patchKupasItem } from '@/api/payroll'
@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { idrToDigits } from '@/lib/format-idr'
 import type { Ingredient } from '@/types/inventory'
@@ -57,6 +58,22 @@ export function AdminPayrollKupasItemsPage() {
       setLoading(false)
     }
   }, [])
+
+  const kupasSortGetters = useMemo(
+    () => ({
+      name: (item: KupasItem) => item.name,
+      resulting_ingredient_name: (item: KupasItem) => item.resulting_ingredient_name,
+      rate_per_kg_idr: (item: KupasItem) => Number(item.rate_per_kg_idr),
+      is_active: (item: KupasItem) => item.is_active,
+    }),
+    []
+  )
+
+  const { sortHeader, sortedRows } = useLocalTableSorting({
+    rows: items,
+    defaultOrdering: 'name',
+    getters: kupasSortGetters,
+  })
 
   useEffect(() => {
     void load()
@@ -186,15 +203,15 @@ export function AdminPayrollKupasItemsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Bahan hasil</TableHead>
-                <TableHead>Tarif / kg</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{sortHeader('Nama', 'name')}</TableHead>
+                <TableHead>{sortHeader('Bahan hasil', 'resulting_ingredient_name')}</TableHead>
+                <TableHead>{sortHeader('Tarif / kg', 'rate_per_kg_idr')}</TableHead>
+                <TableHead>{sortHeader('Status', 'is_active')}</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item) => (
+              {sortedRows.map((item) => (
                 <TableRow key={item.id} className={!item.is_active ? 'opacity-60' : undefined}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-sm">{item.resulting_ingredient_name ?? '—'}</TableCell>

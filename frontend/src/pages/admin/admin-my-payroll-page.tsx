@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { fetchMyPayrollSlips } from '@/api/payroll'
 import {
@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
 import { formatKgAmount } from '@/lib/format-kg'
@@ -49,6 +50,27 @@ export function AdminMyPayrollPage() {
     }
   }, [])
 
+  const payrollSortGetters = useMemo(
+    () => ({
+      pay_date: (r: MyPayrollSlip) => r.pay_date,
+      pay_type_snapshot: (r: MyPayrollSlip) => r.pay_type_snapshot,
+      detail: (r: MyPayrollSlip) =>
+        r.pay_type_snapshot === 'PIECE_RATE' ? Number(r.total_kg) : r.days_present,
+      gross_idr: (r: MyPayrollSlip) => Number(r.gross_idr),
+      bonus_idr: (r: MyPayrollSlip) => Number(r.bonus_idr),
+      deductions_idr: (r: MyPayrollSlip) =>
+        Number(r.deductions_idr) + Number(r.advance_deduction_idr),
+      net_pay_idr: (r: MyPayrollSlip) => Number(r.net_pay_idr),
+    }),
+    []
+  )
+
+  const { sortHeader, sortedRows } = useLocalTableSorting({
+    rows,
+    defaultOrdering: '-pay_date',
+    getters: payrollSortGetters,
+  })
+
   return (
     <div className="space-y-8">
       <div>
@@ -71,17 +93,27 @@ export function AdminMyPayrollPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Periode</TableHead>
-                <TableHead>Tipe</TableHead>
-                <TableHead className="text-right">Detail</TableHead>
-                <TableHead className="text-right">Kotor</TableHead>
-                <TableHead className="text-right">Bonus</TableHead>
-                <TableHead className="text-right">Potongan</TableHead>
-                <TableHead className="text-right">Bersih</TableHead>
+                <TableHead>{sortHeader('Periode', 'pay_date', { preferDesc: true })}</TableHead>
+                <TableHead>{sortHeader('Tipe', 'pay_type_snapshot')}</TableHead>
+                <TableHead className="text-right">
+                  {sortHeader('Detail', 'detail', { className: 'justify-end' })}
+                </TableHead>
+                <TableHead className="text-right">
+                  {sortHeader('Kotor', 'gross_idr', { className: 'justify-end' })}
+                </TableHead>
+                <TableHead className="text-right">
+                  {sortHeader('Bonus', 'bonus_idr', { className: 'justify-end' })}
+                </TableHead>
+                <TableHead className="text-right">
+                  {sortHeader('Potongan', 'deductions_idr', { className: 'justify-end' })}
+                </TableHead>
+                <TableHead className="text-right">
+                  {sortHeader('Bersih', 'net_pay_idr', { className: 'justify-end' })}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => {
+              {sortedRows.map((r) => {
                 const isKupas = r.pay_type_snapshot === 'PIECE_RATE'
                 return (
                   <TableRow key={r.period_id}>

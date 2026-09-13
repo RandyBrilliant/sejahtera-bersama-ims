@@ -143,10 +143,12 @@ export async function fetchPayrollPeriod(id: number): Promise<PayrollPeriod> {
 export async function fetchPayrollPeriods(params?: {
   page?: number
   page_size?: number
+  ordering?: string
 }): Promise<{ count: number; page: number; page_size: number; results: PayrollPeriod[] }> {
   const search = new URLSearchParams()
   if (params?.page != null) search.set('page', String(params.page))
   if (params?.page_size != null) search.set('page_size', String(params.page_size))
+  if (params?.ordering) search.set('ordering', params.ordering)
   const qs = search.toString()
   const path = qs ? `/api/payroll/periods/?${qs}` : '/api/payroll/periods/'
   const { data } = await api.get<

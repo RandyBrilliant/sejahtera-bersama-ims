@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Label } from '@/components/ui/label'
+import { useTableSorting } from '@/hooks/use-table-sorting'
 import { cn } from '@/lib/utils'
 import {
   endOfMonth,
@@ -34,6 +35,7 @@ import { PAY_CADENCE_LABEL } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
 const PERIODS_PAGE_SIZE = 20
+const DEFAULT_PERIODS_ORDERING = '-pay_date'
 
 function axiosDetail(err: unknown): string | undefined {
   if (!isAxiosError(err)) return undefined
@@ -51,6 +53,7 @@ export function AdminPayrollPeriodsPage() {
   const [rows, setRows] = useState<PayrollPeriod[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [ordering, setOrdering] = useState(DEFAULT_PERIODS_ORDERING)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [cadence, setCadence] = useState<PayCadence>('WEEKLY')
@@ -67,10 +70,23 @@ export function AdminPayrollPeriodsPage() {
     return formatPayrollWeekLabel(payDate, bounds.start, bounds.end, cadence)
   }, [payDate, cutoffDate, cadence])
 
+  const { sortHeader } = useTableSorting({
+    ordering,
+    defaultOrdering: DEFAULT_PERIODS_ORDERING,
+    onOrderingChange: (next) => {
+      setPage(1)
+      setOrdering((current) => (typeof next === 'function' ? next(current) : next))
+    },
+  })
+
   async function reload(targetPage = page) {
     setLoading(true)
     try {
-      const list = await fetchPayrollPeriods({ page: targetPage, page_size: PERIODS_PAGE_SIZE })
+      const list = await fetchPayrollPeriods({
+        page: targetPage,
+        page_size: PERIODS_PAGE_SIZE,
+        ordering,
+      })
       setRows(list.results)
       setTotal(list.count)
       if (list.page !== page) {
@@ -84,10 +100,10 @@ export function AdminPayrollPeriodsPage() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load paginated list when page changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load paginated list when page/sort changes
     void reload(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
+  }, [page, ordering])
 
   function handleCadenceChange(next: PayCadence) {
     setCadence(next)
@@ -238,9 +254,11 @@ export function AdminPayrollPeriodsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Jenis</TableHead>
-                  <TableHead>Periode / bayar</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{sortHeader('Jenis', 'cadence')}</TableHead>
+                  <TableHead>
+                    {sortHeader('Periode / bayar', 'pay_date', { preferDesc: true })}
+                  </TableHead>
+                  <TableHead>{sortHeader('Status', 'status')}</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>

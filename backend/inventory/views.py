@@ -138,7 +138,14 @@ class ProductViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name", "variant_name"]
-    ordering_fields = ["name", "variant_name", "price_per_kg_idr", "remaining_mass_grams"]
+    ordering_fields = [
+        "name",
+        "variant_name",
+        "price_per_kg_idr",
+        "remaining_mass_grams",
+        "is_active",
+        "updated_at",
+    ]
     ordering = ["variant_name"]
 
     def get_queryset(self):
@@ -164,12 +171,26 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = ProductPackagingFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
-    ordering_fields = ["label", "packaging_type", "net_mass_kg"]
+    ordering_fields = [
+        "label",
+        "packaging_type",
+        "net_mass_kg",
+        "remaining_stock",
+        "total_price_idr",
+        "sku",
+        "is_active",
+    ]
     ordering = ["product__variant_name", "net_mass_kg"]
 
     def get_queryset(self):
         qs = ProductPackaging.objects.select_related("product", "created_by", "updated_by")
-        return annotate_packaging_derived_remaining(qs)
+        qs = annotate_packaging_derived_remaining(qs)
+        return qs.annotate(
+            total_price_idr=ExpressionWrapper(
+                F("product__price_per_kg_idr") * F("net_mass_kg"),
+                output_field=DecimalField(max_digits=20, decimal_places=6),
+            )
+        )
 
 
 class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
@@ -179,7 +200,7 @@ class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = IngredientFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["name"]
-    ordering_fields = ["name"]
+    ordering_fields = ["name", "default_unit", "is_active"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -193,7 +214,12 @@ class IngredientInventoryViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     filterset_class = IngredientInventoryFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["ingredient__name"]
-    ordering_fields = ["ingredient__name"]
+    ordering_fields = [
+        "ingredient__name",
+        "remaining_stock",
+        "minimum_stock",
+        "is_below_minimum",
+    ]
     ordering = ["ingredient__name"]
 
     def get_queryset(self):
@@ -444,6 +470,9 @@ class IngredientStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin
     search_fields = ["ingredient_inventory__ingredient__name", "note"]
     ordering_fields = [
         "ingredient_inventory__ingredient__name",
+        "movement_type",
+        "quantity",
+        "note",
         "movement_at",
         "id",
     ]
@@ -526,6 +555,11 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
     ]
     ordering_fields = [
         "product__variant_name",
+        "movement_type",
+        "mass_grams",
+        "bonus_mass_grams",
+        "total_mass_grams",
+        "note",
         "movement_at",
         "id",
     ]
@@ -629,7 +663,7 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
     filterset_class = ProductionBatchFilter
     filter_backends = [DjangoFilterBackend, PhraseSearchFilter, OrderingFilter]
     search_fields = ["shift_label", "note"]
-    ordering_fields = ["production_date", "created_at", "updated_at"]
+    ordering_fields = ["production_date", "shift_label", "note", "created_at", "updated_at"]
     ordering = ["-production_date", "-id"]
     http_method_names = ["get", "post", "head", "options"]
 

@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from account.api_ordering import apply_api_ordering
 from account.api_responses import ApiCode, error_response, success_response
 from account.throttles import AttendanceKioskRateThrottle
 from attendance.models import AttendanceDailyCheckIn, StaffAttendanceBadge
@@ -316,11 +317,25 @@ class AttendanceReportRowsView(APIView):
                 status=400,
             )
 
-        qs = AttendanceDailyCheckIn.objects.select_related(
-            "employee",
-            "verified_by",
-            "verified_out_by",
-        ).filter(work_date__gte=date_from, work_date__lte=date_to).order_by("-work_date", "employee__username")
+        qs = apply_api_ordering(
+            AttendanceDailyCheckIn.objects.select_related(
+                "employee",
+                "verified_by",
+                "verified_out_by",
+            ).filter(work_date__gte=date_from, work_date__lte=date_to),
+            request.query_params.get("ordering"),
+            {
+                "work_date": "work_date",
+                "employee_name": "employee__full_name",
+                "checked_in_at": "checked_in_at",
+                "is_late": "is_late",
+                "minutes_late": "minutes_late",
+                "checked_out_at": "checked_out_at",
+                "verified_in_by": "verified_by__full_name",
+                "verified_out_by": "verified_out_by__full_name",
+            },
+            ["-work_date", "employee__username"],
+        )
 
         if emp_id and str(emp_id).isdigit():
             qs = qs.filter(employee_id=int(emp_id))

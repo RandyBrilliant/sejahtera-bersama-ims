@@ -119,6 +119,7 @@ export type AttendanceReportParams = {
   employee_id?: number
   page?: number
   page_size?: number
+  ordering?: string
 }
 
 export async function fetchAttendanceReport(
@@ -130,6 +131,7 @@ export async function fetchAttendanceReport(
   if (params.employee_id != null) search.set('employee_id', String(params.employee_id))
   if (params.page != null) search.set('page', String(params.page))
   if (params.page_size != null) search.set('page_size', String(params.page_size))
+  if (params.ordering) search.set('ordering', params.ordering)
   const qs = search.toString()
   const path = qs ? `/api/attendance/reports/rows/?${qs}` : '/api/attendance/reports/rows/'
   const { data } = await api.get<Envelope<AttendanceReportEnvelope>>(path)

@@ -99,7 +99,16 @@ class OperationalCashEntryViewSet(AuditTrailMixin, viewsets.ModelViewSet):
         "sales_order__order_code",
         "payment_method",
     ]
-    ordering_fields = ["occurred_on", "id"]
+    ordering_fields = [
+        "occurred_on",
+        "id",
+        "direction",
+        "payment_method",
+        "category__name",
+        "amount_idr",
+        "description",
+        "reference",
+    ]
     ordering = ["-occurred_on", "-id"]
 
     def get_queryset(self):

@@ -73,6 +73,54 @@ export type OrderingChangeHandler = (
   next: string | ((current: string | undefined) => string)
 ) => void
 
+export type SortValue = string | number | boolean | null | undefined
+
+function compareSortValues(a: SortValue, b: SortValue): number {
+  if (a == null && b == null) return 0
+  if (a == null || a === '') return 1
+  if (b == null || b === '') return -1
+  if (typeof a === 'boolean' || typeof b === 'boolean') {
+    return Number(Boolean(a)) - Number(Boolean(b))
+  }
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  const as = String(a)
+  const bs = String(b)
+  const an = Number(as)
+  const bn = Number(bs)
+  if (as.trim() !== '' && bs.trim() !== '' && Number.isFinite(an) && Number.isFinite(bn)) {
+    return an - bn
+  }
+  return as.localeCompare(bs, 'id', { numeric: true, sensitivity: 'base' })
+}
+
+export function sortRowsByOrdering<T>(
+  rows: T[],
+  ordering: string | undefined,
+  getters: Record<string, (row: T) => SortValue>,
+  defaultOrdering?: string
+): T[] {
+  const effective = resolveTableOrdering(ordering, defaultOrdering)
+  if (!effective) return rows
+
+  const tokens = effective
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean)
+  if (!tokens.length) return rows
+
+  return [...rows].sort((a, b) => {
+    for (const token of tokens) {
+      const desc = token.startsWith('-')
+      const field = desc ? token.slice(1) : token
+      const get = getters[field]
+      if (!get) continue
+      const cmp = compareSortValues(get(a), get(b))
+      if (cmp !== 0) return desc ? -cmp : cmp
+    }
+    return 0
+  })
+}
+
 export function createOrderingChangeHandler<T extends { page?: number; ordering?: string }>(
   setParams: Dispatch<SetStateAction<T>>,
   options?: { resetPage?: boolean }

@@ -114,7 +114,7 @@ export function CustomersTable() {
       },
       {
         accessorKey: 'phone',
-        header: 'Telepon',
+        header: () => sortHeader('Telepon', 'phone'),
         cell: ({ row }) => formatRegionalPhonePreview(row.original.phone),
       },
       {
@@ -124,12 +124,12 @@ export function CustomersTable() {
       },
       {
         accessorKey: 'address',
-        header: 'Alamat',
+        header: () => sortHeader('Alamat', 'address'),
         cell: ({ row }) => row.original.address || '—',
       },
       {
         id: 'status',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge className="bg-emerald-500/15 text-emerald-800 dark:text-emerald-300">

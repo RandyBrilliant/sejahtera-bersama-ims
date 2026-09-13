@@ -9,7 +9,6 @@ import { ChevronLeft, ChevronRight, Eye, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Input } from '@/components/ui/input'
@@ -31,17 +30,14 @@ import {
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
 import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
-import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import { useSalesOrdersQuery } from '@/hooks/use-purchase-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import {
-  aggregatePackingFromOrders,
   formatKgId,
   formatOneKemasanMass,
   orderTotalMassKg,
   productDisplayName,
 } from '@/lib/format-packaging-mass'
-import { formatDecimalId } from '@/lib/format-number-id'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { cn } from '@/lib/utils'
 import type { OrderStatus, SalesOrder, SalesOrdersListParams } from '@/types/purchase'
@@ -72,24 +68,12 @@ export function WarehouseSalesPackingTable() {
   const [endDate, setEndDate] = useState('')
 
   const { data, isLoading, isError, error, isFetching } = useSalesOrdersQuery(params)
-  const catalog = useProductPackagingListQuery({
-    page: 1,
-    page_size: 100,
-    is_active: true,
-    ordering: 'net_mass_kg',
-  })
 
   const rows = data?.results ?? []
   const total = data?.count ?? 0
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const packingTotals = useMemo(
-    () => aggregatePackingFromOrders(data?.results ?? []),
-    [data]
-  )
-  const catalogRows = catalog.data?.results ?? []
 
   const runSearch = useCallback(() => {
     setParams((p) => ({
@@ -110,15 +94,24 @@ export function WarehouseSalesPackingTable() {
   const columns = useMemo<ColumnDef<SalesOrder>[]>(
     () => [
       {
+        accessorKey: 'created_at',
+        header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),
+        cell: ({ row }) => (
+          <span className="text-on-surface-variant text-sm whitespace-nowrap">
+            {fmtShort(row.original.created_at)}
+          </span>
+        ),
+      },
+      {
         accessorKey: 'order_code',
-        header: 'Kode',
+        header: () => sortHeader('Kode', 'order_code'),
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.order_code}</span>
         ),
       },
       {
         accessorKey: 'customer_name',
-        header: 'Pelanggan',
+        header: () => sortHeader('Pelanggan', 'customer__name'),
         cell: ({ row }) => (
           <div className="flex min-w-0 flex-col">
             <span className="truncate font-medium">{row.original.customer_name}</span>
@@ -129,22 +122,8 @@ export function WarehouseSalesPackingTable() {
         ),
       },
       {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
-      },
-      {
-        accessorKey: 'created_at',
-        header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),
-        cell: ({ row }) => (
-          <span className="text-on-surface-variant text-sm whitespace-nowrap">
-            {fmtShort(row.original.created_at)}
-          </span>
-        ),
-      },
-      {
         id: 'packing',
-        header: 'Produk & kemasan',
+        header: 'Kemasan',
         cell: ({ row }) => {
           const lines = row.original.lines ?? []
           if (lines.length === 0) {
@@ -176,6 +155,11 @@ export function WarehouseSalesPackingTable() {
             {formatKgId(orderTotalMassKg(row.original))}
           </span>
         ),
+      },
+      {
+        accessorKey: 'status',
+        header: () => sortHeader('Status', 'status'),
+        cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
       },
       {
         id: 'actions',
@@ -212,98 +196,7 @@ export function WarehouseSalesPackingTable() {
   const statusFilter = params.status ?? 'all'
 
   return (
-    <div className="space-y-6">
-      <section className="border-outline-variant bg-surface-container-lowest ambient-shadow overflow-x-auto rounded-xl border">
-        <div className="border-outline-variant border-b px-4 py-3 md:px-5">
-          <h2 className="text-on-surface font-heading text-base font-semibold">Jenis kemasan</h2>
-          <p className="text-on-surface-variant mt-1 text-sm leading-relaxed">
-            Acuan packing: 1 ons = 0,1 kg. Total order di bawah sudah dihitung dalam kg.
-          </p>
-        </div>
-        {catalog.isError ? (
-          <p className="text-destructive p-4 text-sm">Gagal memuat jenis kemasan.</p>
-        ) : catalog.isPending ? (
-          <p className="text-on-surface-variant p-4 text-sm">Memuat kemasan…</p>
-        ) : catalogRows.length === 0 ? (
-          <p className="text-on-surface-variant p-4 text-sm">Belum ada kemasan aktif.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant hover:bg-transparent">
-                <TableHead>Produk</TableHead>
-                <TableHead>Jenis</TableHead>
-                <TableHead>Kemasan</TableHead>
-                <TableHead className="text-right">1 kemasan</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {catalogRows.map((pkg) => (
-                <TableRow key={pkg.id} className="border-outline-variant">
-                  <TableCell className="font-medium">
-                    {pkg.product_name && pkg.product_variant_name !== pkg.product_name
-                      ? `${pkg.product_name} ${pkg.product_variant_name}`
-                      : pkg.product_variant_name || pkg.product_name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{PACKAGING_TYPE_LABEL[pkg.packaging_type]}</Badge>
-                  </TableCell>
-                  <TableCell>{pkg.label}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">
-                    {formatOneKemasanMass(pkg.net_mass_kg)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </section>
-
-      {packingTotals.length > 0 ? (
-        <section className="border-outline-variant bg-surface-container-lowest ambient-shadow overflow-x-auto rounded-xl border">
-          <div className="border-outline-variant border-b px-4 py-3 md:px-5">
-            <h2 className="text-on-surface font-heading text-base font-semibold">
-              Total packing di halaman ini
-            </h2>
-            <p className="text-on-surface-variant mt-1 text-sm leading-relaxed">
-              Gabungan berat per jenis produk & kemasan (order dibatalkan tidak dihitung).
-            </p>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant hover:bg-transparent">
-                <TableHead>Produk</TableHead>
-                <TableHead>Kemasan</TableHead>
-                <TableHead>1 kemasan</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {packingTotals.map((row) => (
-                <TableRow key={row.key} className="border-outline-variant">
-                  <TableCell className="font-medium">{row.productName}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      {row.packagingType ? (
-                        <Badge variant="secondary" className="w-fit">
-                          {PACKAGING_TYPE_LABEL[row.packagingType]}
-                        </Badge>
-                      ) : null}
-                      <span>{row.packagingLabel}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm tabular-nums">
-                    {formatOneKemasanMass(row.unitKg)}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
-                    {formatKgId(row.totalKg)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
-      ) : null}
-
+    <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="relative max-w-md flex-1">
           <Search className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
@@ -468,10 +361,6 @@ export function WarehouseSalesPackingTable() {
         </div>
       ) : null}
 
-      <p className="text-on-surface-variant text-xs leading-relaxed">
-        Jumlah kemasan tidak ditampilkan sebagai qty; yang dipakai packing adalah total kg (qty ×
-        berat bersih). Contoh: 10 kemasan 1 ons = {formatDecimalId(1)} kg.
-      </p>
     </div>
   )
 }

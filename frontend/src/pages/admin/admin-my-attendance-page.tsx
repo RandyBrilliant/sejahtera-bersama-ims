@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
 import type { MyAttendanceRow } from '@/types/attendance'
 import { isAxiosError } from 'axios'
@@ -70,6 +71,22 @@ export function AdminMyAttendancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const attendanceSortGetters = useMemo(
+    () => ({
+      work_date: (r: MyAttendanceRow) => r.work_date,
+      checked_in_at: (r: MyAttendanceRow) => r.checked_in_at,
+      is_late: (r: MyAttendanceRow) => r.is_late,
+      checked_out_at: (r: MyAttendanceRow) => r.checked_out_at,
+    }),
+    []
+  )
+
+  const { sortHeader, sortedRows } = useLocalTableSorting({
+    rows,
+    defaultOrdering: '-work_date',
+    getters: attendanceSortGetters,
+  })
+
   return (
     <div className="space-y-8">
       <div>
@@ -110,14 +127,14 @@ export function AdminMyAttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tanggal kerja</TableHead>
-                <TableHead>Masuk</TableHead>
-                <TableHead>Telat</TableHead>
-                <TableHead>Pulang</TableHead>
+                <TableHead>{sortHeader('Tanggal kerja', 'work_date', { preferDesc: true })}</TableHead>
+                <TableHead>{sortHeader('Masuk', 'checked_in_at', { preferDesc: true })}</TableHead>
+                <TableHead>{sortHeader('Telat', 'is_late')}</TableHead>
+                <TableHead>{sortHeader('Pulang', 'checked_out_at', { preferDesc: true })}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {sortedRows.map((r) => (
                 <TableRow key={r.work_date}>
                   <TableCell className="tabular-nums">{r.work_date}</TableCell>
                   <TableCell className="tabular-nums">{fmtDt(r.checked_in_at)}</TableCell>

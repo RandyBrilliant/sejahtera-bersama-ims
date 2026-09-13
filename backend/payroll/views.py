@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from account.api_ordering import apply_api_ordering
 from account.api_responses import ApiCode, error_response, success_response
 from account.models import UserRole
 from payroll.kas_sync import delete_loan_item, post_period_gaji_to_cash, save_loan_item
@@ -277,7 +278,16 @@ class PayrollPeriodListCreateView(APIView):
                 status=400,
             )
 
-        qs = PayrollPeriod.objects.select_related("gaji_cash_entry").order_by("-pay_date")
+        qs = apply_api_ordering(
+            PayrollPeriod.objects.select_related("gaji_cash_entry"),
+            request.query_params.get("ordering"),
+            {
+                "cadence": "cadence",
+                "pay_date": "pay_date",
+                "status": "status",
+            },
+            ["-pay_date"],
+        )
         total = qs.count()
         start = (page - 1) * page_size
         slice_qs = qs[start : start + page_size]

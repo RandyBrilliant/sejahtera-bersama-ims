@@ -99,7 +99,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'remaining_stock',
-        header: 'Stok sisa',
+        header: () => sortHeader('Stok sisa', 'remaining_stock'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.remaining_stock)} {row.original.ingredient_unit}
@@ -108,7 +108,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'minimum_stock',
-        header: 'Minimum',
+        header: () => sortHeader('Minimum', 'minimum_stock'),
         cell: ({ row }) => (
           <span className="tabular-nums">
             {fmtQty(row.original.minimum_stock)} {row.original.ingredient_unit}
@@ -117,7 +117,7 @@ export function IngredientInventoryTable() {
       },
       {
         accessorKey: 'is_below_minimum',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_below_minimum'),
         cell: ({ row }) =>
           row.original.is_below_minimum ? (
             <Badge variant="destructive">Di bawah minimum</Badge>

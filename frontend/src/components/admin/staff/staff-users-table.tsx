@@ -139,7 +139,7 @@ export function StaffUsersTable() {
       },
       {
         id: 'phone',
-        header: 'Telepon',
+        header: () => sortHeader('Telepon', 'phone_number'),
         cell: ({ row }) => (
           <span className="text-on-surface-variant max-w-[14rem] truncate text-sm">
             {formatRegionalPhonePreview(row.original.phone_number ?? '')}
@@ -166,7 +166,7 @@ export function StaffUsersTable() {
       },
       {
         accessorKey: 'is_active',
-        header: 'Status',
+        header: () => sortHeader('Status', 'is_active'),
         cell: ({ row }) =>
           row.original.is_active ? (
             <Badge variant="default">Aktif</Badge>

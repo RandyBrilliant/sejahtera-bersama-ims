@@ -170,26 +170,26 @@ export function OperationalCashEntriesTable() {
       },
       {
         accessorKey: 'direction',
-        header: 'Jenis',
+        header: () => sortHeader('Jenis', 'direction'),
         cell: ({ row }) => (
           <Badge variant="outline">{ENTRY_KIND_LABEL[row.original.direction]}</Badge>
         ),
       },
       {
         accessorKey: 'payment_method',
-        header: 'Metode',
+        header: () => sortHeader('Metode', 'payment_method'),
         cell: ({ row }) => (
           <Badge variant="secondary">{PAYMENT_METHOD_LABEL[row.original.payment_method]}</Badge>
         ),
       },
       {
         accessorKey: 'category_name',
-        header: 'Kategori',
+        header: () => sortHeader('Kategori', 'category__name'),
         cell: ({ row }) => row.original.category_name,
       },
       {
         accessorKey: 'amount_idr',
-        header: 'Jumlah',
+        header: () => sortHeader('Jumlah', 'amount_idr'),
         cell: ({ row }) => (
           <span className="font-medium tabular-nums">
             {formatIdr(row.original.amount_idr)}
@@ -198,14 +198,14 @@ export function OperationalCashEntriesTable() {
       },
       {
         accessorKey: 'description',
-        header: 'Deskripsi',
+        header: () => sortHeader('Deskripsi', 'description'),
         cell: ({ row }) => (
           <span className="max-w-[220px]">{truncate(row.original.description, 80)}</span>
         ),
       },
       {
         accessorKey: 'reference',
-        header: 'Referensi',
+        header: () => sortHeader('Referensi', 'reference'),
         cell: ({ row }) => {
           const ref = row.original.reference?.trim()
           const so = row.original.sales_order_code?.trim()
