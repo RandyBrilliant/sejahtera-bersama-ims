@@ -2,7 +2,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from account.models import UserRole
@@ -21,12 +21,27 @@ from payroll.models import (
 from payroll.period_week import default_bounds_for_pay_date, week_bounds_for_pay_saturday
 from payroll.services import (
     PayrollWorkflowError,
+    compute_net_pay,
     finalize_payroll_period,
     generate_payroll_entries,
     unfinalize_payroll_period,
 )
 
 User = get_user_model()
+
+
+class ComputeNetPayTests(SimpleTestCase):
+    def test_allows_negative_when_pinjam_exceeds_pay(self):
+        self.assertEqual(
+            compute_net_pay(Decimal("420000"), Decimal("125000"), Decimal("0"), Decimal("550000")),
+            Decimal("-5000.00"),
+        )
+
+    def test_positive_net_unchanged(self):
+        self.assertEqual(
+            compute_net_pay(Decimal("100000"), Decimal("0"), Decimal("0"), Decimal("40000")),
+            Decimal("60000.00"),
+        )
 
 
 class ProductionLaborForRangeTests(TestCase):
@@ -376,6 +391,21 @@ class PayrollLoanAndKasTests(TestCase):
         self.assertEqual(loan.note, "PINJAM 1")
         self.assertEqual(loan.cash_entry.description, "PINJAMAN WH LOAN — PINJAM 1")
         self.assertEqual(loan.cash_entry.description, loan.cash_entry.description.upper())
+
+    def test_pinjam_overshoot_keeps_negative_net(self):
+        from payroll.kas_sync import save_loan_item
+
+        save_loan_item(
+            entry=self.entry,
+            user=self.admin,
+            amount=Decimal("130000"),
+            occurred_on=date(2026, 8, 5),
+            payment_method="CASH",
+            note="Pinjam lebih",
+        )
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.advance_deduction_idr, Decimal("130000.00"))
+        self.assertEqual(self.entry.net_pay_idr, Decimal("-30000.00"))
 
     def test_post_period_gaji_to_cash(self):
         from expenses.models import OperationalCashEntry

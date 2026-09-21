@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/table'
 import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
-import { formatIdr } from '@/lib/format-idr'
+import { formatIdr, signedIdrClassName } from '@/lib/format-idr'
+import { cn } from '@/lib/utils'
 import { formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import type { MyPayrollSlip } from '@/types/payroll'
@@ -157,7 +158,12 @@ export function AdminMyPayrollPage() {
                         Number(r.deductions_idr) + Number(r.advance_deduction_idr)
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell
+                      className={cn(
+                        'text-right font-medium tabular-nums',
+                        signedIdrClassName(r.net_pay_idr)
+                      )}
+                    >
                       {formatIdr(Number(r.net_pay_idr))}
                     </TableCell>
                   </TableRow>

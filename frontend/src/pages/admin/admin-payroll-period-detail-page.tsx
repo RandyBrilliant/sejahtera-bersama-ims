@@ -39,7 +39,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { expensesKeys } from '@/hooks/use-expenses-query'
 import { useLocalTableSorting } from '@/hooks/use-table-sorting'
 import { alert } from '@/lib/alert'
-import { formatIdr, idrToDigits } from '@/lib/format-idr'
+import { formatIdr, idrToDigits, signedIdrClassName } from '@/lib/format-idr'
 import { formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import { cn } from '@/lib/utils'
@@ -497,7 +497,12 @@ export function AdminPayrollPeriodDetailPage() {
                               formatIdr(row.deductions_idr)
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">
+                          <TableCell
+                            className={cn(
+                              'text-right font-medium tabular-nums',
+                              signedIdrClassName(row.net_pay_idr)
+                            )}
+                          >
                             {formatIdr(row.net_pay_idr)}
                           </TableCell>
                           {isDraft ? (

@@ -74,11 +74,9 @@ def compute_day_pay(row, daily_rate: Decimal, settings) -> tuple[Decimal, Decima
     return gross, deduction
 
 
-def _compute_net(gross: Decimal, bonus: Decimal, deductions: Decimal, advance: Decimal) -> Decimal:
-    net = gross + bonus - deductions - advance
-    if net < 0:
-        net = Decimal("0")
-    return _quantize_idr(net)
+def compute_net_pay(gross: Decimal, bonus: Decimal, deductions: Decimal, advance: Decimal) -> Decimal:
+    """Kotor + bonus − potongan − pinjam. Boleh negatif jika pinjam melebihi gaji."""
+    return _quantize_idr(gross + bonus - deductions - advance)
 
 
 def _unpaid_attendance_qs(employee_id: int, cutoff):
@@ -116,7 +114,7 @@ def _generate_daily_entry(period, comp, settings, existing_bonus=Decimal("0"), e
 
     gross_total = _quantize_idr(gross_total)
     deductions = _quantize_idr(deductions)
-    net_pay = _compute_net(gross_total, existing_bonus, deductions, existing_advance)
+    net_pay = compute_net_pay(gross_total, existing_bonus, deductions, existing_advance)
 
     return {
         "pay_type_snapshot": PayType.DAILY,
@@ -142,7 +140,7 @@ def _generate_monthly_fixed_entry(
     late_count = sum(1 for row in rows if row.is_late)
     deductions = _quantize_idr(settings.late_fine_idr * late_count)
     gross_total = _quantize_idr(comp.monthly_base_salary_idr)
-    net_pay = _compute_net(gross_total, existing_bonus, deductions, existing_advance)
+    net_pay = compute_net_pay(gross_total, existing_bonus, deductions, existing_advance)
 
     return {
         "pay_type_snapshot": PayType.DAILY,
@@ -183,7 +181,7 @@ def _generate_piece_rate_entry(period, comp, existing_bonus=Decimal("0"), existi
 
     gross_total = _quantize_idr(gross_total)
     total_kg = _quantize_kg(total_kg)
-    net_pay = _compute_net(gross_total, existing_bonus, Decimal("0"), existing_advance)
+    net_pay = compute_net_pay(gross_total, existing_bonus, Decimal("0"), existing_advance)
 
     return {
         "pay_type_snapshot": PayType.PIECE_RATE,

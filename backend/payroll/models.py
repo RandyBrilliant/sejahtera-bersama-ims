@@ -310,8 +310,8 @@ class PayrollEntry(models.Model):
         _("net pay (IDR)"),
         max_digits=14,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal("0"))],
         default=Decimal("0"),
+        help_text=_("Bisa negatif jika pinjaman melebihi gaji periode ini."),
     )
     notes = models.TextField(_("notes"), blank=True)
     paid_out = models.BooleanField(

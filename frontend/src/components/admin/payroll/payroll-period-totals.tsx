@@ -15,7 +15,8 @@ import {
 import { PAYMENT_METHOD_LABEL } from '@/constants/expenses'
 import { expensesKeys } from '@/hooks/use-expenses-query'
 import { alert } from '@/lib/alert'
-import { formatIdr, toFiniteNumber } from '@/lib/format-idr'
+import { formatIdr, signedIdrClassName, toFiniteNumber } from '@/lib/format-idr'
+import { cn } from '@/lib/utils'
 import type { PayrollEntryRow, PayrollPeriod } from '@/types/payroll'
 import { isAxiosError } from 'axios'
 
@@ -113,7 +114,12 @@ export function PayrollPeriodTotals({ period, entries, busy, onPeriodUpdated }: 
           <p className="text-on-surface-variant flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase">
             <Wallet className="size-3.5" /> Total bersih (uang gaji)
           </p>
-          <p className="text-on-surface mt-1 font-heading text-xl font-semibold tabular-nums">
+          <p
+            className={cn(
+              'mt-1 font-heading text-xl font-semibold tabular-nums',
+              signedIdrClassName(totals.net) || 'text-on-surface'
+            )}
+          >
             {formatIdr(totals.net)}
           </p>
           <p className="text-on-surface-variant mt-1 text-xs">

@@ -1,7 +1,8 @@
 import { forwardRef } from 'react'
 
 import { APP_BRAND_NAME } from '@/constants/brand'
-import { formatIdr } from '@/lib/format-idr'
+import { formatIdr, signedIdrClassName } from '@/lib/format-idr'
+import { cn } from '@/lib/utils'
 import { formatKg, formatKgAmount } from '@/lib/format-kg'
 import { formatPayrollWeekLabel } from '@/lib/payroll-week'
 import type { PayrollSlipDetail } from '@/types/payroll'
@@ -201,7 +202,9 @@ export const PayrollSlipDocument = forwardRef<HTMLElement, Props>(function Payro
         </div>
         <div className="border-outline-variant flex justify-between gap-4 border-t pt-2 text-base font-semibold">
           <span>Diterima bersih</span>
-          <span className="tabular-nums">{formatIdr(slip.net_pay_idr)}</span>
+          <span className={cn('tabular-nums', signedIdrClassName(slip.net_pay_idr))}>
+            {formatIdr(slip.net_pay_idr)}
+          </span>
         </div>
       </section>
 

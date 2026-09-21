@@ -14,6 +14,7 @@ from payroll.models import (
     PayType,
 )
 from payroll.period_week import PayrollPeriodError, default_bounds_for_pay_date
+from payroll.services import compute_net_pay
 
 User = get_user_model()
 
@@ -298,10 +299,7 @@ class PayrollEntryAdjustSerializer(serializers.ModelSerializer):
         if "notes" in validated_data:
             instance.notes = validated_data["notes"]
 
-        net = gross + bonus - deductions - advance
-        if net < Decimal("0"):
-            net = Decimal("0")
-        instance.net_pay_idr = net
+        instance.net_pay_idr = compute_net_pay(gross, bonus, deductions, advance)
         instance.save(
             update_fields=[
                 "deductions_idr",

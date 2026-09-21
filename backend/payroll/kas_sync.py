@@ -11,6 +11,7 @@ from django.db.models.functions import Coalesce
 from expenses.models import EntryKind, OperationalCashEntry, OperationalCategory, PaymentMethod
 from payroll.exceptions import PayrollWorkflowError
 from payroll.models import PayrollEntry, PayrollLoanItem, PayrollPeriod
+from payroll.services import compute_net_pay
 
 GAJI_CATEGORY_SLUG = "gaji-upah"
 PINJAMAN_CATEGORY_SLUG = "pinjaman-karyawan"
@@ -18,13 +19,6 @@ PINJAMAN_CATEGORY_SLUG = "pinjaman-karyawan"
 
 def _quantize_idr(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
-def _compute_net(gross: Decimal, bonus: Decimal, deductions: Decimal, advance: Decimal) -> Decimal:
-    net = gross + bonus - deductions - advance
-    if net < 0:
-        net = Decimal("0")
-    return _quantize_idr(net)
 
 
 def _idr_int(value: Decimal) -> int:
@@ -50,7 +44,7 @@ def refresh_entry_advance_from_loans(entry: PayrollEntry) -> PayrollEntry:
         s=Coalesce(Sum("amount_idr"), Value(Decimal("0")))
     )["s"] or Decimal("0")
     entry.advance_deduction_idr = _quantize_idr(total)
-    entry.net_pay_idr = _compute_net(
+    entry.net_pay_idr = compute_net_pay(
         entry.gross_idr,
         entry.bonus_idr,
         entry.deductions_idr,
