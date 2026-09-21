@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { parseInventoryMutationError } from '@/components/admin/inventory/inventory-mutation-error'
 import { useDeleteProductPackagingMutation } from '@/hooks/use-inventory-query'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,8 +34,8 @@ export function ProductPackagingDeleteModal({ open, onOpenChange, row }: Props) 
     try {
       await mutation.mutateAsync({ id: row.id, productId: row.product })
       handleOpenChange(false)
-    } catch {
-      setErrorMessage('Tidak dapat menghapus kemasan. Coba lagi.')
+    } catch (err) {
+      setErrorMessage(parseInventoryMutationError(err))
     }
   }
 

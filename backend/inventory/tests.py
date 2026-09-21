@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from account.models import UserRole
@@ -220,3 +221,74 @@ class ProductMutasiPackagingBookkeepingTests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
+
+
+class ProductDeleteInUseTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            "prod_del_admin", full_name="Admin", role=UserRole.ADMIN, password="pass"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        self.product = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Nyonya Merah",
+            price_per_kg_idr=100000,
+        )
+        self.pkg = ProductPackaging.objects.create(
+            product=self.product, label="1 KG", net_mass_kg=Decimal("1")
+        )
+
+    def test_unused_product_can_be_deleted(self):
+        resp = self.client.delete(f"/api/inventory/products/{self.product.id}/")
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(Product.objects.filter(pk=self.product.id).exists())
+
+    def test_product_with_sales_and_stock_shows_reasons(self):
+        from purchase.models import Customer, OrderStatus, SalesOrder, SalesOrderLine
+
+        ProductStockMovement.objects.create(
+            product=self.product,
+            product_packaging=self.pkg,
+            movement_type="IN",
+            mass_grams=Decimal("1000"),
+            movement_at=timezone.now(),
+        )
+        customer = Customer.objects.create(name="Toko Nyonya", address="Jl. Test")
+        order = SalesOrder.objects.create(
+            order_code="SO-NYONYA-1",
+            customer=customer,
+            status=OrderStatus.AWAITING_PAYMENT,
+            subtotal_idr=100000,
+            total_idr=100000,
+        )
+        SalesOrderLine.objects.create(
+            order=order,
+            product_packaging=self.pkg,
+            quantity=Decimal("1"),
+            unit_price_idr=100000,
+        )
+
+        resp = self.client.delete(f"/api/inventory/products/{self.product.id}/")
+        self.assertEqual(resp.status_code, 409, resp.content)
+        body = resp.json()
+        self.assertEqual(body["code"], "in_use")
+        self.assertIn("Nyonya Merah", body["detail"])
+        self.assertIn("pesanan penjualan (1)", body["detail"])
+        self.assertIn("mutasi stok (1)", body["detail"])
+        self.assertTrue(Product.objects.filter(pk=self.product.id).exists())
+
+    def test_packaging_in_use_shows_label(self):
+        ProductStockMovement.objects.create(
+            product=self.product,
+            product_packaging=self.pkg,
+            movement_type="IN",
+            mass_grams=Decimal("1000"),
+            movement_at=timezone.now(),
+        )
+        resp = self.client.delete(f"/api/inventory/product-packaging/{self.pkg.id}/")
+        self.assertEqual(resp.status_code, 409, resp.content)
+        body = resp.json()
+        self.assertEqual(body["code"], "in_use")
+        self.assertIn("1 KG", body["detail"])
+        self.assertIn("mutasi stok (1)", body["detail"])

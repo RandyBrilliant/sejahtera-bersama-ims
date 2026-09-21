@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { parseInventoryMutationError } from '@/components/admin/inventory/inventory-mutation-error'
 import { useDeleteIngredientMutation } from '@/hooks/use-inventory-query'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,10 +34,8 @@ export function IngredientDeleteModal({ open, onOpenChange, ingredient }: Props)
     try {
       await mutation.mutateAsync(ingredient.id)
       handleOpenChange(false)
-    } catch {
-      setErrorMessage(
-        'Tidak dapat menghapus bahan. Pastikan tidak ada mutasi atau produksi yang bergantung pada data ini.'
-      )
+    } catch (err) {
+      setErrorMessage(parseInventoryMutationError(err))
     }
   }
 

@@ -11,7 +11,7 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from account.api_responses import success_response
+from account.api_responses import ApiCode, error_response, success_response
 from account.filters import PhraseSearchFilter
 from account.pagination import StandardResultsSetPagination
 from account.permissions import (
@@ -20,6 +20,7 @@ from account.permissions import (
     InventoryAccess,
 )
 
+from .deletion import ingredient_in_use_detail, packaging_in_use_detail, product_in_use_detail
 from .filters import (
     IngredientFilter,
     IngredientInventoryFilter,
@@ -155,6 +156,16 @@ class ProductViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         return Product.objects.select_related("created_by", "updated_by")
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        detail = product_in_use_detail(instance)
+        if detail:
+            return Response(
+                error_response(detail=detail, code=ApiCode.IN_USE),
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=["get"], url_path="packaging-summary")
     def packaging_summary(self, request, pk=None):
         product = self.get_object()
@@ -196,6 +207,16 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
             )
         )
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        detail = packaging_in_use_detail(instance)
+        if detail:
+            return Response(
+                error_response(detail=detail, code=ApiCode.IN_USE),
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     serializer_class = IngredientSerializer
@@ -209,6 +230,16 @@ class IngredientViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Ingredient.objects.select_related("created_by", "updated_by")
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        detail = ingredient_in_use_detail(instance)
+        if detail:
+            return Response(
+                error_response(detail=detail, code=ApiCode.IN_USE),
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class IngredientInventoryViewSet(InventoryWriteMixin, viewsets.ModelViewSet):

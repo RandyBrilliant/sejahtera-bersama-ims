@@ -16,6 +16,7 @@ class ApiCode:
     SERVER_ERROR = INTERNAL_ERROR
 
     DELETE_NOT_ALLOWED = "delete_not_allowed"
+    IN_USE = "in_use"
     ALREADY_DEACTIVATED = "already_deactivated"
     ALREADY_ACTIVATED = "already_activated"
     DEACTIVATED = "deactivated"
@@ -86,6 +87,19 @@ def validate_username_unique(model_class, value: str, instance=None):
 
 
 def api_exception_handler(exc, context):
+    from django.db.models.deletion import ProtectedError
+
+    if isinstance(exc, ProtectedError):
+        from rest_framework.response import Response
+
+        return Response(
+            error_response(
+                detail="Tidak dapat menghapus data ini karena masih dipakai transaksi lain.",
+                code=ApiCode.IN_USE,
+            ),
+            status=status.HTTP_409_CONFLICT,
+        )
+
     response = exception_handler(exc, context)
     if response is None:
         from rest_framework.response import Response
