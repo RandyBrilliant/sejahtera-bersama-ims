@@ -44,6 +44,9 @@ class OperationalCategorySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Nama kategori wajib diisi.")
         return cleaned
 
+    def validate_description(self, value: str):
+        return (value or "").strip().upper()
+
 
 class OperationalCashEntrySerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()

@@ -41,8 +41,8 @@ function RequiredAsterisk() {
 export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [phone, setPhone] = useState(initial?.phone ?? '')
-  const [address, setAddress] = useState(initial?.address ?? '')
-  const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [address, setAddress] = useState(initial?.address?.toUpperCase() ?? '')
+  const [notes, setNotes] = useState(initial?.notes?.toUpperCase() ?? '')
   const [wilayahId, setWilayahId] = useState<string>(initial?.wilayah != null ? String(initial.wilayah) : '__none')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
@@ -58,7 +58,7 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
       alert.error('Validasi', 'Nama pelanggan wajib diisi.')
       return
     }
-    const a = address.trim()
+    const a = address.trim().toUpperCase()
     if (!a) {
       alert.error('Validasi', 'Alamat wajib diisi.')
       return
@@ -68,7 +68,7 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
       name: n,
       phone: p || undefined,
       address: a,
-      notes: notes.trim() || undefined,
+      notes: notes.trim().toUpperCase() || undefined,
       wilayah: wilayahId === '__none' ? null : Number(wilayahId),
       is_active: isActive,
     }
@@ -152,10 +152,10 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
               <textarea
                 id="cust-address"
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={(e) => setAddress(e.target.value.toUpperCase())}
                 disabled={submitting}
                 rows={3}
-                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm uppercase shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             <div className="grid gap-2 md:col-span-2">
@@ -163,10 +163,10 @@ export function CustomerForm({ mode, initial, onCancel, onSaved }: Props) {
               <textarea
                 id="cust-notes"
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => setNotes(e.target.value.toUpperCase())}
                 disabled={submitting}
                 rows={2}
-                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm uppercase shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>

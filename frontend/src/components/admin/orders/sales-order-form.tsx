@@ -381,7 +381,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   async function handleCreateCustomerFromModal(e: React.FormEvent) {
     e.preventDefault()
     const name = newCustomerName.trim()
-    const address = newCustomerAddress.trim()
+    const address = newCustomerAddress.trim().toUpperCase()
     if (!name) {
       alert.error('Validasi', 'Nama pelanggan wajib diisi.')
       return
@@ -396,7 +396,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
         phone: newCustomerPhone.trim() || undefined,
         address,
         wilayah: newCustomerWilayahId === '__none' ? null : Number(newCustomerWilayahId),
-        notes: newCustomerNotes.trim() || undefined,
+        notes: newCustomerNotes.trim().toUpperCase() || undefined,
         is_active: true,
       })
       setCustomerId(created.id)
@@ -1058,11 +1058,11 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               <textarea
                 id="quick-customer-address"
                 value={newCustomerAddress}
-                onChange={(e) => setNewCustomerAddress(e.target.value)}
+                onChange={(e) => setNewCustomerAddress(e.target.value.toUpperCase())}
                 disabled={createCustomerMut.isPending}
                 rows={3}
                 className={cn(
-                  'border-outline-variant bg-field min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm outline-none',
+                  'border-outline-variant bg-field min-h-[72px] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none',
                   'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]'
                 )}
               />

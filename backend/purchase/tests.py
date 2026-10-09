@@ -98,3 +98,15 @@ class HppProfitReportViewTests(TestCase):
         data = resp.json()["data"]
         self.assertEqual(data["revenue_idr"], 0)
         self.assertEqual(data["cogs"]["material_idr"], 0)
+
+
+class CustomerTextUppercaseTests(TestCase):
+    def test_address_and_notes_are_stored_uppercase(self):
+        customer = Customer.objects.create(
+            name="Toko A",
+            address="jl. merdeka no. 1",
+            notes="dekat pasar",
+        )
+        customer.refresh_from_db()
+        self.assertEqual(customer.address, "JL. MERDEKA NO. 1")
+        self.assertEqual(customer.notes, "DEKAT PASAR")

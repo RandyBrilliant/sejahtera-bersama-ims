@@ -79,10 +79,13 @@ class CustomerSerializer(serializers.ModelSerializer):
         return cleaned
 
     def validate_address(self, value: str):
-        cleaned = (value or "").strip()
+        cleaned = (value or "").strip().upper()
         if not cleaned:
             raise serializers.ValidationError("Alamat wajib diisi.")
         return cleaned
+
+    def validate_notes(self, value: str):
+        return (value or "").strip().upper()
 
 
 class WilayahSerializer(serializers.ModelSerializer):

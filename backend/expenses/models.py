@@ -53,6 +53,7 @@ class OperationalCategory(AuditModel):
         return f"{self.get_entry_kind_display()}: {self.name}"
 
     def save(self, *args, **kwargs):
+        self.description = (self.description or "").strip().upper()
         if not self.slug:
             base = slugify(self.name)[:120] or "category"
             slug = base

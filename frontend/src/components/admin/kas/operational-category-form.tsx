@@ -31,7 +31,7 @@ type Props = {
 export function OperationalCategoryForm({ mode, initial, onCancel, onSaved }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [entryKind, setEntryKind] = useState<EntryKind>(initial?.entry_kind ?? 'EXPENSE')
-  const [description, setDescription] = useState(initial?.description ?? '')
+  const [description, setDescription] = useState(initial?.description?.toUpperCase() ?? '')
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0))
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
@@ -53,7 +53,7 @@ export function OperationalCategoryForm({ mode, initial, onCancel, onSaved }: Pr
         await createMutation.mutateAsync({
           name: n,
           entry_kind: entryKind,
-          description: description.trim() || undefined,
+          description: description.trim().toUpperCase() || undefined,
           sort_order: sort,
           is_active: isActive,
         })
@@ -63,7 +63,7 @@ export function OperationalCategoryForm({ mode, initial, onCancel, onSaved }: Pr
         await updateMutation.mutateAsync({
           name: n,
           entry_kind: entryKind,
-          description: description.trim() || undefined,
+          description: description.trim().toUpperCase() || undefined,
           sort_order: sort,
           is_active: isActive,
         })
@@ -135,10 +135,10 @@ export function OperationalCategoryForm({ mode, initial, onCancel, onSaved }: Pr
               <textarea
                 id="cat-desc"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => setDescription(e.target.value.toUpperCase())}
                 disabled={submitting}
                 rows={3}
-                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-field focus-visible:ring-ring placeholder:text-muted-foreground flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm uppercase shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {mode === 'edit' && initial ? (

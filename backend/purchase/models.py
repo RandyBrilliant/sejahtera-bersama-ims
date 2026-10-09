@@ -56,6 +56,11 @@ class Customer(AuditModel):
             models.Index(fields=["created_at"]),
         ]
 
+    def save(self, *args, **kwargs):
+        self.address = (self.address or "").strip().upper()
+        self.notes = (self.notes or "").strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return self.name
 
