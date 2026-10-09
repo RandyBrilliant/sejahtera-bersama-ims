@@ -13,6 +13,12 @@ export type Product = {
   price_per_kg_idr: number
   /** Bulk stock for this variant (API: grams; tampilan UI: kg). */
   remaining_mass_grams: string
+  /** Stok utama dipisah jadi bawang goreng + tepung (keduanya dihitung di stok utama). */
+  tracks_tepung: boolean
+  /** Bagian tepung dari stok utama (gram). */
+  tepung_mass_grams: string
+  /** Bagian bawang goreng dari stok utama (gram) = stok utama − tepung. */
+  goreng_mass_grams: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -79,6 +85,7 @@ export type ProductCreateInput = {
   name: string
   variant_name: string
   price_per_kg_idr: number
+  tracks_tepung?: boolean
   is_active?: boolean
 }
 
@@ -143,6 +150,9 @@ export type IngredientInventory = {
 
 export type StockMovementType = 'IN' | 'OUT'
 
+/** `StockComponent` di backend — baris stok utama untuk varian dengan tepung terpisah. */
+export type StockComponent = 'GORENG' | 'TEPUNG'
+
 export type IngredientStockMovement = {
   id: number
   ingredient_inventory: number
@@ -170,6 +180,10 @@ export type ProductStockMovement = {
   bonus_mass_grams: string
   total_mass_grams: string
   unit_cost_per_kg_idr: string | null
+  /** Kosong = bukan varian tepung terpisah, atau keluar proporsional (penjualan). */
+  stock_component: StockComponent | ''
+  /** Bagian massa mutasi ini yang masuk/keluar dari stok tepung (gram). */
+  tepung_mass_grams: string
   note: string
   movement_at: string
   created_at: string
@@ -245,6 +259,8 @@ export type ProductStockMovementCreateInput = {
   bonus_mass_grams?: string | number
   /** Required for IN — updates moving-average cost per kg. */
   unit_cost_per_kg_idr?: string | number | null
+  /** Hanya untuk varian dengan tepung terpisah; kosong saat keluar = proporsional. */
+  stock_component?: StockComponent | ''
   note?: string
   movement_at: string
 }

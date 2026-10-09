@@ -124,9 +124,18 @@ export function ProductStockMovementsTable() {
         accessorKey: 'total_mass_grams',
         header: () => sortHeader('Total baris (kg)', 'total_mass_grams'),
         cell: ({ row }) => (
-          <span className="tabular-nums">
-            {formatProductMassKgFromGrams(row.original.total_mass_grams)} kg
-          </span>
+          <div className="tabular-nums">
+            <span>{formatProductMassKgFromGrams(row.original.total_mass_grams)} kg</span>
+            {row.original.stock_component === 'TEPUNG' ? (
+              <p className="text-on-surface-variant text-xs">Tepung</p>
+            ) : Number(row.original.tepung_mass_grams) > 0 ? (
+              <p className="text-on-surface-variant text-xs">
+                Termasuk tepung {formatProductMassKgFromGrams(row.original.tepung_mass_grams)} kg
+              </p>
+            ) : row.original.stock_component === 'GORENG' ? (
+              <p className="text-on-surface-variant text-xs">Bawang goreng</p>
+            ) : null}
+          </div>
         ),
       },
       {

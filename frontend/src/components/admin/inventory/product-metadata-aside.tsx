@@ -28,6 +28,24 @@ export function ProductMetadataAside({ product }: { product: Product }) {
               {formatProductMassKgFromGrams(product.remaining_mass_grams)} kg
             </dd>
           </div>
+          {product.tracks_tepung ? (
+            <>
+              <div>
+                <dt className="text-on-surface-variant text-xs font-medium uppercase">
+                  Bawang goreng
+                </dt>
+                <dd className="text-on-surface mt-0.5 tabular-nums">
+                  {formatProductMassKgFromGrams(product.goreng_mass_grams)} kg
+                </dd>
+              </div>
+              <div>
+                <dt className="text-on-surface-variant text-xs font-medium uppercase">Tepung</dt>
+                <dd className="text-on-surface mt-0.5 tabular-nums">
+                  {formatProductMassKgFromGrams(product.tepung_mass_grams)} kg
+                </dd>
+              </div>
+            </>
+          ) : null}
           <div>
             <dt className="text-on-surface-variant text-xs font-medium uppercase">Status</dt>
             <dd className="text-on-surface mt-0.5">{product.is_active ? 'Aktif' : 'Nonaktif'}</dd>

@@ -100,9 +100,15 @@ export function ProductsTable() {
         accessorKey: 'remaining_mass_grams',
         header: () => sortHeader('Stok utama', 'remaining_mass_grams'),
         cell: ({ row }) => (
-          <span className="tabular-nums">
-            {formatProductMassKgFromGrams(row.original.remaining_mass_grams)} kg
-          </span>
+          <div className="tabular-nums">
+            <span>{formatProductMassKgFromGrams(row.original.remaining_mass_grams)} kg</span>
+            {row.original.tracks_tepung ? (
+              <p className="text-on-surface-variant text-xs">
+                Goreng {formatProductMassKgFromGrams(row.original.goreng_mass_grams)} kg · Tepung{' '}
+                {formatProductMassKgFromGrams(row.original.tepung_mass_grams)} kg
+              </p>
+            ) : null}
+          </div>
         ),
       },
       {

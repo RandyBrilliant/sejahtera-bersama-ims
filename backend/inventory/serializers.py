@@ -12,6 +12,7 @@ from .models import (
     ProductionPackagingOutput,
     ProductPackaging,
     ProductStockMovement,
+    StockComponent,
     StockMovementType,
 )
 from .product_stock import (
@@ -31,6 +32,7 @@ class ProductSerializer(serializers.ModelSerializer):
     created_by = AuditUserMiniSerializer(read_only=True)
     updated_by = AuditUserMiniSerializer(read_only=True)
     price_per_kg_idr = serializers.IntegerField(min_value=1)
+    goreng_mass_grams = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
@@ -40,6 +42,9 @@ class ProductSerializer(serializers.ModelSerializer):
             "variant_name",
             "price_per_kg_idr",
             "remaining_mass_grams",
+            "tracks_tepung",
+            "tepung_mass_grams",
+            "goreng_mass_grams",
             "is_active",
             "created_at",
             "updated_at",
@@ -49,11 +54,28 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "remaining_mass_grams",
+            "tepung_mass_grams",
+            "goreng_mass_grams",
             "created_at",
             "updated_at",
             "created_by",
             "updated_by",
         ]
+
+    def get_goreng_mass_grams(self, obj) -> str:
+        goreng = (obj.remaining_mass_grams or Decimal("0")) - (obj.tepung_mass_grams or Decimal("0"))
+        return str(goreng.quantize(Decimal("0.001")))
+
+    def validate_tracks_tepung(self, value: bool) -> bool:
+        if (
+            not value
+            and self.instance is not None
+            and (self.instance.tepung_mass_grams or Decimal("0")) > 0
+        ):
+            raise serializers.ValidationError(
+                "Masih ada stok tepung pada varian ini. Keluarkan stok tepung terlebih dahulu."
+            )
+        return value
 
     def validate_name(self, value: str):
         cleaned = (value or "").strip()
@@ -288,6 +310,8 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
             "bonus_mass_grams",
             "total_mass_grams",
             "unit_cost_per_kg_idr",
+            "stock_component",
+            "tepung_mass_grams",
             "note",
             "movement_at",
             "created_at",
@@ -300,6 +324,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
             "product_packaging_label",
             "product_variant_name",
             "total_mass_grams",
+            "tepung_mass_grams",
             "created_at",
             "updated_at",
             "created_by",
@@ -352,6 +377,15 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         if pkg is not None and prod is not None and pkg.product_id != prod.pk:
             raise serializers.ValidationError(
                 {"product_packaging": "Kemasan harus milik varian yang dipilih."}
+            )
+        component = attrs.get("stock_component") or ""
+        if (
+            component == StockComponent.TEPUNG
+            and prod is not None
+            and not prod.tracks_tepung
+        ):
+            raise serializers.ValidationError(
+                {"stock_component": "Varian ini tidak memisahkan stok tepung."}
             )
         return attrs
 

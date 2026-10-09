@@ -223,6 +223,95 @@ class ProductMutasiPackagingBookkeepingTests(TestCase):
         self.assertEqual(resp.status_code, 400)
 
 
+class ProductTepungSplitTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            "admin_tepung", full_name="Admin", role=UserRole.ADMIN, password="pass"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        self.product = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Nyonya Merah",
+            price_per_kg_idr=43000,
+            tracks_tepung=True,
+            remaining_mass_grams=Decimal("8000"),
+            tepung_mass_grams=Decimal("2000"),
+        )
+
+    def _post(self, **payload):
+        body = {
+            "product": self.product.id,
+            "movement_at": timezone.now().isoformat(),
+            **payload,
+        }
+        return self.client.post("/api/inventory/product-stock-movements/", body, format="json")
+
+    def test_tepung_in_adds_to_stok_utama_and_tepung_line(self):
+        resp = self._post(
+            movement_type="IN",
+            stock_component="TEPUNG",
+            mass_grams="1000",
+            unit_cost_per_kg_idr="10000",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("9000"))
+        self.assertEqual(self.product.tepung_mass_grams, Decimal("3000"))
+        self.assertEqual(Decimal(resp.json()["tepung_mass_grams"]), Decimal("1000"))
+
+    def test_in_without_component_counts_as_bawang_goreng(self):
+        resp = self._post(movement_type="IN", mass_grams="1000", unit_cost_per_kg_idr="10000")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.json()["stock_component"], "GORENG")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("9000"))
+        self.assertEqual(self.product.tepung_mass_grams, Decimal("2000"))
+
+    def test_tepung_out_cannot_exceed_tepung_line(self):
+        resp = self._post(movement_type="OUT", stock_component="TEPUNG", mass_grams="2500")
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("8000"))
+        self.assertEqual(self.product.tepung_mass_grams, Decimal("2000"))
+
+    def test_out_without_component_splits_proportionally(self):
+        resp = self._post(movement_type="OUT", mass_grams="4000")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("4000"))
+        self.assertEqual(self.product.tepung_mass_grams, Decimal("1000"))
+
+    def test_tepung_rejected_for_product_without_split(self):
+        other = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Asli",
+            price_per_kg_idr=160000,
+            remaining_mass_grams=Decimal("1000"),
+        )
+        resp = self.client.post(
+            "/api/inventory/product-stock-movements/",
+            {
+                "product": other.id,
+                "movement_type": "IN",
+                "stock_component": "TEPUNG",
+                "mass_grams": "1000",
+                "unit_cost_per_kg_idr": "10000",
+                "movement_at": timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400, resp.content)
+
+    def test_cannot_disable_split_while_tepung_remains(self):
+        resp = self.client.patch(
+            f"/api/inventory/products/{self.product.id}/",
+            {"tracks_tepung": False},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400, resp.content)
+
+
 class ProductDeleteInUseTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_user(

@@ -35,6 +35,11 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
   const [isActive, setIsActive] = useState(
     mode === 'edit' && initialProduct ? initialProduct.is_active : true
   )
+  const [tracksTepung, setTracksTepung] = useState(
+    mode === 'edit' && initialProduct ? initialProduct.tracks_tepung : false
+  )
+  const hasTepungStock =
+    mode === 'edit' && initialProduct ? Number(initialProduct.tepung_mass_grams) > 0 : false
 
   const createMutation = useCreateProductMutation()
   const updateMutation = useUpdateProductMutation(initialProduct?.id ?? 0)
@@ -61,6 +66,7 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
           name: name.trim(),
           variant_name: variantName.trim(),
           price_per_kg_idr: Math.floor(price),
+          tracks_tepung: tracksTepung,
           is_active: isActive,
         })
         alert.success('Berhasil', 'Produk berhasil dibuat.')
@@ -70,6 +76,7 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
           name: name.trim(),
           variant_name: variantName.trim(),
           price_per_kg_idr: Math.floor(price),
+          tracks_tepung: tracksTepung,
           is_active: isActive,
         })
         alert.success('Berhasil', 'Produk diperbarui.')
@@ -130,6 +137,27 @@ export function ProductForm({ mode, initialProduct, onCancel, onSaved }: Product
             <p className="text-on-surface-variant text-xs">
               Harga tetap per kilogram. Harga total tiap kemasan dihitung otomatis dari harga ini
               dikali berat bersih kemasan.
+            </p>
+          </div>
+          <div className="grid gap-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="inv-product-tepung"
+                checked={tracksTepung}
+                onCheckedChange={(v) => setTracksTepung(v === true)}
+                disabled={submitting || (tracksTepung && hasTepungStock)}
+              />
+              <Label htmlFor="inv-product-tepung" className="font-normal">
+                Pisahkan stok tepung
+              </Label>
+            </div>
+            <p className="text-on-surface-variant text-xs">
+              Stok utama dibagi jadi bawang goreng dan tepung, keduanya tetap dihitung di stok utama.
+              Mutasi masuk memilih bawang goreng atau tepung; penjualan mengurangi keduanya secara
+              proporsional.
+              {tracksTepung && hasTepungStock
+                ? ' Tidak bisa dimatikan selama masih ada stok tepung.'
+                : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">

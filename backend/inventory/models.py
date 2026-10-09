@@ -71,6 +71,22 @@ class Product(AuditModel):
         default=0,
         help_text=_("Total bulk stock for this variant (shared across all kemasan)."),
     )
+    tracks_tepung = models.BooleanField(
+        _("track tepung separately"),
+        default=False,
+        help_text=_(
+            "When enabled, stok utama is split into bawang goreng and tepung. "
+            "Both lines are counted in remaining_mass_grams."
+        ),
+    )
+    tepung_mass_grams = models.DecimalField(
+        _("tepung mass (grams)"),
+        max_digits=14,
+        decimal_places=3,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_("Portion of remaining_mass_grams that is tepung (only when tracks_tepung)."),
+    )
     avg_cost_per_kg_idr = models.DecimalField(
         _("average cost per kg (IDR)"),
         max_digits=14,
@@ -260,6 +276,13 @@ class StockMovementType(models.TextChoices):
     OUT = "OUT", _("Stock Out")
 
 
+class StockComponent(models.TextChoices):
+    """Which line of stok utama a movement touches, for products with tracks_tepung."""
+
+    GORENG = "GORENG", _("Bawang goreng")
+    TEPUNG = "TEPUNG", _("Tepung")
+
+
 class IngredientStockMovement(AuditModel):
     """Immutable ingredient stock movement ledger."""
 
@@ -366,6 +389,25 @@ class ProductStockMovement(AuditModel):
             "Production cost per kg at this movement (audit): batch cost on IN, "
             "moving-average cost on OUT (sale). Null for legacy/manual rows."
         ),
+    )
+    stock_component = models.CharField(
+        _("stock component"),
+        max_length=10,
+        choices=StockComponent.choices,
+        blank=True,
+        default="",
+        help_text=_(
+            "For products with tracks_tepung: the line this movement targets. "
+            "Blank on OUT means split proportionally between bawang goreng and tepung."
+        ),
+    )
+    tepung_mass_grams = models.DecimalField(
+        _("tepung mass (grams)"),
+        max_digits=14,
+        decimal_places=3,
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text=_("Part of this movement's mass applied to the tepung line."),
     )
     note = models.TextField(_("note"), blank=True)
     movement_at = models.DateTimeField(_("movement at"), db_index=True)

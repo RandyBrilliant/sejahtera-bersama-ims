@@ -92,6 +92,55 @@ def weighted_moving_average(old_qty, old_avg_unit_cost, add_qty, add_total_cost)
     return (old_qty * old_avg + add_total_cost) / new_qty
 
 
+def tepung_mass_for_movement(
+    product,
+    *,
+    movement_type: str,
+    total_mass_grams: Decimal,
+    component: str,
+) -> Decimal:
+    """
+    Grams of a movement that belong to the product's tepung line (always >= 0).
+
+    Products without ``tracks_tepung`` always return 0. On IN, only a TEPUNG movement
+    adds to the tepung line. On OUT, TEPUNG takes from tepung only, GORENG from bawang
+    goreng only, and a blank component (sales) splits by the current tepung share.
+    Raises ``ValueError`` when the targeted line does not have enough stock.
+    """
+    from .models import StockComponent, StockMovementType
+
+    if not getattr(product, "tracks_tepung", False):
+        return Decimal("0")
+
+    total = Decimal(str(total_mass_grams or 0))
+    tepung = Decimal(str(product.tepung_mass_grams or 0))
+    remaining = Decimal(str(product.remaining_mass_grams or 0))
+
+    if movement_type == StockMovementType.IN:
+        return total if component == StockComponent.TEPUNG else Decimal("0")
+
+    if component == StockComponent.TEPUNG:
+        if total > tepung:
+            raise ValueError(
+                f"Stok tepung «{product.variant_name}» tidak mencukupi: "
+                f"butuh {total} g, tersedia {tepung} g."
+            )
+        return total
+    if component == StockComponent.GORENG:
+        goreng = remaining - tepung
+        if total > goreng:
+            raise ValueError(
+                f"Stok bawang goreng «{product.variant_name}» tidak mencukupi: "
+                f"butuh {total} g, tersedia {goreng} g."
+            )
+        return Decimal("0")
+
+    if remaining <= 0 or tepung <= 0:
+        return Decimal("0")
+    share = (tepung * total / remaining).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+    return min(share, tepung)
+
+
 def product_financial_value_idr(product) -> int:
     """
     Inventory value from the product's fixed price per kg:

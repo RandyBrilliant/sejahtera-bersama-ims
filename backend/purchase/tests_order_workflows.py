@@ -147,6 +147,20 @@ class SalesCancelVerifyTests(TestCase):
         line = self.order.lines.get()
         self.assertEqual(line.cogs_material_idr, 60000)
 
+    def test_verify_takes_tepung_share_from_split_product(self):
+        self.product.tracks_tepung = True
+        self.product.tepung_mass_grams = Decimal("1000")
+        self.product.save(update_fields=["tracks_tepung", "tepung_mass_grams"])
+        self.client.force_authenticate(self.owner)
+        resp = self.client.post(f"/api/purchase/sales-orders/{self.order.pk}/verify/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.product.refresh_from_db()
+        # 1000 g sold from 5000 g stock that is 20% tepung -> 200 g tepung out.
+        self.assertEqual(self.product.remaining_mass_grams, Decimal("4000"))
+        self.assertEqual(self.product.tepung_mass_grams, Decimal("800"))
+        movement = self.product.stock_movements.get()
+        self.assertEqual(movement.tepung_mass_grams, Decimal("200"))
+
     def test_sales_staff_cannot_cancel(self):
         self.client.force_authenticate(self.sales)
         resp = self.client.post(f"/api/purchase/sales-orders/{self.order.pk}/cancel/")

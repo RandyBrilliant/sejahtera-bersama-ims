@@ -37,7 +37,7 @@ from inventory.models import (
     ProductStockMovement,
     StockMovementType,
 )
-from inventory.product_stock import weighted_moving_average
+from inventory.product_stock import tepung_mass_for_movement, weighted_moving_average
 from payroll.costing import production_labor_for_range
 
 from .filters import (
@@ -679,11 +679,35 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        tepung_out_by_product: defaultdict[int, Decimal] = defaultdict(Decimal)
+        line_tepung: dict[int, Decimal] = {}
+        for line in lines:
+            packaging = line.product_packaging
+            line_mass = (
+                Decimal(str(line.quantity)) * Decimal(str(packaging.net_mass_kg)) * Decimal("1000")
+            )
+            prod = products_locked[packaging.product_id]
+            share = tepung_mass_for_movement(
+                prod,
+                movement_type=StockMovementType.OUT,
+                total_mass_grams=line_mass,
+                component="",
+            )
+            share = min(
+                share,
+                (prod.tepung_mass_grams or Decimal("0")) - tepung_out_by_product[prod.pk],
+            )
+            line_tepung[line.pk] = share
+            tepung_out_by_product[prod.pk] += share
+
         for pid, need in mass_by_product.items():
             prod = products_locked[pid]
             prod.remaining_mass_grams = (prod.remaining_mass_grams or Decimal("0")) - need
+            prod.tepung_mass_grams = (prod.tepung_mass_grams or Decimal("0")) - tepung_out_by_product[pid]
             prod.updated_by = request.user
-            prod.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+            prod.save(
+                update_fields=["remaining_mass_grams", "tepung_mass_grams", "updated_by", "updated_at"]
+            )
 
         for line in lines:
             packaging = line.product_packaging
@@ -707,6 +731,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 mass_grams=line_mass,
                 bonus_mass_grams=Decimal("0"),
                 unit_cost_per_kg_idr=avg_cost_per_kg,
+                tepung_mass_grams=line_tepung[line.pk],
                 note=f"PENGIRIMAN PENJUALAN {order.order_code}",
                 movement_at=now,
                 created_by=request.user,

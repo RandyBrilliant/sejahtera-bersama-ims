@@ -40,12 +40,14 @@ from .models import (
     ProductionPackagingOutput,
     ProductPackaging,
     ProductStockMovement,
+    StockComponent,
     StockMovementType,
 )
 from .product_stock import (
     annotate_packaging_derived_remaining,
     grams_delta_from_mass_fields,
     product_financial_value_idr,
+    tepung_mass_for_movement,
     weighted_moving_average,
 )
 from .serializers import (
@@ -664,6 +666,24 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
                 "Stok produk (massa utama) tidak mencukupi untuk pengeluaran ini."
             )
 
+        component = serializer.validated_data.get("stock_component") or ""
+        if product.tracks_tepung:
+            if movement == StockMovementType.IN and not component:
+                component = StockComponent.GORENG
+        else:
+            component = ""
+        tepung_mass = tepung_mass_for_movement(
+            product,
+            movement_type=movement,
+            total_mass_grams=mass + bonus_mass,
+            component=component,
+        )
+        tepung_before = product.tepung_mass_grams or Decimal("0")
+        if movement == StockMovementType.IN:
+            product.tepung_mass_grams = tepung_before + tepung_mass
+        else:
+            product.tepung_mass_grams = tepung_before - tepung_mass
+
         if movement == StockMovementType.IN:
             unit_cost_per_kg = Decimal(str(serializer.validated_data["unit_cost_per_kg_idr"]))
             add_mass = mass + bonus_mass
@@ -684,6 +704,7 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
             product.save(
                 update_fields=[
                     "remaining_mass_grams",
+                    "tepung_mass_grams",
                     "avg_cost_per_kg_idr",
                     "updated_by",
                     "updated_at",
@@ -691,6 +712,8 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
             )
             serializer.save(
                 unit_cost_per_kg_idr=unit_cost_per_kg,
+                stock_component=component,
+                tepung_mass_grams=tepung_mass,
                 created_by=self.request.user,
                 updated_by=self.request.user,
             )
@@ -698,9 +721,13 @@ class ProductStockMovementViewSet(InventorySummaryCacheMixin, AuditTrailMixin, v
             unit_cost_per_kg = product.avg_cost_per_kg_idr
             product.remaining_mass_grams = next_mass
             product.updated_by = self.request.user
-            product.save(update_fields=["remaining_mass_grams", "updated_by", "updated_at"])
+            product.save(
+                update_fields=["remaining_mass_grams", "tepung_mass_grams", "updated_by", "updated_at"]
+            )
             serializer.save(
                 unit_cost_per_kg_idr=unit_cost_per_kg,
+                stock_component=component,
+                tepung_mass_grams=tepung_mass,
                 created_by=self.request.user,
                 updated_by=self.request.user,
             )
@@ -857,6 +884,9 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
                     mass_grams=mass_main,
                     bonus_mass_grams=mass_bonus,
                     unit_cost_per_kg_idr=batch_cost_per_kg_by_pid.get(packaging.product_id),
+                    stock_component=(
+                        StockComponent.GORENG if packaging.product.tracks_tepung else ""
+                    ),
                     note=f"HASIL PRODUKSI BATCH #{batch.id}",
                     movement_at=batch.created_at,
                     created_by=request.user,

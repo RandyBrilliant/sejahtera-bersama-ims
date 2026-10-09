@@ -26,11 +26,12 @@ import { cn } from '@/lib/utils'
 import { parseInventoryMutationError } from '@/components/admin/inventory/inventory-mutation-error'
 import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
-import type { StockMovementType } from '@/types/inventory'
+import type { StockComponent, StockMovementType } from '@/types/inventory'
 
 const PAGE = { page: 1, page_size: 500 } as const
 const NO_PROD = '__none__' as const
 const NO_PKG = '__none__' as const
+const PROPORTIONAL = '__proportional__' as const
 
 function parseQtyField(s: string): number {
   return Number(String(s).trim().replace(/\s/g, '').replace(',', '.'))
@@ -52,6 +53,7 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
   const [productId, setProductId] = useState<number | ''>('')
   const [packagingId, setPackagingId] = useState<number | ''>('')
   const [movementType, setMovementType] = useState<StockMovementType>('IN')
+  const [component, setComponent] = useState<StockComponent | ''>('GORENG')
   /** Input dalam kg jika tanpa kemasan; dikirim ke API sebagai gram. */
   const [massKg, setMassKg] = useState('')
   const [bonusKg, setBonusKg] = useState('')
@@ -91,8 +93,12 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
     if (v === 'OUT') {
       setBonusKg('')
       setBonusUnits('')
+    } else if (component === '') {
+      setComponent('GORENG')
     }
   }
+
+  const tracksTepung = selectedProduct?.tracks_tepung === true
 
   const netKg = selectedPackaging
     ? Number(String(selectedPackaging.net_mass_kg).replace(',', '.'))
@@ -193,6 +199,7 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
         bonus_mass_grams:
           movementType === 'IN' && bonusG > 0 ? String(bonusG) : undefined,
         unit_cost_per_kg_idr: movementType === 'IN' ? unitCostPerKg.trim() : undefined,
+        stock_component: tracksTepung ? component : undefined,
         note: note.trim().toUpperCase() || undefined,
         movement_at: datetimeLocalValueToIso(movementAtLocal),
       })
@@ -311,6 +318,38 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
               </SelectContent>
             </Select>
           </div>
+
+          {tracksTepung && selectedProduct ? (
+            <div className="grid gap-2">
+              <Label>Bagian stok</Label>
+              <Select
+                value={component === '' ? PROPORTIONAL : component}
+                onValueChange={(v) =>
+                  setComponent(v === PROPORTIONAL ? '' : (v as StockComponent))
+                }
+                disabled={pending}
+              >
+                <SelectTrigger className="border-outline-variant w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GORENG">
+                    Bawang goreng ·{' '}
+                    {formatProductMassKgFromGrams(selectedProduct.goreng_mass_grams)} kg
+                  </SelectItem>
+                  <SelectItem value="TEPUNG">
+                    Tepung · {formatProductMassKgFromGrams(selectedProduct.tepung_mass_grams)} kg
+                  </SelectItem>
+                  {movementType === 'OUT' ? (
+                    <SelectItem value={PROPORTIONAL}>Campuran (proporsional)</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+              <p className="text-on-surface-variant text-xs">
+                Keduanya dihitung di stok utama. Pilih tepung untuk mencatat tepung terpisah.
+              </p>
+            </div>
+          ) : null}
 
           {useKemasan ? (
             <>
