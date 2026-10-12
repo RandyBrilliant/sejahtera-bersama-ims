@@ -7,7 +7,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from inventory.models import AuditModel, IngredientInventory, ProductPackaging
+from inventory.models import AuditModel, IngredientInventory, PackagingType, ProductPackaging
 
 
 class OrderStatus(models.TextChoices):
@@ -296,6 +296,13 @@ class SalesOrderLine(AuditModel):
         related_name="sales_order_lines",
         verbose_name=_("product packaging"),
     )
+    packaging_type = models.CharField(
+        _("packaging type"),
+        max_length=5,
+        choices=PackagingType.choices,
+        default=PackagingType.BAL,
+        help_text=_("Jenis kemasan luar (Bal / Kotak) for this line; does not affect stock."),
+    )
     quantity = models.DecimalField(
         _("quantity"),
         max_digits=12,
@@ -321,6 +328,12 @@ class SalesOrderLine(AuditModel):
         verbose_name = _("sales order line")
         verbose_name_plural = _("sales order lines")
         ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order", "product_packaging", "packaging_type"],
+                name="uq_sales_line_packaging_type_per_order",
+            ),
+        ]
         indexes = [
             models.Index(fields=["order", "product_packaging"]),
         ]

@@ -1,6 +1,8 @@
 """Integration tests for purchase/sales cancel locking and verify flows."""
 
+from datetime import date
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -117,7 +119,6 @@ class SalesCancelVerifyTests(TestCase):
         self.pkg = ProductPackaging.objects.create(
             product=self.product,
             label="250g",
-            packaging_type="KTK",
             net_mass_kg=Decimal("0.25"),
         )
         self.customer = Customer.objects.create(name="Toko B", address="Jl. B")
@@ -132,6 +133,7 @@ class SalesCancelVerifyTests(TestCase):
         SalesOrderLine.objects.create(
             order=self.order,
             product_packaging=self.pkg,
+            packaging_type="KTK",
             quantity=Decimal("4"),
             unit_price_idr=12500,
         )
@@ -197,3 +199,162 @@ class SalesCancelVerifyTests(TestCase):
             format="json",
         )
         self.assertEqual(create.status_code, 403)
+
+
+class SalesLinePackagingTypeTests(TestCase):
+    """Jenis kemasan (Bal / Kotak) is chosen per sales line, not on the kemasan master."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "owner3", full_name="Owner", role=UserRole.LEADERSHIP, password="pass"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+        self.product = Product.objects.create(
+            name="Bawang Goreng",
+            variant_name="Original",
+            price_per_kg_idr=100000,
+            remaining_mass_grams=Decimal("5000"),
+        )
+        self.pkg = ProductPackaging.objects.create(
+            product=self.product, label="1/2 KG", net_mass_kg=Decimal("0.5")
+        )
+        self.customer = Customer.objects.create(name="Toko C", address="Jl. C")
+
+    def _create(self, lines):
+        return self.client.post(
+            "/api/purchase/sales-orders/",
+            {"customer": self.customer.pk, "lines": lines},
+            format="json",
+        )
+
+    def test_defaults_to_bal(self):
+        resp = self._create([{"product_packaging": self.pkg.pk, "quantity": "2"}])
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.data["lines"][0]["packaging_type"], "BAL")
+
+    def test_same_kemasan_with_both_types_is_allowed(self):
+        resp = self._create(
+            [
+                {"product_packaging": self.pkg.pk, "packaging_type": "BAL", "quantity": "2"},
+                {"product_packaging": self.pkg.pk, "packaging_type": "KTK", "quantity": "3"},
+            ]
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        types = sorted(line["packaging_type"] for line in resp.data["lines"])
+        self.assertEqual(types, ["BAL", "KTK"])
+
+    def test_same_kemasan_and_type_is_rejected(self):
+        resp = self._create(
+            [
+                {"product_packaging": self.pkg.pk, "packaging_type": "KTK", "quantity": "2"},
+                {"product_packaging": self.pkg.pk, "packaging_type": "KTK", "quantity": "3"},
+            ]
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_invalid_type_is_rejected(self):
+        resp = self._create(
+            [{"product_packaging": self.pkg.pk, "packaging_type": "XYZ", "quantity": "2"}]
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_update_changes_line_type(self):
+        created = self._create([{"product_packaging": self.pkg.pk, "quantity": "2"}])
+        resp = self.client.patch(
+            f"/api/purchase/sales-orders/{created.data['id']}/",
+            {"lines": [{"product_packaging": self.pkg.pk, "packaging_type": "KTK", "quantity": "2"}]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["lines"][0]["packaging_type"], "KTK")
+
+    def test_receipt_uses_line_type(self):
+        from purchase.receipt_pdf import _line_qty_display
+
+        order = SalesOrder.objects.create(order_code="SO-TEST-PT", customer=self.customer)
+        line = SalesOrderLine.objects.create(
+            order=order,
+            product_packaging=self.pkg,
+            packaging_type="KTK",
+            quantity=Decimal("4"),
+            unit_price_idr=50000,
+        )
+        self.assertEqual(_line_qty_display(line), "4 KTK X 0.5 KG")
+
+
+class PreprintedReceiptLayoutTests(TestCase):
+    """Nota lama overlay must keep each value inside its pre-printed field."""
+
+    def setUp(self):
+        product = Product.objects.create(name="Bawang Goreng", variant_name="NYONYA MERAH")
+        pkg = ProductPackaging.objects.create(
+            product=product, label="5 KG @ 2 ONS", net_mass_kg=Decimal("0.2")
+        )
+        customer = Customer.objects.create(
+            name="ASRI", address="JL. MASJID KOMPLEK PASAR INDUK, LAMBARO, B ACEH"
+        )
+        self.order = SalesOrder.objects.create(
+            order_code="SO-TEST-RCPT",
+            customer=customer,
+            invoice_date=date(2026, 10, 13),
+            total_idr=8600000,
+        )
+        SalesOrderLine.objects.create(
+            order=self.order, product_packaging=pkg, quantity=Decimal("1000"), unit_price_idr=8600
+        )
+
+    def _draw(self):
+        """Render the overlay and return {text: (left_mm, right_mm, font_size)}."""
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+
+        from purchase.receipt_pdf import DEFAULT_LAYOUT, PAGE_SIZE, _draw_values
+
+        drawn = {}
+
+        class Recorder(canvas.Canvas):
+            def drawString(self, x, y, text, *args, **kwargs):
+                width = self.stringWidth(text, self._fontname, self._fontsize)
+                drawn[text] = (x / mm, (x + width) / mm, self._fontsize)
+                return super().drawString(x, y, text, *args, **kwargs)
+
+            def drawRightString(self, x, y, text, *args, **kwargs):
+                width = self.stringWidth(text, self._fontname, self._fontsize)
+                drawn[text] = ((x - width) / mm, x / mm, self._fontsize)
+                return super().drawRightString(x, y, text, *args, **kwargs)
+
+        pdf = Recorder(BytesIO(), pagesize=PAGE_SIZE)
+        _draw_values(
+            pdf, DEFAULT_LAYOUT, self.order, list(self.order.lines.all()), include_faktur_number=False
+        )
+        return drawn
+
+    def test_day_and_date_are_split_around_tgl_label(self):
+        drawn = self._draw()
+        # Pad prints "tgl." at ~102.6–106.7 mm between the two blanks.
+        self.assertLess(drawn["SELASA"][1], 102.6)
+        self.assertGreater(drawn["13-10-2026"][0], 106.7)
+
+    def test_address_uses_pad_lines_at_readable_size(self):
+        drawn = self._draw()
+        address_lines = [k for k in drawn if k.startswith("JL.") or "ACEH" in k]
+        self.assertTrue(address_lines)
+        for text in address_lines:
+            self.assertGreaterEqual(drawn[text][2], 8.0, text)
+
+    def test_long_qty_is_condensed_inside_banyaknya_rule(self):
+        from reportlab.pdfgen import canvas
+
+        from purchase.receipt_pdf import DEFAULT_LAYOUT, PAGE_SIZE, _draw_fitted
+
+        layout = DEFAULT_LAYOUT
+        width = layout.preprinted_qty_right - layout.preprinted_qty_left
+        pdf = canvas.Canvas(BytesIO(), pagesize=PAGE_SIZE)
+        printed = _draw_fitted(
+            pdf, 0, 0, "1000 BAL X 0.2 KG", "Helvetica", layout.font_qty, width,
+            layout.font_min, layout.min_horiz_scale,
+        )
+        self.assertLessEqual(printed, width)
+        # The pad's Banyaknya | Nama Barang rule sits at ~25 mm.
+        self.assertLess(layout.preprinted_qty_right, 25.0)

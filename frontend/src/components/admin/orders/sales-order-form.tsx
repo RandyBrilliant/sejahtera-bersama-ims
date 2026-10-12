@@ -39,10 +39,12 @@ import {
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useProductPackagingListQuery } from '@/hooks/use-inventory-query'
 import {
   useCreateCustomerMutation,
   useCreateSalesOrderMutation,
+  useCustomerQuery,
   useCustomersQuery,
   useSalesOrderQuery,
   useSalesOrdersQuery,
@@ -50,11 +52,14 @@ import {
   useWilayahQuery,
 } from '@/hooks/use-purchase-query'
 import { canEditOrderLines } from '@/constants/order-status'
-import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
-import type { ProductPackaging } from '@/types/inventory'
+import { PACKAGING_TYPE_LABEL, PACKAGING_TYPES } from '@/constants/packaging-types'
+import type { PackagingType, ProductPackaging } from '@/types/inventory'
 import type { SalesOrder, SalesOrderLineInput } from '@/types/purchase'
 
 const listParams = { page: 1, page_size: 500 } as const
+
+/** Customer picker searches server-side; the API caps pages at 100 rows. */
+const CUSTOMER_PICKER_PAGE_SIZE = 50
 
 function isoTomorrowLocal(): string {
   const d = new Date()
@@ -84,13 +89,19 @@ function nextSalesOrderCode(existingCodes: string[], stem: string): string {
   return `${stem}-${String(max + 1).padStart(4, '0')}`
 }
 
-/** Cart line, keyed by product_packaging id (duplicates always merge). */
+/** Cart line, keyed by kemasan + jenis (duplicates always merge). */
 type CartItem = {
   product_packaging: number
+  /** Jenis kemasan luar untuk baris ini (tidak memengaruhi stok). */
+  packaging_type: PackagingType
   /** Berat yang dipesan (kg). Dikonversi ke jumlah kemasan saat simpan. */
   massKg: string
   /** Optional custom price per kg (IDR) for this order; blank = product default. */
   unit_price_per_kg_idr: string
+}
+
+function cartKey(it: Pick<CartItem, 'product_packaging' | 'packaging_type'>): string {
+  return `${it.product_packaging}:${it.packaging_type}`
 }
 
 function massKgOf(pkg: ProductPackaging | undefined): number {
@@ -137,6 +148,7 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
     if (!allowCustomPrice) {
       return {
         product_packaging: l.product_packaging,
+        packaging_type: l.packaging_type,
         massKg,
         unit_price_per_kg_idr: '',
       }
@@ -150,6 +162,7 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
     const isCustom = defaultUnit == null || l.unit_price_idr !== defaultUnit
     return {
       product_packaging: l.product_packaging,
+      packaging_type: l.packaging_type,
       massKg,
       unit_price_per_kg_idr: isCustom ? perKgFromLine(l.unit_price_idr, l.net_mass_kg) : '',
     }
@@ -171,7 +184,15 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   /** Sales may only change cart lines when editing — nota header stays locked. */
   const lockNotaDetails = mode === 'edit' && isSalesStaff
 
-  const customersQuery = useCustomersQuery({ ...listParams, is_active: true })
+  const [customerSearch, setCustomerSearch] = useState('')
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch.trim())
+  const customersQuery = useCustomersQuery({
+    page: 1,
+    page_size: CUSTOMER_PICKER_PAGE_SIZE,
+    is_active: true,
+    ordering: 'name',
+    search: debouncedCustomerSearch || undefined,
+  })
   const wilayahQuery = useWilayahQuery({ page: 1, page_size: 200, ordering: 'name' })
   const packagingQuery = useProductPackagingListQuery(listParams)
 
@@ -186,6 +207,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   }, [todayOrdersQuery.data?.results, soCodeStem])
 
   const customers = useMemo(() => customersQuery.data?.results ?? [], [customersQuery.data?.results])
+  const customersHasMore = (customersQuery.data?.count ?? 0) > customers.length
   const packagingRows = useMemo(
     () => packagingQuery.data?.results ?? [],
     [packagingQuery.data?.results]
@@ -199,6 +221,17 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const [customerId, setCustomerId] = useState<number | ''>(() =>
     initial?.customer != null ? initial.customer : ''
   )
+  const customerInList = customers.find((c) => c.id === customerId)
+  // The picker only holds the current search page, so fetch the chosen customer when it is not in it.
+  const customerDetailQuery = useCustomerQuery(
+    customerId === '' ? null : customerId,
+    customerId !== '' && !customerInList
+  )
+  const selectedCustomer =
+    customerInList ?? (customerDetailQuery.data?.id === customerId ? customerDetailQuery.data : undefined)
+  const selectedCustomerName =
+    selectedCustomer?.name ??
+    (initial && initial.customer === customerId ? initial.customer_name : undefined)
   const [invoiceNumber, setInvoiceNumber] = useState(() => initial?.invoice_number ?? '')
   const [invoiceDate, setInvoiceDate] = useState(() =>
     initial?.invoice_date ? initial.invoice_date.slice(0, 10) : isoTomorrowLocal()
@@ -207,13 +240,12 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     initial?.notes != null ? initial.notes.toUpperCase() : ''
   )
   const [cart, setCart] = useState<CartItem[]>(() => cartFromInitial(initial, canSetCustomPrice))
-  const [expandedCustom, setExpandedCustom] = useState<Set<number>>(new Set())
+  const [expandedCustom, setExpandedCustom] = useState<Set<string>>(new Set())
 
   const [catalogSearch, setCatalogSearch] = useState('')
   const [variantFilter, setVariantFilter] = useState<string>('__all')
   const [fakturOpen, setFakturOpen] = useState(false)
 
-  const [customerSearch, setCustomerSearch] = useState('')
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false)
   const [customerModalOpen, setCustomerModalOpen] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
@@ -227,18 +259,6 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   const updateMut = useUpdateSalesOrderMutation(orderId ?? 0)
   const pending = createMut.isPending || updateMut.isPending
 
-  const filteredCustomers = useMemo(() => {
-    const q = customerSearch.trim().toLowerCase()
-    if (!q) return customers
-    return customers.filter((c) => {
-      return (
-        c.name.toLowerCase().includes(q) ||
-        (c.wilayah_name ?? '').toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        c.address.toLowerCase().includes(q)
-      )
-    })
-  }, [customerSearch, customers])
 
   const activePackaging = useMemo(
     () => packagingRows.filter((p) => p.is_active),
@@ -266,7 +286,10 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
   const cartKgById = useMemo(() => {
     const map = new Map<number, number>()
-    for (const it of cart) map.set(it.product_packaging, parseDecimalLike(it.massKg) || 0)
+    for (const it of cart) {
+      const kg = parseDecimalLike(it.massKg) || 0
+      map.set(it.product_packaging, (map.get(it.product_packaging) ?? 0) + kg)
+    }
     return map
   }, [cart])
 
@@ -319,27 +342,37 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     return [...byProduct.values()].filter((v) => v.cartG > v.availableG + 0.5)
   }, [cart, packagingById])
 
+  /** Catalog tap: add one kemasan to the first line of that kemasan, else a new BAL line. */
   function addToCart(id: number) {
     const unitKg = massKgOf(packagingById.get(id))
     const step = unitKg > 0 ? unitKg : 0.1
     setCart((prev) => {
       const found = prev.find((it) => it.product_packaging === id)
       if (found) {
+        const key = cartKey(found)
         const next = (parseDecimalLike(found.massKg) || 0) + step
         return prev.map((it) =>
-          it.product_packaging === id ? { ...it, massKg: formatKgInputValue(next) } : it
+          cartKey(it) === key ? { ...it, massKg: formatKgInputValue(next) } : it
         )
       }
-      return [...prev, { product_packaging: id, massKg: formatKgInputValue(step), unit_price_per_kg_idr: '' }]
+      return [
+        ...prev,
+        {
+          product_packaging: id,
+          packaging_type: 'BAL',
+          massKg: formatKgInputValue(step),
+          unit_price_per_kg_idr: '',
+        },
+      ]
     })
   }
 
-  function stepMassKg(id: number, deltaPacks: number) {
-    const unitKg = massKgOf(packagingById.get(id))
-    const step = unitKg > 0 ? unitKg : 0.1
+  function stepMassKg(key: string, deltaPacks: number) {
     setCart((prev) =>
       prev.flatMap((it) => {
-        if (it.product_packaging !== id) return [it]
+        if (cartKey(it) !== key) return [it]
+        const unitKg = massKgOf(packagingById.get(it.product_packaging))
+        const step = unitKg > 0 ? unitKg : 0.1
         const next = (parseDecimalLike(it.massKg) || 0) + deltaPacks * step
         if (next <= 1e-9) return []
         return [{ ...it, massKg: formatKgInputValue(next) }]
@@ -347,33 +380,50 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     )
   }
 
-  function setMassKg(id: number, raw: string) {
+  function setMassKg(key: string, raw: string) {
     const cleaned = raw.replace(/[^\d.,]/g, '')
-    setCart((prev) =>
-      prev.map((it) => (it.product_packaging === id ? { ...it, massKg: cleaned } : it))
-    )
+    setCart((prev) => prev.map((it) => (cartKey(it) === key ? { ...it, massKg: cleaned } : it)))
   }
 
-  function removeItem(id: number) {
-    setCart((prev) => prev.filter((it) => it.product_packaging !== id))
+  /** Switch jenis; if the kemasan already has a line with that jenis, merge into it. */
+  function setLinePackagingType(key: string, type: PackagingType) {
+    setCart((prev) => {
+      const source = prev.find((it) => cartKey(it) === key)
+      if (!source || source.packaging_type === type) return prev
+      const targetKey = cartKey({ product_packaging: source.product_packaging, packaging_type: type })
+      const target = prev.find((it) => cartKey(it) === targetKey)
+      if (!target) {
+        return prev.map((it) => (cartKey(it) === key ? { ...it, packaging_type: type } : it))
+      }
+      const mergedKg = (parseDecimalLike(target.massKg) || 0) + (parseDecimalLike(source.massKg) || 0)
+      return prev.flatMap((it) => {
+        if (cartKey(it) === key) return []
+        if (cartKey(it) === targetKey) return [{ ...it, massKg: formatKgInputValue(mergedKg) }]
+        return [it]
+      })
+    })
+  }
+
+  function removeItem(key: string) {
+    setCart((prev) => prev.filter((it) => cartKey(it) !== key))
     setExpandedCustom((prev) => {
       const next = new Set(prev)
-      next.delete(id)
+      next.delete(key)
       return next
     })
   }
 
-  function setCustomPerKg(id: number, val: string) {
+  function setCustomPerKg(key: string, val: string) {
     setCart((prev) =>
-      prev.map((it) => (it.product_packaging === id ? { ...it, unit_price_per_kg_idr: val } : it))
+      prev.map((it) => (cartKey(it) === key ? { ...it, unit_price_per_kg_idr: val } : it))
     )
   }
 
-  function toggleCustom(id: number) {
+  function toggleCustom(key: string) {
     setExpandedCustom((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -439,6 +489,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
       }
       const line: SalesOrderLineInput = {
         product_packaging: it.product_packaging,
+        packaging_type: it.packaging_type,
         quantity: String(qtyNum),
       }
       if (canSetCustomPrice) {
@@ -484,7 +535,6 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     }
   }
 
-  const selectedCustomer = customers.find((c) => c.id === customerId)
 
   return (
     <>
@@ -574,8 +624,6 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       </span>
                       <span className="text-on-surface truncate font-medium">{p.label}</span>
                       <span className="text-on-surface-variant text-xs">
-                        {PACKAGING_TYPE_LABEL[p.packaging_type] ?? p.packaging_type}
-                        {' · '}
                         {fmtKgLabel(p.net_mass_kg)}
                       </span>
                       <span className="text-primary mt-1 font-semibold tabular-nums">
@@ -604,8 +652,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               {lockNotaDetails ? (
                 <>
                   <div className="border-outline-variant bg-surface-container-low rounded-lg border px-3 py-2 text-sm">
-                    {selectedCustomer?.name ??
-                      (customerId !== '' ? `#${customerId}` : '—')}
+                    {selectedCustomerName ?? (customerId !== '' ? 'Memuat…' : '—')}
                   </div>
                   {selectedCustomer ? (
                     <p className="text-on-surface-variant truncate text-xs">
@@ -629,7 +676,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                     disabled={pending || customersQuery.isLoading}
                   >
                     <span className="truncate text-left">
-                      {selectedCustomer?.name ?? (customerId !== '' ? `#${customerId}` : 'Pilih pelanggan…')}
+                      {selectedCustomerName ?? (customerId !== '' ? 'Memuat…' : 'Pilih pelanggan…')}
                     </span>
                     <span className="text-on-surface-variant text-xs">Cari</span>
                   </Button>
@@ -649,12 +696,14 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       className="border-outline-variant"
                     />
                     <div className="border-outline-variant max-h-56 overflow-auto rounded-md border">
-                      {filteredCustomers.length === 0 ? (
+                      {customersQuery.isLoading ? (
+                        <div className="text-on-surface-variant p-3 text-sm">Memuat pelanggan…</div>
+                      ) : customers.length === 0 ? (
                         <div className="text-on-surface-variant p-3 text-sm">
                           Pelanggan tidak ditemukan.
                         </div>
                       ) : (
-                        filteredCustomers.map((c) => {
+                        customers.map((c) => {
                           const selected = customerId === c.id
                           return (
                             <button
@@ -684,6 +733,12 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                         })
                       )}
                     </div>
+                    {customersHasMore ? (
+                      <p className="text-on-surface-variant px-1 text-[11px]">
+                        Menampilkan {customers.length} dari {customersQuery.data?.count} pelanggan —
+                        ketik nama untuk mencari.
+                      </p>
+                    ) : null}
                     <Button
                       type="button"
                       variant="outline"
@@ -738,24 +793,25 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               ) : (
                 <ul className="divide-outline-variant divide-y">
                   {cart.map((it) => {
+                    const key = cartKey(it)
                     const pkg = packagingById.get(it.product_packaging)
                     const massNum = parseDecimalLike(it.massKg) || 0
                     const isCustom = canSetCustomPrice && it.unit_price_per_kg_idr.trim() !== ''
                     const expanded =
                       canSetCustomPrice &&
-                      (expandedCustom.has(it.product_packaging) || isCustom)
+                      (expandedCustom.has(key) || isCustom)
                     const unitKg = massKgOf(pkg)
                     const qtyEq = packageQtyFromKg(massNum, unitKg)
                     const pricePerKg = isCustom
                       ? Number(it.unit_price_per_kg_idr) || 0
                       : pkg?.price_per_kg_idr ?? 0
                     return (
-                      <li key={it.product_packaging} className="space-y-2 px-4 py-3">
+                      <li key={key} className="space-y-2 px-4 py-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-on-surface truncate text-sm font-medium">
                               {pkg
-                                ? `${pkg.product_variant_name} · ${pkg.label} · ${PACKAGING_TYPE_LABEL[pkg.packaging_type] ?? pkg.packaging_type}`
+                                ? `${pkg.product_variant_name} · ${pkg.label}`
                                 : `#${it.product_packaging}`}
                             </p>
                             <p className="text-on-surface-variant text-xs leading-relaxed">
@@ -771,7 +827,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                           </div>
                           <button
                             type="button"
-                            onClick={() => removeItem(it.product_packaging)}
+                            onClick={() => removeItem(key)}
                             disabled={pending}
                             className="text-on-surface-variant hover:text-destructive shrink-0 rounded-md p-1"
                             aria-label="Hapus item"
@@ -779,11 +835,38 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                             <Trash2 className="size-4" />
                           </button>
                         </div>
+                        <div
+                          role="radiogroup"
+                          aria-label="Jenis kemasan"
+                          className="border-outline-variant inline-flex rounded-lg border p-0.5"
+                        >
+                          {PACKAGING_TYPES.map((t) => {
+                            const active = it.packaging_type === t
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                onClick={() => setLinePackagingType(key, t)}
+                                disabled={pending}
+                                className={cn(
+                                  'rounded-md px-2.5 py-1 text-xs font-medium transition',
+                                  active
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-on-surface-variant hover:bg-surface-container-low'
+                                )}
+                              >
+                                {PACKAGING_TYPE_LABEL[t]}
+                              </button>
+                            )
+                          })}
+                        </div>
                         <div className="flex items-center justify-between gap-2">
                           <div className="border-outline-variant flex items-center rounded-lg border">
                             <button
                               type="button"
-                              onClick={() => stepMassKg(it.product_packaging, -1)}
+                              onClick={() => stepMassKg(key, -1)}
                               disabled={pending}
                               className="text-on-surface-variant hover:bg-surface-container-low flex size-8 items-center justify-center rounded-l-lg"
                               aria-label="Kurangi satu kemasan"
@@ -795,7 +878,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                                 type="text"
                                 inputMode="decimal"
                                 value={it.massKg}
-                                onChange={(e) => setMassKg(it.product_packaging, e.target.value)}
+                                onChange={(e) => setMassKg(key, e.target.value)}
                                 disabled={pending}
                                 className="w-14 bg-transparent text-center text-sm tabular-nums outline-none"
                                 aria-label="Berat kilogram"
@@ -804,7 +887,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                             </div>
                             <button
                               type="button"
-                              onClick={() => stepMassKg(it.product_packaging, 1)}
+                              onClick={() => stepMassKg(key, 1)}
                               disabled={pending}
                               className="text-on-surface-variant hover:bg-surface-container-low flex size-8 items-center justify-center rounded-r-lg"
                               aria-label="Tambah satu kemasan"
@@ -824,7 +907,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                               </Label>
                               <CurrencyInput
                                 value={it.unit_price_per_kg_idr}
-                                onChange={(v) => setCustomPerKg(it.product_packaging, v)}
+                                onChange={(v) => setCustomPerKg(key, v)}
                                 disabled={pending}
                                 placeholder="Auto (harga produk)"
                                 className="border-outline-variant h-8"
@@ -833,7 +916,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                           ) : (
                             <button
                               type="button"
-                              onClick={() => toggleCustom(it.product_packaging)}
+                              onClick={() => toggleCustom(key)}
                               disabled={pending}
                               className="text-primary text-[11px] font-medium"
                             >

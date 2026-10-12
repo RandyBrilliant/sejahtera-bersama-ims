@@ -99,10 +99,12 @@ class ReceiptLayout:
     date_value_x: float = 100.0
     date_line_left: float = 100.0
     date_line_right: float = 142.0
-    # Preprinted pad still has the date line then "tgl." on the right.
-    # Left-align hari+tanggal so it clears the "tgl." label on the right.
-    preprinted_date_line_left: float = 86.0
-    preprinted_date_line_right: float = 128.0
+    # Preprinted pad reads "______ tgl. ______" ("tgl." sits at ~103–107 mm, Oct 2026
+    # photo): hari is right-aligned on the left blank, tanggal starts after "tgl.".
+    preprinted_day_left: float = 83.0
+    preprinted_day_right: float = 100.5
+    preprinted_date_left: float = 108.5
+    preprinted_date_right: float = 145.0
     preprinted_date_value_top: float = 12.6
 
     kepada_label_top: float = 15.5
@@ -116,14 +118,16 @@ class ReceiptLayout:
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
     # Full mode: name + up to 3 address lines (shifted up with tanggal).
     full_kepada_line_tops: tuple[float, ...] = (15.0, 19.3, 23.6, 27.9)
-    # Preprinted: name at first top; address continues with denser, smaller lines.
-    preprinted_kepada_line_tops: tuple[float, ...] = (17.6, 24.0, 30.4)
-    # Stop address before item table (table_top = 40).
-    preprinted_kepada_bottom: float = 38.5
-    preprinted_name_line_height: float = 4.2
-    preprinted_address_line_height: float = 3.2
-    font_buyer_address: float = 7.0
-    font_buyer_address_min: float = 5.5
+    # Preprinted: name on the KEPADA YTH. line, alamat on the two pad lines below it.
+    preprinted_buyer_top: float = 17.6
+    preprinted_buyer_right: float = 145.0
+    # (baseline top, left, right) per pad line: a full-width line, then a shorter one.
+    preprinted_address_slots: tuple[tuple[float, float, float], ...] = (
+        (24.0, 83.0, 145.0),
+        (30.2, 101.5, 145.0),
+    )
+    font_buyer_address: float = 9.0
+    font_buyer_address_min: float = 7.0
 
     # Bon / Faktur number — full mode on the 4th KEPADA line (below WA/HP).
     faktur_label_top: float = 37.5
@@ -157,11 +161,12 @@ class ReceiptLayout:
     col_total: Column = field(default_factory=lambda: Column(118.0, 142.0))
 
     cell_padding: float = 1.6
-    # Preprinted pad: qty/name sit nearer the left rule (centered qty crowded the divider).
-    preprinted_qty_pad: float = 1.0
-    # Nama barang starts a touch left of the PDF column so it lines up with pad text.
-    preprinted_name_left: float = 40.5
-    preprinted_name_pad: float = 0.3
+    # Preprinted pad columns differ from the full-mode grid: the Banyaknya rule sits at
+    # ~25 mm and Nama Barang runs to ~94 mm (Oct 2026 photo; qty used to spill over).
+    preprinted_qty_left: float = 7.5
+    preprinted_qty_right: float = 23.5
+    preprinted_name_left: float = 26.5
+    preprinted_name_right: float = 93.5
 
     # Overlay value sizes (pt). Long text shrinks down to font_min via _sized_text.
     font_date: float = 10.0
@@ -173,6 +178,8 @@ class ReceiptLayout:
     font_faktur: float = 12.0
     # Shrink before ellipsis when cell text is too wide (banyaknya, totals, etc.).
     font_min: float = 5.5
+    # Preprinted cells condense glyphs horizontally (down to this %) before shrinking.
+    min_horiz_scale: float = 70.0
 
     # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0
@@ -232,17 +239,10 @@ def _caps(text: str) -> str:
     return (text or "").upper()
 
 
-def _packaging_jenis(packaging) -> str:
-    """Packaging type code from the kemasan master (KTK / BAL)."""
-    if packaging is None:
-        return PackagingType.BAL
-    # Prefer the in-memory field; refresh if missing so we never silently default.
-    value = getattr(packaging, "packaging_type", None)
-    if not value and getattr(packaging, "pk", None):
-        packaging.refresh_from_db(fields=["packaging_type"])
-        value = packaging.packaging_type
-    cleaned = str(value or "").strip().upper()
-    if cleaned in {PackagingType.KOTAK, PackagingType.BAL}:
+def _packaging_jenis(line) -> str:
+    """Jenis kemasan code chosen on the sales line (KTK / BAL)."""
+    cleaned = str(getattr(line, "packaging_type", "") or "").strip().upper()
+    if cleaned in PackagingType.values:
         return cleaned
     return PackagingType.BAL
 
@@ -263,7 +263,7 @@ def _line_qty_display(line) -> str:
     """Banyaknya: ``4 BAL X 10 KG`` (qty + jenis + net mass per kemasan)."""
     qty = _format_quantity(line.quantity)
     packaging = line.product_packaging
-    jenis = _packaging_jenis(packaging)
+    jenis = _packaging_jenis(line)
     if packaging is None:
         return f"{qty} {jenis}"
     net = Decimal(str(packaging.net_mass_kg or 0))
@@ -333,6 +333,84 @@ def _sized_text(
     return _fit_text(pdf, text, font, size, max_width), size
 
 
+def _draw_fitted(
+    pdf: canvas.Canvas,
+    x: float,
+    y: float,
+    text: str,
+    font: str,
+    preferred: float,
+    max_width: float,
+    min_size: float,
+    min_scale: float,
+) -> float:
+    """Draw ``text`` left-aligned within ``max_width`` mm; return its printed width (mm).
+
+    Narrow pad cells keep a readable height by condensing glyphs horizontally
+    first (down to ``min_scale`` %), then shrinking the font, then truncating.
+    """
+    limit = max_width * mm
+    size = preferred
+    scale = 100.0
+    natural = _printed_width(pdf, text, font, size)
+    if natural > limit:
+        scale = max(min_scale, float(int(limit / natural * 100)))
+        while size > min_size and _printed_width(pdf, text, font, size) * scale / 100 > limit:
+            size -= 0.5
+        text = _fit_text(pdf, text, font, size, max_width * 100 / scale)
+    # Horizontal scale is PDF graphics state; scope it so later text is not condensed.
+    pdf.saveState()
+    text_obj = pdf.beginText(x, y)
+    text_obj.setFont(font, size)
+    text_obj.setHorizScale(scale)
+    text_obj.textOut(text)
+    pdf.drawText(text_obj)
+    pdf.restoreState()
+    return _printed_width(pdf, text, font, size) * scale / 100 / mm
+
+
+def _wrap_into_slots(
+    pdf: canvas.Canvas,
+    text: str,
+    font: str,
+    preferred: float,
+    min_size: float,
+    widths: list[float],
+) -> tuple[list[str], float]:
+    """Word-wrap ``text`` across lines of the given widths (mm), one line per slot.
+
+    Shrinks from ``preferred`` to ``min_size`` until everything fits; otherwise the
+    last slot ends with an ellipsis.
+    """
+    words = text.split()
+
+    def fill(size: float) -> tuple[list[str], int]:
+        lines: list[str] = []
+        index = 0
+        for width in widths:
+            if index >= len(words):
+                break
+            line = words[index]
+            index += 1
+            while index < len(words) and (
+                _printed_width(pdf, f"{line} {words[index]}", font, size) <= width * mm
+            ):
+                line = f"{line} {words[index]}"
+                index += 1
+            lines.append(line)
+        return lines, index
+
+    size = preferred
+    lines, used = fill(size)
+    while used < len(words) and size > min_size:
+        size -= 0.5
+        lines, used = fill(size)
+    if used < len(words) and lines:
+        lines[-1] = " ".join([lines[-1], *words[used:]])
+    fitted = [_fit_text(pdf, line, font, size, width) for line, width in zip(lines, widths)]
+    return fitted, size
+
+
 _DAY_NAME_ID = (
     "SENIN",
     "SELASA",
@@ -344,15 +422,19 @@ _DAY_NAME_ID = (
 )
 
 
-def _receipt_date(order) -> str:
-    """Tanggal nota: ``KAMIS 23-07-2026`` (hari + tanggal, no hyphen)."""
+def _receipt_day_and_date(order) -> tuple[str, str]:
+    """Hari and tanggal for the nota: ``("KAMIS", "23-07-2026")``."""
     value = order.invoice_date
     if value is None and order.created_at is not None:
         value = order.created_at.date()
     if not value:
-        return ""
-    day_name = _DAY_NAME_ID[value.weekday()]
-    return f"{day_name} {value.strftime('%d-%m-%Y')}"
+        return "", ""
+    return _DAY_NAME_ID[value.weekday()], value.strftime("%d-%m-%Y")
+
+
+def _receipt_date(order) -> str:
+    """Tanggal nota: ``KAMIS 23-07-2026`` (hari + tanggal, no hyphen)."""
+    return " ".join(part for part in _receipt_day_and_date(order) if part)
 
 
 def _address_lines(customer, max_lines: int) -> list[str]:
@@ -549,27 +631,45 @@ def _draw_values(
     """
     # Date.
     pdf.setFillColor(black)
-    date_text = _caps(_receipt_date(order))
-    if date_text:
-        if include_faktur_number:
-            date_left = layout.date_line_left
-            date_right = layout.date_line_right
-            date_top = layout.date_value_top
-        else:
-            date_left = layout.preprinted_date_line_left
-            date_right = layout.preprinted_date_line_right
-            date_top = layout.preprinted_date_value_top
-        date_width = date_right - date_left
-        date_font = FONT if include_faktur_number else FONT_BOLD
-        text, size = _sized_text(
-            pdf, date_text, date_font, layout.font_date, date_width, layout.font_min
-        )
-        pdf.setFont(date_font, size)
-        if include_faktur_number:
-            pdf.drawString(layout.x(layout.date_value_x), layout.y(date_top), text)
-        else:
-            # Left-align on the date line so hari clears the "tgl." label on the right.
-            pdf.drawString(layout.x(date_left), layout.y(date_top), text)
+    if include_faktur_number:
+        date_text = _caps(_receipt_date(order))
+        if date_text:
+            text, size = _sized_text(
+                pdf,
+                date_text,
+                FONT,
+                layout.font_date,
+                layout.date_line_right - layout.date_line_left,
+                layout.font_min,
+            )
+            pdf.setFont(FONT, size)
+            pdf.drawString(layout.x(layout.date_value_x), layout.y(layout.date_value_top), text)
+    else:
+        # Pad: "<hari> tgl. <tanggal>" — never print across the "tgl." label.
+        day_text, date_text = _receipt_day_and_date(order)
+        top = layout.y(layout.preprinted_date_value_top)
+        if day_text:
+            text, size = _sized_text(
+                pdf,
+                day_text,
+                FONT_BOLD,
+                layout.font_date,
+                layout.preprinted_day_right - layout.preprinted_day_left,
+                layout.font_min,
+            )
+            pdf.setFont(FONT_BOLD, size)
+            pdf.drawRightString(layout.x(layout.preprinted_day_right), top, text)
+        if date_text:
+            text, size = _sized_text(
+                pdf,
+                date_text,
+                FONT_BOLD,
+                layout.font_date,
+                layout.preprinted_date_right - layout.preprinted_date_left,
+                layout.font_min,
+            )
+            pdf.setFont(FONT_BOLD, size)
+            pdf.drawString(layout.x(layout.preprinted_date_left), top, text)
 
     # Kepada Yth. — name then alamat.
     if include_faktur_number:
@@ -596,61 +696,35 @@ def _draw_values(
         for raw, top in zip(wrapped, kepada_tops):
             pdf.drawString(layout.x(name_x), layout.y(top), raw)
     else:
-        # Nota lama (preprinted): smaller alamat + denser lines so the full address shows.
+        # Nota lama (preprinted): name on the KEPADA YTH. line, alamat on the pad lines below.
         name_x = layout.kepada_value_x
-        buyer_width = PAGE_WIDTH_MM - layout.margin_right - name_x
-        name_top = layout.preprinted_kepada_line_tops[0]
-        top = name_top
-
-        name_lines: list[str] = []
         if order.customer_id:
-            name_lines = _wrap_text(
+            _draw_fitted(
                 pdf,
+                layout.x(name_x),
+                layout.y(layout.preprinted_buyer_top),
                 _caps(order.customer.name.strip()),
                 FONT,
                 layout.font_buyer,
-                buyer_width,
+                layout.preprinted_buyer_right - name_x,
+                layout.font_buyer_address_min,
+                layout.min_horiz_scale,
             )
-        pdf.setFont(FONT, layout.font_buyer)
-        for raw in name_lines:
-            if top > layout.preprinted_kepada_bottom:
-                break
-            pdf.drawString(layout.x(name_x), layout.y(top), raw)
-            top += layout.preprinted_name_line_height
 
         address = " ".join(_address_lines(order.customer, max_lines=12))
         if address:
-            # Leave a little gap after the name block.
-            if name_lines:
-                top = max(top, name_top + layout.preprinted_name_line_height * len(name_lines))
-            available = layout.preprinted_kepada_bottom - top
-            max_addr_lines = max(
-                1, int(available / layout.preprinted_address_line_height) + 1
+            slots = layout.preprinted_address_slots
+            addr_lines, addr_size = _wrap_into_slots(
+                pdf,
+                _caps(address),
+                FONT,
+                layout.font_buyer_address,
+                layout.font_buyer_address_min,
+                [right - left for _, left, right in slots],
             )
-            addr_size = layout.font_buyer_address
-            addr_lines = _wrap_text(
-                pdf, _caps(address), FONT, addr_size, buyer_width
-            )
-            while (
-                len(addr_lines) > max_addr_lines
-                and addr_size > layout.font_buyer_address_min
-            ):
-                addr_size -= 0.5
-                addr_lines = _wrap_text(
-                    pdf, _caps(address), FONT, addr_size, buyer_width
-                )
-            # Prefer showing every wrapped line; tighten line height if needed.
-            line_h = layout.preprinted_address_line_height
-            if len(addr_lines) > 1 and available > 0:
-                needed = (len(addr_lines) - 1) * line_h
-                if needed > available:
-                    line_h = max(2.4, available / (len(addr_lines) - 1))
             pdf.setFont(FONT, addr_size)
-            for raw in addr_lines:
-                if top > layout.preprinted_kepada_bottom + 0.4:
-                    break
-                pdf.drawString(layout.x(name_x), layout.y(top), raw)
-                top += line_h
+            for raw, (top, left, _) in zip(addr_lines, slots):
+                pdf.drawString(layout.x(left), layout.y(top), raw)
 
     # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
@@ -665,13 +739,8 @@ def _draw_values(
             )
 
     # Item rows — size each cell to its column so amounts fill @ Rp / Jumlah Harga.
-    qty_pad = layout.cell_padding if include_faktur_number else layout.preprinted_qty_pad
-    name_left = (
-        layout.col_name.left if include_faktur_number else layout.preprinted_name_left
-    )
-    name_pad = layout.cell_padding if include_faktur_number else layout.preprinted_name_pad
-    name_width = (layout.col_name.right - name_left) - 2 * name_pad
-    qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * qty_pad
+    qty_width = (layout.col_qty.right - layout.col_qty.left) - 2 * layout.cell_padding
+    name_width = (layout.col_name.right - layout.col_name.left) - 2 * layout.cell_padding
     unit_width = (layout.col_unit.right - layout.col_unit.left) - 2 * layout.cell_padding
     total_width = (layout.col_total.right - layout.col_total.left) - 2 * layout.cell_padding
     first_row_top = (
@@ -680,32 +749,44 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
-        qty_preferred = layout.font_row if include_faktur_number else layout.font_qty
-        qty_text, qty_size = _sized_text(
-            pdf,
-            _caps(_line_qty_display(line)),
-            FONT,
-            qty_preferred,
-            qty_width,
-            layout.font_min,
-        )
-        pdf.setFont(FONT, qty_size)
+        qty_raw = _caps(_line_qty_display(line))
+        name_raw = _caps(_line_name_display(line))
         if include_faktur_number:
+            qty_text, qty_size = _sized_text(
+                pdf, qty_raw, FONT, layout.font_row, qty_width, layout.font_min
+            )
+            pdf.setFont(FONT, qty_size)
             pdf.drawCentredString(layout.x(layout.col_qty.center), baseline, qty_text)
-        else:
-            # Left-align so values sit inside Banyaknya (not against the right rule).
-            pdf.drawString(layout.x(layout.col_qty.left + qty_pad), baseline, qty_text)
 
-        name_text, name_size = _sized_text(
-            pdf,
-            _caps(_line_name_display(line)),
-            FONT,
-            layout.font_row,
-            name_width,
-            layout.font_min,
-        )
-        pdf.setFont(FONT, name_size)
-        pdf.drawString(layout.x(name_left + name_pad), baseline, name_text)
+            name_text, name_size = _sized_text(
+                pdf, name_raw, FONT, layout.font_row, name_width, layout.font_min
+            )
+            pdf.setFont(FONT, name_size)
+            pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
+        else:
+            # Pad cells are narrow: condense before shrinking so text stays inside the rules.
+            _draw_fitted(
+                pdf,
+                layout.x(layout.preprinted_qty_left),
+                baseline,
+                qty_raw,
+                FONT,
+                layout.font_qty,
+                layout.preprinted_qty_right - layout.preprinted_qty_left,
+                layout.font_min,
+                layout.min_horiz_scale,
+            )
+            _draw_fitted(
+                pdf,
+                layout.x(layout.preprinted_name_left),
+                baseline,
+                name_raw,
+                FONT,
+                layout.font_row,
+                layout.preprinted_name_right - layout.preprinted_name_left,
+                layout.font_min,
+                layout.min_horiz_scale,
+            )
 
         unit_text, unit_size = _sized_text(
             pdf,

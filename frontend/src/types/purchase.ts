@@ -78,8 +78,8 @@ export type SalesOrderLine = {
   product_name?: string
   product_variant_name: string
   packaging_label: string
-  /** Jenis kemasan luar: BAL atau KTK. */
-  packaging_type?: PackagingType
+  /** Jenis kemasan luar (BAL / KTK), dipilih per baris order. */
+  packaging_type: PackagingType
   /** Berat bersih per kemasan (kg), untuk menghitung total kg order. */
   net_mass_kg?: string
   /** Harga tetap per kg (IDR) dari produk induk. */
@@ -178,6 +178,8 @@ export type PurchaseInOrderUpdateInput = Partial<
 
 export type SalesOrderLineInput = {
   product_packaging: number
+  /** Jenis kemasan luar; default BAL di backend. */
+  packaging_type?: PackagingType
   quantity: string | number
   /** Harga custom per kg (IDR) untuk order ini; kosong = pakai harga produk. */
   unit_price_per_kg_idr?: number | null

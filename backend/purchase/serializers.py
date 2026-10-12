@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 from account.media_fields import SignedMediaUrlField
 from account.models import UserRole
-from inventory.models import ProductPackaging
+from inventory.models import PackagingType, ProductPackaging
 
 from .models import (
     Customer,
@@ -374,7 +374,6 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product_packaging.product.name", read_only=True)
     product_variant_name = serializers.CharField(source="product_packaging.product.variant_name", read_only=True)
     packaging_label = serializers.CharField(source="product_packaging.label", read_only=True)
-    packaging_type = serializers.CharField(source="product_packaging.packaging_type", read_only=True)
     net_mass_kg = serializers.DecimalField(
         max_digits=14,
         decimal_places=6,
@@ -413,7 +412,6 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
             "product_name",
             "product_variant_name",
             "packaging_label",
-            "packaging_type",
             "net_mass_kg",
             "price_per_kg_idr",
             "unit_price_idr",
@@ -506,10 +504,12 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         seen = set()
         for row in lines_data:
             pid = row.get("product_packaging")
-            pk = getattr(pid, "pk", pid)
-            if pk in seen:
-                raise serializers.ValidationError("Produk kemasan tidak boleh duplikat dalam satu order.")
-            seen.add(pk)
+            key = (getattr(pid, "pk", pid), row.get("packaging_type", PackagingType.BAL))
+            if key in seen:
+                raise serializers.ValidationError(
+                    "Produk kemasan dengan jenis yang sama tidak boleh duplikat dalam satu order."
+                )
+            seen.add(key)
         return lines_data
 
     @transaction.atomic
@@ -544,6 +544,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             SalesOrderLine.objects.create(
                 order=order,
                 product_packaging=packaging,
+                packaging_type=row.get("packaging_type", PackagingType.BAL),
                 quantity=row["quantity"],
                 unit_price_idr=unit_price,
                 created_by=user,
@@ -606,6 +607,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
                 SalesOrderLine.objects.create(
                     order=instance,
                     product_packaging=packaging,
+                    packaging_type=row.get("packaging_type", PackagingType.BAL),
                     quantity=row["quantity"],
                     unit_price_idr=unit_price,
                     created_by=user,

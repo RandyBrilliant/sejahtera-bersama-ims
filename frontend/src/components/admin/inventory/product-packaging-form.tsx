@@ -5,22 +5,14 @@ import {
   useUpdateProductPackagingMutation,
 } from '@/hooks/use-inventory-query'
 import { alert } from '@/lib/alert'
-import { PACKAGING_TYPE_LABEL, PACKAGING_TYPES } from '@/constants/packaging-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 import { parseInventoryMutationError } from '@/components/admin/inventory/inventory-mutation-error'
-import type { PackagingType, ProductPackaging } from '@/types/inventory'
+import type { ProductPackaging } from '@/types/inventory'
 
 type Props = {
   mode: 'create' | 'edit'
@@ -32,9 +24,6 @@ type Props = {
 
 export function ProductPackagingForm({ mode, productId, initial, onCancel, onSaved }: Props) {
   const [label, setLabel] = useState(initial?.label ?? '')
-  const [packagingType, setPackagingType] = useState<PackagingType>(
-    initial?.packaging_type ?? 'BAL'
-  )
   const [netMassKg, setNetMassKg] = useState(
     initial ? String(initial.net_mass_kg) : ''
   )
@@ -62,7 +51,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
         await createMutation.mutateAsync({
           product: productId,
           label: label.trim(),
-          packaging_type: packagingType,
           net_mass_kg: kgRaw,
           sku: sku.trim() || '',
           is_active: isActive,
@@ -72,7 +60,6 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
         if (!initial) return
         await updateMutation.mutateAsync({
           label: label.trim(),
-          packaging_type: packagingType,
           net_mass_kg: kgRaw,
           sku: sku.trim() || '',
           is_active: isActive,
@@ -102,37 +89,16 @@ export function ProductPackagingForm({ mode, productId, initial, onCancel, onSav
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-label">Label kemasan</Label>
-              <Input
-                id="pkg-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                disabled={submitting}
-                className="border-outline-variant"
-                placeholder="250g"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-type">Jenis kemasan</Label>
-              <Select
-                value={packagingType}
-                onValueChange={(v) => setPackagingType(v as PackagingType)}
-                disabled={submitting}
-              >
-                <SelectTrigger id="pkg-type" className="border-outline-variant w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PACKAGING_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {PACKAGING_TYPE_LABEL[t]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="pkg-label">Label kemasan</Label>
+            <Input
+              id="pkg-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              disabled={submitting}
+              className="border-outline-variant"
+              placeholder="250g"
+            />
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="grid gap-2">

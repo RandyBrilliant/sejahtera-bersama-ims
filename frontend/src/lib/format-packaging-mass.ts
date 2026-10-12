@@ -44,7 +44,7 @@ export function aggregatePackingFromOrders(orders: SalesOrder[]): PackingAggRow[
       const unitKg = parseDecimalLike(line.net_mass_kg ?? '0')
       const qty = parseDecimalLike(line.quantity)
       const addKg = Number.isFinite(qty) && Number.isFinite(unitKg) ? qty * unitKg : 0
-      const key = `${line.product_packaging}:${line.packaging_label}`
+      const key = `${line.product_packaging}:${line.packaging_type}`
       const existing = map.get(key)
       if (existing) {
         existing.totalKg += addKg

@@ -190,7 +190,6 @@ class ProductPackagingViewSet(InventoryWriteMixin, viewsets.ModelViewSet):
     search_fields = ["label", "sku", "product__name", "product__variant_name"]
     ordering_fields = [
         "label",
-        "packaging_type",
         "net_mass_kg",
         "remaining_stock",
         "total_price_idr",

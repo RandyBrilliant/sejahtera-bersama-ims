@@ -120,7 +120,6 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "product_variant_name",
             "price_per_kg_idr",
             "label",
-            "packaging_type",
             "net_mass_kg",
             "product_remaining_mass_grams",
             "remaining_stock",

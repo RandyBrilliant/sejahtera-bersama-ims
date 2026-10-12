@@ -122,7 +122,7 @@ class Product(AuditModel):
 
 
 class PackagingType(models.TextChoices):
-    """Outer packaging unit for a product kemasan (SKU)."""
+    """Outer packaging unit (jenis kemasan) chosen per sales order line."""
 
     KOTAK = "KTK", _("Kotak")
     BAL = "BAL", _("Bal")
@@ -143,13 +143,6 @@ class ProductPackaging(AuditModel):
         verbose_name=_("product"),
     )
     label = models.CharField(_("packaging label"), max_length=100)
-    packaging_type = models.CharField(
-        _("packaging type"),
-        max_length=5,
-        choices=PackagingType.choices,
-        default=PackagingType.BAL,
-        db_index=True,
-    )
     net_mass_kg = models.DecimalField(
         _("net mass (kg)"),
         max_digits=12,
@@ -178,10 +171,7 @@ class ProductPackaging(AuditModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"{self.product.name} - {self.label} "
-            f"[{self.packaging_type}] ({self.net_mass_kg} kg)"
-        )
+        return f"{self.product.name} - {self.label} ({self.net_mass_kg} kg)"
 
 
 class StockUnit(models.TextChoices):

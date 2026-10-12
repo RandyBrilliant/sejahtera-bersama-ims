@@ -24,7 +24,6 @@ import {
 import { cn } from '@/lib/utils'
 
 import { parseInventoryMutationError } from '@/components/admin/inventory/inventory-mutation-error'
-import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import type { StockComponent, StockMovementType } from '@/types/inventory'
 
@@ -286,8 +285,6 @@ export function ProductStockMovementForm({ onCancel, onSaved }: Props) {
                 {packagingRows.map((row) => (
                   <SelectItem key={row.id} value={String(row.id)}>
                     {row.label}
-                    {' · '}
-                    {PACKAGING_TYPE_LABEL[row.packaging_type] ?? row.packaging_type}
                     {' · '}
                     {Number(String(row.net_mass_kg).replace(',', '.')).toLocaleString('id-ID', {
                       maximumFractionDigits: 6,
