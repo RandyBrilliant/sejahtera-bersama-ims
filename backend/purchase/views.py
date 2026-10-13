@@ -41,6 +41,7 @@ from inventory.models import (
 from inventory.product_stock import tepung_mass_for_movement, weighted_moving_average
 from payroll.costing import production_labor_for_range
 
+from .envelope_pdf import build_sales_order_envelope_pdf
 from .filters import (
     CustomerFilter,
     CustomerProductPriceFilter,
@@ -57,7 +58,6 @@ from .models import (
     SalesOrderLine,
     Wilayah,
 )
-from .envelope_pdf import build_sales_order_envelope_pdf
 from .receipt_pdf import build_sales_order_receipt_pdf
 from .serializers import (
     CustomerProductPriceSerializer,
