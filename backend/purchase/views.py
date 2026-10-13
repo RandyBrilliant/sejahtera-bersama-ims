@@ -57,6 +57,7 @@ from .models import (
     SalesOrderLine,
     Wilayah,
 )
+from .envelope_pdf import build_sales_order_envelope_pdf
 from .receipt_pdf import build_sales_order_receipt_pdf
 from .serializers import (
     CustomerProductPriceSerializer,
@@ -610,7 +611,8 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         """Bon/Faktur receipt (15x10.5 cm) for the Epson LQ printer.
 
         Query param ``mode``: ``preprinted`` (default) prints values only to
-        overlay the existing pre-printed pad; ``full`` prints the whole form.
+        overlay the existing pre-printed pad; ``full`` prints the whole form;
+        ``envelope`` prints the amplop (230x110 mm) instead of the nota.
         """
         order = self.get_object()
         if order.status == OrderStatus.CANCELLED:
@@ -619,13 +621,20 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         mode = (request.query_params.get("mode") or "preprinted").strip().lower()
-        if mode not in ("preprinted", "full"):
+        if mode not in ("preprinted", "full", "envelope"):
             return Response(
-                {"detail": "Parameter 'mode' harus 'preprinted' atau 'full'.", "code": "validation_error"},
+                {
+                    "detail": "Parameter 'mode' harus 'preprinted', 'full', atau 'envelope'.",
+                    "code": "validation_error",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        pdf_buffer = build_sales_order_receipt_pdf(order, mode=mode)
-        filename = f"{order.order_code}-nota-{mode}.pdf"
+        if mode == "envelope":
+            pdf_buffer = build_sales_order_envelope_pdf(order)
+            filename = f"{order.order_code}-amplop.pdf"
+        else:
+            pdf_buffer = build_sales_order_receipt_pdf(order, mode=mode)
+            filename = f"{order.order_code}-nota-{mode}.pdf"
         return FileResponse(
             pdf_buffer,
             as_attachment=True,

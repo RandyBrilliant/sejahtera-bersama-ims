@@ -249,7 +249,8 @@ export async function downloadSalesInvoicePdf(id: number): Promise<Blob> {
   return data
 }
 
-export type SalesReceiptMode = 'preprinted' | 'full'
+/** ``envelope`` prints the amplop (230 × 110 mm) instead of the nota. */
+export type SalesReceiptMode = 'preprinted' | 'full' | 'envelope'
 
 export async function downloadSalesReceiptPdf(
   id: number,

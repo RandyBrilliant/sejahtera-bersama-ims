@@ -161,7 +161,10 @@ export function AdminSalesOrderDetailPage() {
       } else {
         const link = document.createElement('a')
         link.href = url
-        link.download = `${order?.order_code ?? id}-nota-${mode}.pdf`
+        link.download =
+          mode === 'envelope'
+            ? `${order?.order_code ?? id}-amplop.pdf`
+            : `${order?.order_code ?? id}-nota-${mode}.pdf`
         link.rel = 'noopener'
         document.body.appendChild(link)
         link.click()
@@ -170,7 +173,10 @@ export function AdminSalesOrderDetailPage() {
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (err) {
       printWindow?.close()
-      alert.error('Gagal membuat nota', parsePurchaseMutationError(err))
+      alert.error(
+        mode === 'envelope' ? 'Gagal membuat amplop' : 'Gagal membuat nota',
+        parsePurchaseMutationError(err)
+      )
     }
   }
 
@@ -243,6 +249,17 @@ export function AdminSalesOrderDetailPage() {
                 {receiptMut.isPending && receiptMut.variables?.mode === 'full'
                   ? 'Nota…'
                   : 'Cetak nota (form baru)'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handlePrintReceipt('envelope')}
+                disabled={receiptMut.isPending}
+                title="Cetak amplop: rincian berat & Kpd. Yth. (Epson LQ, amplop 23 × 11 cm)"
+              >
+                {receiptMut.isPending && receiptMut.variables?.mode === 'envelope'
+                  ? 'Amplop…'
+                  : 'Cetak amplop'}
               </Button>
             </>
           ) : null}

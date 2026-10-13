@@ -174,12 +174,16 @@ class ReceiptLayout:
     font_row: float = 9.5
     # Pad @ Rp / Jumlah Harga amounts; _sized_text shrinks them to stay inside the rules.
     font_preprinted_price: float = 11.0
+    # Pad nama barang (and the TOTAL KG line under it).
+    font_preprinted_name: float = 11.0
     font_total: float = 11.5
     font_faktur: float = 12.0
     # Shrink before ellipsis when cell text is too wide (totals, etc.).
     font_min: float = 5.5
     # Preprinted cells condense glyphs horizontally (down to this %) before shrinking.
     min_horiz_scale: float = 70.0
+    # Nama barang may condense further so long names keep the larger pad font.
+    name_min_horiz_scale: float = 60.0
 
     # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0
@@ -783,10 +787,10 @@ def _draw_values(
                 baseline,
                 name_raw,
                 FONT,
-                layout.font_row,
+                layout.font_preprinted_name,
                 layout.preprinted_name_right - layout.preprinted_name_left,
                 layout.font_min,
-                layout.min_horiz_scale,
+                layout.name_min_horiz_scale,
             )
 
         price_font = layout.font_row if include_faktur_number else layout.font_preprinted_price
@@ -832,7 +836,7 @@ def _draw_values(
             layout.y(first_row_top + len(lines) * layout.row_height),
             f"TOTAL: {_format_quantity(_total_mass_kg(lines))} KG",
             FONT_BOLD,
-            layout.font_row,
+            layout.font_preprinted_name,
             layout.preprinted_name_right - layout.preprinted_name_left,
             layout.font_min,
             layout.min_horiz_scale,

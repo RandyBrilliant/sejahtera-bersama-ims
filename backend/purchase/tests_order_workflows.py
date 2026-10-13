@@ -225,6 +225,21 @@ class SalesCancelVerifyTests(TestCase):
         self.assertEqual(res.status_code, 400)
 
 
+    def test_envelope_pdf_renders(self):
+        self.client.force_authenticate(self.warehouse)
+        res = self.client.get(f"/api/purchase/sales-orders/{self.order.pk}/receipt-pdf/?mode=envelope")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("amplop", res["Content-Disposition"])
+        self.assertTrue(b"".join(res.streaming_content).startswith(b"%PDF"))
+
+    def test_envelope_text(self):
+        from purchase.envelope_pdf import _product_text, _summary_text
+
+        line = self.order.lines.get()
+        self.assertEqual(_summary_text(line), "4 KTK X 0.25 KG = 1 KG")
+        self.assertEqual(_product_text([line]), "BAWANG GORENG CAP NYONYA")
+
+
 class SalesLinePackagingTypeTests(TestCase):
     """Jenis kemasan (Bal / Kotak) is chosen per sales line, not on the kemasan master."""
 
