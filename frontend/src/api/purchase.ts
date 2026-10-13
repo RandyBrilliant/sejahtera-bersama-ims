@@ -269,6 +269,17 @@ export async function verifySalesOrder(id: number): Promise<SalesOrder> {
   return data
 }
 
+export async function setSalesOrderPrepared(
+  id: number,
+  prepared: boolean
+): Promise<SalesOrder> {
+  const { data } = await api.post<SalesOrder>(
+    `/api/purchase/sales-orders/${id}/set-prepared/`,
+    { prepared }
+  )
+  return data
+}
+
 export async function cancelSalesOrder(id: number): Promise<SalesOrder> {
   const { data } = await api.post<SalesOrder>(
     `/api/purchase/sales-orders/${id}/cancel/`

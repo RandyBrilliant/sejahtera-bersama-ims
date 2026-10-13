@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
 import { parsePurchaseMutationError } from '@/components/admin/orders/purchase-mutation-error'
+import { SalesOrderPreparedCheckbox } from '@/components/admin/orders/sales-order-prepared-checkbox'
 import { Button } from '@/components/ui/button'
 import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import {
@@ -177,6 +178,11 @@ export function SalesOrdersTable() {
 
   const columns = useMemo<ColumnDef<SalesOrder>[]>(
     () => [
+      {
+        id: 'prepared',
+        header: () => <span className="block text-center">Siap</span>,
+        cell: ({ row }) => <SalesOrderPreparedCheckbox order={row.original} />,
+      },
       {
         accessorKey: 'created_at',
         header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),

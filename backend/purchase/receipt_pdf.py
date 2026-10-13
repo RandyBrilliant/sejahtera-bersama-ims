@@ -118,16 +118,16 @@ class ReceiptLayout:
     kepada_line_tops: tuple[float, ...] = (21.0, 26.8, 32.6)
     # Full mode: name + up to 3 address lines (shifted up with tanggal).
     full_kepada_line_tops: tuple[float, ...] = (15.0, 19.3, 23.6, 27.9)
-    # Preprinted: name on the KEPADA YTH. line, alamat on the two pad lines below it.
+    # Preprinted: name on the KEPADA YTH. line, alamat on the pad lines below it,
+    # left-aligned with the name (``kepada_value_x``).
     preprinted_buyer_top: float = 17.6
     preprinted_buyer_right: float = 145.0
-    # (baseline top, left, right) per pad line: a full-width line, then a shorter one.
-    preprinted_address_slots: tuple[tuple[float, float, float], ...] = (
-        (24.0, 83.0, 145.0),
-        (30.2, 101.5, 145.0),
-    )
-    font_buyer_address: float = 9.0
-    font_buyer_address_min: float = 7.0
+    # Baseline tops of the alamat lines under the name: the two pad lines, then one
+    # spare line above the table so long alamat stays readable at the narrower width.
+    preprinted_address_tops: tuple[float, ...] = (24.0, 30.2, 36.2)
+    font_preprinted_buyer: float = 11.5
+    font_buyer_address: float = 11.0
+    font_buyer_address_min: float = 8.0
 
     # Bon / Faktur number — full mode on the 4th KEPADA line (below WA/HP).
     faktur_label_top: float = 37.5
@@ -161,22 +161,22 @@ class ReceiptLayout:
     col_total: Column = field(default_factory=lambda: Column(118.0, 142.0))
 
     cell_padding: float = 1.6
-    # Preprinted pad columns differ from the full-mode grid: the Banyaknya rule sits at
-    # ~25 mm and Nama Barang runs to ~94 mm (Oct 2026 photo; qty used to spill over).
-    preprinted_qty_left: float = 7.5
-    preprinted_qty_right: float = 23.5
+    # Preprinted pad columns differ from the full-mode grid: Nama Barang runs from the
+    # Banyaknya rule (~25 mm) to ~94 mm. Banyaknya stays blank on the pad — the nama
+    # barang already carries the kg / kemasan detail.
     preprinted_name_left: float = 26.5
     preprinted_name_right: float = 93.5
 
     # Overlay value sizes (pt). Long text shrinks down to font_min via _sized_text.
     font_date: float = 10.0
+    font_preprinted_date: float = 12.0
     font_buyer: float = 9.5
     font_row: float = 9.5
-    # Banyaknya prefers a touch smaller so ``1 BAL X 2 KG`` stays inside the cell.
-    font_qty: float = 8.0
-    font_total: float = 10.5
+    # Pad @ Rp / Jumlah Harga amounts; _sized_text shrinks them to stay inside the rules.
+    font_preprinted_price: float = 11.0
+    font_total: float = 11.5
     font_faktur: float = 12.0
-    # Shrink before ellipsis when cell text is too wide (banyaknya, totals, etc.).
+    # Shrink before ellipsis when cell text is too wide (totals, etc.).
     font_min: float = 5.5
     # Preprinted cells condense glyphs horizontally (down to this %) before shrinking.
     min_horiz_scale: float = 70.0
@@ -202,6 +202,8 @@ class ReceiptLayout:
     full_total_value_top: float = 93.8
     # Preprinted pad: grand total under Jumlah Harga; nudge up to share Jumlah baseline.
     preprinted_total_value_right: float = 143.0
+    # Leftmost ink for the grand total so it never reaches the pre-printed "Rp.".
+    preprinted_total_value_left: float = 123.5
     preprinted_total_value_top: float = 94.6
 
     def x(self, left_mm: float) -> float:
@@ -653,7 +655,7 @@ def _draw_values(
                 pdf,
                 day_text,
                 FONT_BOLD,
-                layout.font_date,
+                layout.font_preprinted_date,
                 layout.preprinted_day_right - layout.preprinted_day_left,
                 layout.font_min,
             )
@@ -664,7 +666,7 @@ def _draw_values(
                 pdf,
                 date_text,
                 FONT_BOLD,
-                layout.font_date,
+                layout.font_preprinted_date,
                 layout.preprinted_date_right - layout.preprinted_date_left,
                 layout.font_min,
             )
@@ -696,7 +698,7 @@ def _draw_values(
         for raw, top in zip(wrapped, kepada_tops):
             pdf.drawString(layout.x(name_x), layout.y(top), raw)
     else:
-        # Nota lama (preprinted): name on the KEPADA YTH. line, alamat on the pad lines below.
+        # Nota lama (preprinted): name on the KEPADA YTH. line, alamat directly below it.
         name_x = layout.kepada_value_x
         if order.customer_id:
             _draw_fitted(
@@ -705,7 +707,7 @@ def _draw_values(
                 layout.y(layout.preprinted_buyer_top),
                 _caps(order.customer.name.strip()),
                 FONT,
-                layout.font_buyer,
+                layout.font_preprinted_buyer,
                 layout.preprinted_buyer_right - name_x,
                 layout.font_buyer_address_min,
                 layout.min_horiz_scale,
@@ -713,18 +715,18 @@ def _draw_values(
 
         address = " ".join(_address_lines(order.customer, max_lines=12))
         if address:
-            slots = layout.preprinted_address_slots
+            tops = layout.preprinted_address_tops
             addr_lines, addr_size = _wrap_into_slots(
                 pdf,
                 _caps(address),
                 FONT,
                 layout.font_buyer_address,
                 layout.font_buyer_address_min,
-                [right - left for _, left, right in slots],
+                [layout.preprinted_buyer_right - name_x] * len(tops),
             )
             pdf.setFont(FONT, addr_size)
-            for raw, (top, left, _) in zip(addr_lines, slots):
-                pdf.drawString(layout.x(left), layout.y(top), raw)
+            for raw, top in zip(addr_lines, tops):
+                pdf.drawString(layout.x(name_x), layout.y(top), raw)
 
     # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
@@ -749,9 +751,9 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
-        qty_raw = _caps(_line_qty_display(line))
         name_raw = _caps(_line_name_display(line))
         if include_faktur_number:
+            qty_raw = _caps(_line_qty_display(line))
             qty_text, qty_size = _sized_text(
                 pdf, qty_raw, FONT, layout.font_row, qty_width, layout.font_min
             )
@@ -764,18 +766,7 @@ def _draw_values(
             pdf.setFont(FONT, name_size)
             pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
         else:
-            # Pad cells are narrow: condense before shrinking so text stays inside the rules.
-            _draw_fitted(
-                pdf,
-                layout.x(layout.preprinted_qty_left),
-                baseline,
-                qty_raw,
-                FONT,
-                layout.font_qty,
-                layout.preprinted_qty_right - layout.preprinted_qty_left,
-                layout.font_min,
-                layout.min_horiz_scale,
-            )
+            # Pad: Banyaknya left blank. Condense before shrinking so text stays inside the rules.
             _draw_fitted(
                 pdf,
                 layout.x(layout.preprinted_name_left),
@@ -788,11 +779,12 @@ def _draw_values(
                 layout.min_horiz_scale,
             )
 
+        price_font = layout.font_row if include_faktur_number else layout.font_preprinted_price
         unit_text, unit_size = _sized_text(
             pdf,
             _format_thousands(_price_per_kg_idr(line)),
             FONT,
-            layout.font_row,
+            price_font,
             unit_width,
             layout.font_min,
         )
@@ -811,7 +803,7 @@ def _draw_values(
             pdf,
             _format_thousands(int(line.line_total_idr)),
             FONT,
-            layout.font_row,
+            price_font,
             total_width,
             layout.font_min,
         )
@@ -844,7 +836,12 @@ def _draw_values(
         total_right = layout.preprinted_total_value_right
         total_top = layout.preprinted_total_value_top
         grand_text, grand_size = _sized_text(
-            pdf, grand, FONT_BOLD, layout.font_total, total_width, layout.font_min
+            pdf,
+            grand,
+            FONT_BOLD,
+            layout.font_total,
+            total_right - layout.preprinted_total_value_left,
+            layout.font_min,
         )
         pdf.setFont(FONT_BOLD, grand_size)
         pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)

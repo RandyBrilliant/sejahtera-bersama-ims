@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, Eye, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { OrderStatusBadge } from '@/components/admin/orders/order-status-badge'
+import { SalesOrderPreparedCheckbox } from '@/components/admin/orders/sales-order-prepared-checkbox'
 import { Button } from '@/components/ui/button'
 import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
 import { Input } from '@/components/ui/input'
@@ -93,6 +94,11 @@ export function WarehouseSalesPackingTable() {
 
   const columns = useMemo<ColumnDef<SalesOrder>[]>(
     () => [
+      {
+        id: 'prepared',
+        header: () => <span className="block text-center">Siap</span>,
+        cell: ({ row }) => <SalesOrderPreparedCheckbox order={row.original} />,
+      },
       {
         accessorKey: 'created_at',
         header: () => sortHeader('Tanggal', 'created_at', { preferDesc: true }),

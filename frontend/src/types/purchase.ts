@@ -109,6 +109,9 @@ export type SalesOrder = {
   payment_proof_uploaded_at: string | null
   verified_at: string | null
   verified_by: AuditUserMini | null
+  /** Packing checklist: set when gudang has prepared the goods. */
+  prepared_at: string | null
+  prepared_by: AuditUserMini | null
   notes: string
   lines: SalesOrderLine[]
   created_at: string

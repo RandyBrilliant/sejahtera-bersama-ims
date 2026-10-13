@@ -26,6 +26,7 @@ from account.permissions import (
     IsOwner,
     PurchaseInOrderAccess,
     SalesOrderAccess,
+    SalesOrderPreparedAccess,
     SalesRevenueReportAccess,
 )
 from account.upload_validation import upload_validation_error_response, validate_uploaded_file
@@ -534,6 +535,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             "created_by",
             "updated_by",
             "verified_by",
+            "prepared_by",
         ).prefetch_related("lines__product_packaging__product")
 
     def perform_create(self, serializer):
@@ -742,6 +744,36 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         order.verified_by = request.user
         order.updated_by = request.user
         order.save(update_fields=["status", "verified_at", "verified_by", "updated_by", "updated_at"])
+        return Response(SalesOrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[SalesOrderPreparedAccess],
+        url_path="set-prepared",
+    )
+    def set_prepared(self, request, pk=None):
+        """Tick / untick the packing checklist. Body: ``{"prepared": true|false}``."""
+        order = self.get_object()
+        prepared = request.data.get("prepared")
+        if not isinstance(prepared, bool):
+            return Response(
+                {"detail": "Field 'prepared' wajib bernilai true atau false.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if prepared and order.status == OrderStatus.CANCELLED:
+            return Response(
+                {"detail": "Order dibatalkan.", "code": "validation_error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if prepared and order.prepared_at is None:
+            order.prepared_at = timezone.now()
+            order.prepared_by = request.user
+        elif not prepared:
+            order.prepared_at = None
+            order.prepared_by = None
+        order.updated_by = request.user
+        order.save(update_fields=["prepared_at", "prepared_by", "updated_by", "updated_at"])
         return Response(SalesOrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="cancel")

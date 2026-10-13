@@ -89,8 +89,10 @@ function nextSalesOrderCode(existingCodes: string[], stem: string): string {
   return `${stem}-${String(max + 1).padStart(4, '0')}`
 }
 
-/** Cart line, keyed by kemasan + jenis (duplicates always merge). */
+/** Cart line. One kemasan may appear on several lines, each with its own jenis. */
 type CartItem = {
+  /** Client-only row id (stable across jenis / qty edits). */
+  uid: string
   product_packaging: number
   /** Jenis kemasan luar untuk baris ini (tidak memengaruhi stok). */
   packaging_type: PackagingType
@@ -100,8 +102,20 @@ type CartItem = {
   unit_price_per_kg_idr: string
 }
 
-function cartKey(it: Pick<CartItem, 'product_packaging' | 'packaging_type'>): string {
-  return `${it.product_packaging}:${it.packaging_type}`
+let cartUidSeq = 0
+function newCartUid(): string {
+  cartUidSeq += 1
+  return `line-${cartUidSeq}`
+}
+
+/** Jenis not yet used by another line of the same kemasan (backend allows one line per pair). */
+function freePackagingTypes(cart: CartItem[], packagingId: number, exceptUid?: string): PackagingType[] {
+  const used = new Set(
+    cart
+      .filter((it) => it.product_packaging === packagingId && it.uid !== exceptUid)
+      .map((it) => it.packaging_type)
+  )
+  return PACKAGING_TYPES.filter((t) => !used.has(t))
 }
 
 function massKgOf(pkg: ProductPackaging | undefined): number {
@@ -147,6 +161,7 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
     const massKg = formatKgInputValue(kgFromPackageQty(qty, unitKg))
     if (!allowCustomPrice) {
       return {
+        uid: newCartUid(),
         product_packaging: l.product_packaging,
         packaging_type: l.packaging_type,
         massKg,
@@ -161,6 +176,7 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
         : null
     const isCustom = defaultUnit == null || l.unit_price_idr !== defaultUnit
     return {
+      uid: newCartUid(),
       product_packaging: l.product_packaging,
       packaging_type: l.packaging_type,
       massKg,
@@ -241,6 +257,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
   )
   const [cart, setCart] = useState<CartItem[]>(() => cartFromInitial(initial, canSetCustomPrice))
   const [expandedCustom, setExpandedCustom] = useState<Set<string>>(new Set())
+  /** Newly tapped line: its kg field takes focus so the amount can be typed right away. */
+  const [focusUid, setFocusUid] = useState<string | null>(null)
 
   const [catalogSearch, setCatalogSearch] = useState('')
   const [variantFilter, setVariantFilter] = useState<string>('__all')
@@ -342,35 +360,36 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
     return [...byProduct.values()].filter((v) => v.cartG > v.availableG + 0.5)
   }, [cart, packagingById])
 
-  /** Catalog tap: add one kemasan to the first line of that kemasan, else a new BAL line. */
+  /** Catalog tap: always a new line (one kemasan), on the first jenis still free for it. */
   function addToCart(id: number) {
+    const free = freePackagingTypes(cart, id)
+    if (free.length === 0) {
+      alert.info(
+        'Semua jenis sudah ada',
+        'Kemasan ini sudah ada di keranjang untuk setiap jenis. Ubah jumlah di baris yang ada.'
+      )
+      return
+    }
     const unitKg = massKgOf(packagingById.get(id))
     const step = unitKg > 0 ? unitKg : 0.1
-    setCart((prev) => {
-      const found = prev.find((it) => it.product_packaging === id)
-      if (found) {
-        const key = cartKey(found)
-        const next = (parseDecimalLike(found.massKg) || 0) + step
-        return prev.map((it) =>
-          cartKey(it) === key ? { ...it, massKg: formatKgInputValue(next) } : it
-        )
-      }
-      return [
-        ...prev,
-        {
-          product_packaging: id,
-          packaging_type: 'BAL',
-          massKg: formatKgInputValue(step),
-          unit_price_per_kg_idr: '',
-        },
-      ]
-    })
+    const uid = newCartUid()
+    setCart((prev) => [
+      ...prev,
+      {
+        uid,
+        product_packaging: id,
+        packaging_type: free[0],
+        massKg: formatKgInputValue(step),
+        unit_price_per_kg_idr: '',
+      },
+    ])
+    setFocusUid(uid)
   }
 
   function stepMassKg(key: string, deltaPacks: number) {
     setCart((prev) =>
       prev.flatMap((it) => {
-        if (cartKey(it) !== key) return [it]
+        if (it.uid !== key) return [it]
         const unitKg = massKgOf(packagingById.get(it.product_packaging))
         const step = unitKg > 0 ? unitKg : 0.1
         const next = (parseDecimalLike(it.massKg) || 0) + deltaPacks * step
@@ -382,30 +401,21 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
   function setMassKg(key: string, raw: string) {
     const cleaned = raw.replace(/[^\d.,]/g, '')
-    setCart((prev) => prev.map((it) => (cartKey(it) === key ? { ...it, massKg: cleaned } : it)))
+    setCart((prev) => prev.map((it) => (it.uid === key ? { ...it, massKg: cleaned } : it)))
   }
 
-  /** Switch jenis; if the kemasan already has a line with that jenis, merge into it. */
+  /** Switch jenis; jenis already used by another line of this kemasan are disabled in the UI. */
   function setLinePackagingType(key: string, type: PackagingType) {
     setCart((prev) => {
-      const source = prev.find((it) => cartKey(it) === key)
+      const source = prev.find((it) => it.uid === key)
       if (!source || source.packaging_type === type) return prev
-      const targetKey = cartKey({ product_packaging: source.product_packaging, packaging_type: type })
-      const target = prev.find((it) => cartKey(it) === targetKey)
-      if (!target) {
-        return prev.map((it) => (cartKey(it) === key ? { ...it, packaging_type: type } : it))
-      }
-      const mergedKg = (parseDecimalLike(target.massKg) || 0) + (parseDecimalLike(source.massKg) || 0)
-      return prev.flatMap((it) => {
-        if (cartKey(it) === key) return []
-        if (cartKey(it) === targetKey) return [{ ...it, massKg: formatKgInputValue(mergedKg) }]
-        return [it]
-      })
+      if (!freePackagingTypes(prev, source.product_packaging, key).includes(type)) return prev
+      return prev.map((it) => (it.uid === key ? { ...it, packaging_type: type } : it))
     })
   }
 
   function removeItem(key: string) {
-    setCart((prev) => prev.filter((it) => cartKey(it) !== key))
+    setCart((prev) => prev.filter((it) => it.uid !== key))
     setExpandedCustom((prev) => {
       const next = new Set(prev)
       next.delete(key)
@@ -415,7 +425,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
 
   function setCustomPerKg(key: string, val: string) {
     setCart((prev) =>
-      prev.map((it) => (cartKey(it) === key ? { ...it, unit_price_per_kg_idr: val } : it))
+      prev.map((it) => (it.uid === key ? { ...it, unit_price_per_kg_idr: val } : it))
     )
   }
 
@@ -793,7 +803,8 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
               ) : (
                 <ul className="divide-outline-variant divide-y">
                   {cart.map((it) => {
-                    const key = cartKey(it)
+                    const key = it.uid
+                    const freeTypes = freePackagingTypes(cart, it.product_packaging, key)
                     const pkg = packagingById.get(it.product_packaging)
                     const massNum = parseDecimalLike(it.massKg) || 0
                     const isCustom = canSetCustomPrice && it.unit_price_per_kg_idr.trim() !== ''
@@ -842,6 +853,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                         >
                           {PACKAGING_TYPES.map((t) => {
                             const active = it.packaging_type === t
+                            const taken = !active && !freeTypes.includes(t)
                             return (
                               <button
                                 key={t}
@@ -849,12 +861,14 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                                 role="radio"
                                 aria-checked={active}
                                 onClick={() => setLinePackagingType(key, t)}
-                                disabled={pending}
+                                disabled={pending || taken}
+                                title={taken ? 'Sudah dipakai baris lain untuk kemasan ini' : undefined}
                                 className={cn(
                                   'rounded-md px-2.5 py-1 text-xs font-medium transition',
                                   active
                                     ? 'bg-primary text-primary-foreground'
-                                    : 'text-on-surface-variant hover:bg-surface-container-low'
+                                    : 'text-on-surface-variant hover:bg-surface-container-low',
+                                  taken && 'cursor-not-allowed opacity-40 hover:bg-transparent'
                                 )}
                               >
                                 {PACKAGING_TYPE_LABEL[t]}
@@ -878,6 +892,13 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                                 type="text"
                                 inputMode="decimal"
                                 value={it.massKg}
+                                ref={(el) => {
+                                  if (el && focusUid === key) {
+                                    el.focus()
+                                    el.select()
+                                    setFocusUid(null)
+                                  }
+                                }}
                                 onChange={(e) => setMassKg(key, e.target.value)}
                                 disabled={pending}
                                 className="w-14 bg-transparent text-center text-sm tabular-nums outline-none"

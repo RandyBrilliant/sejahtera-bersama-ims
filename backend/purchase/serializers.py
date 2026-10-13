@@ -428,6 +428,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
     updated_by = serializers.SerializerMethodField()
     verified_by = serializers.SerializerMethodField()
+    prepared_by = serializers.SerializerMethodField()
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_wilayah_name = serializers.CharField(
         source="customer.wilayah.name", read_only=True, allow_null=True
@@ -454,6 +455,8 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             "payment_proof_uploaded_at",
             "verified_at",
             "verified_by",
+            "prepared_at",
+            "prepared_by",
             "notes",
             "lines",
             "created_at",
@@ -475,6 +478,8 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             "payment_proof_uploaded_at",
             "verified_at",
             "verified_by",
+            "prepared_at",
+            "prepared_by",
             "created_at",
             "updated_at",
             "created_by",
@@ -483,6 +488,9 @@ class SalesOrderSerializer(serializers.ModelSerializer):
 
     def get_verified_by(self, obj):
         return _user_mini(obj.verified_by)
+
+    def get_prepared_by(self, obj):
+        return _user_mini(obj.prepared_by)
 
     def get_created_by(self, obj):
         return _user_mini(obj.created_by)

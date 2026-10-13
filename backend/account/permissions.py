@@ -349,6 +349,26 @@ class SalesOrderAccess(permissions.BasePermission):
         return has_role(request.user, UserRole.ADMIN, UserRole.SALES_STAFF)
 
 
+class SalesOrderPreparedAccess(permissions.BasePermission):
+    """
+    Packing checklist on sales orders ("sudah disiapkan"):
+    - Every role that can read sales orders may tick / untick it.
+    """
+
+    message = ApiMessage.PERMISSION_DENIED
+
+    def has_permission(self, request, view):
+        if not is_authenticated(request.user):
+            return False
+        return has_role(
+            request.user,
+            UserRole.ADMIN,
+            UserRole.SALES_STAFF,
+            UserRole.WAREHOUSE_STAFF,
+            UserRole.FINANCE_STAFF,
+        )
+
+
 class SalesRevenueReportAccess(permissions.BasePermission):
     """
     Verified sales revenue reports:

@@ -201,6 +201,30 @@ class SalesCancelVerifyTests(TestCase):
         self.assertEqual(create.status_code, 403)
 
 
+    def test_warehouse_can_tick_and_untick_prepared(self):
+        self.client.force_authenticate(self.warehouse)
+        url = f"/api/purchase/sales-orders/{self.order.pk}/set-prepared/"
+        res = self.client.post(url, {"prepared": True}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertIsNotNone(res.data["prepared_at"])
+        self.assertEqual(res.data["prepared_by"]["id"], self.warehouse.pk)
+
+        res = self.client.post(url, {"prepared": False}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertIsNone(res.data["prepared_at"])
+        self.assertIsNone(res.data["prepared_by"])
+
+    def test_prepared_requires_boolean_and_open_order(self):
+        self.client.force_authenticate(self.admin)
+        url = f"/api/purchase/sales-orders/{self.order.pk}/set-prepared/"
+        self.assertEqual(self.client.post(url, {}, format="json").status_code, 400)
+
+        self.order.status = OrderStatus.CANCELLED
+        self.order.save(update_fields=["status"])
+        res = self.client.post(url, {"prepared": True}, format="json")
+        self.assertEqual(res.status_code, 400)
+
+
 class SalesLinePackagingTypeTests(TestCase):
     """Jenis kemasan (Bal / Kotak) is chosen per sales line, not on the kemasan master."""
 
@@ -324,7 +348,13 @@ class PreprintedReceiptLayoutTests(TestCase):
                 drawn[text] = ((x - width) / mm, x / mm, self._fontsize)
                 return super().drawRightString(x, y, text, *args, **kwargs)
 
+            def drawText(self, text_obj):
+                # Every string ends up here (incl. _draw_fitted cells); keep raw operators.
+                self.codes.append(text_obj.getCode())
+                return super().drawText(text_obj)
+
         pdf = Recorder(BytesIO(), pagesize=PAGE_SIZE)
+        pdf.codes = self.codes = []
         _draw_values(
             pdf, DEFAULT_LAYOUT, self.order, list(self.order.lines.all()), include_faktur_number=False
         )
@@ -343,18 +373,15 @@ class PreprintedReceiptLayoutTests(TestCase):
         for text in address_lines:
             self.assertGreaterEqual(drawn[text][2], 8.0, text)
 
-    def test_long_qty_is_condensed_inside_banyaknya_rule(self):
-        from reportlab.pdfgen import canvas
+    def test_address_is_left_aligned_with_name(self):
+        from purchase.receipt_pdf import DEFAULT_LAYOUT
 
-        from purchase.receipt_pdf import DEFAULT_LAYOUT, PAGE_SIZE, _draw_fitted
+        drawn = self._draw()
+        address_lines = [k for k in drawn if k.startswith("JL.") or "ACEH" in k]
+        for text in address_lines:
+            self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.kepada_value_x, places=3)
 
-        layout = DEFAULT_LAYOUT
-        width = layout.preprinted_qty_right - layout.preprinted_qty_left
-        pdf = canvas.Canvas(BytesIO(), pagesize=PAGE_SIZE)
-        printed = _draw_fitted(
-            pdf, 0, 0, "1000 BAL X 0.2 KG", "Helvetica", layout.font_qty, width,
-            layout.font_min, layout.min_horiz_scale,
-        )
-        self.assertLessEqual(printed, width)
-        # The pad's Banyaknya | Nama Barang rule sits at ~25 mm.
-        self.assertLess(layout.preprinted_qty_right, 25.0)
+    def test_banyaknya_is_left_blank(self):
+        self._draw()
+        self.assertTrue(any("NYONYA MERAH" in code for code in self.codes))
+        self.assertFalse(any("BAL X" in code for code in self.codes), self.codes)

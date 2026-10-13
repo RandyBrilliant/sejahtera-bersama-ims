@@ -29,6 +29,7 @@ import {
   fetchSalesOrder,
   fetchSalesOrders,
   fetchWilayah,
+  setSalesOrderPrepared,
   updateCustomer,
   updateCustomerProductPrice,
   updatePurchaseInOrder,
@@ -356,6 +357,19 @@ export function useVerifySalesOrderByIdMutation() {
     onSuccess: (_data, orderId) => {
       invalidatePurchaseQueries(qc)
       void qc.invalidateQueries({ queryKey: purchaseKeys.salesOrderDetail(orderId) })
+    },
+  })
+}
+
+/** Row-level packing checklist toggle for list tables. */
+export function useSetSalesOrderPreparedMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, prepared }: { orderId: number; prepared: boolean }) =>
+      setSalesOrderPrepared(orderId, prepared),
+    onSuccess: (_data, vars) => {
+      invalidatePurchaseQueries(qc)
+      void qc.invalidateQueries({ queryKey: purchaseKeys.salesOrderDetail(vars.orderId) })
     },
   })
 }

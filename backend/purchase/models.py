@@ -266,6 +266,16 @@ class SalesOrder(AuditModel):
         related_name="verified_sales_orders",
         verbose_name=_("verified by"),
     )
+    # Packing checklist: set once gudang has prepared the goods (independent of payment status).
+    prepared_at = models.DateTimeField(_("prepared at"), null=True, blank=True)
+    prepared_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prepared_sales_orders",
+        verbose_name=_("prepared by"),
+    )
     notes = models.TextField(_("notes"), blank=True)
 
     class Meta:
