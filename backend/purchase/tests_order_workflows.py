@@ -381,6 +381,11 @@ class PreprintedReceiptLayoutTests(TestCase):
         for text in address_lines:
             self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.kepada_value_x, places=3)
 
+    def test_total_kg_is_printed_under_items(self):
+        self._draw()
+        # 1000 kemasan x 0.2 kg.
+        self.assertTrue(any("TOTAL: 200 KG" in code for code in self.codes), self.codes)
+
     def test_banyaknya_is_left_blank(self):
         self._draw()
         self.assertTrue(any("NYONYA MERAH" in code for code in self.codes))

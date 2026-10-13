@@ -290,6 +290,16 @@ def _line_name_display(line) -> str:
     return f"{variant} ({suffix})"
 
 
+def _total_mass_kg(lines) -> Decimal:
+    """Overall berat of the nota: sum of qty x net mass per kemasan."""
+    total = Decimal("0")
+    for line in lines:
+        packaging = line.product_packaging
+        net = Decimal(str(packaging.net_mass_kg or 0)) if packaging is not None else Decimal("0")
+        total += Decimal(str(line.quantity)) * net
+    return total
+
+
 def _price_per_kg_idr(line) -> int:
     """Effective harga per kg for a sales line (unit package price ÷ net mass)."""
     packaging = line.product_packaging
@@ -812,6 +822,20 @@ def _draw_values(
             layout.x(layout.col_total.right - layout.cell_padding),
             baseline,
             line_total_text,
+        )
+
+    # Pad: "TOTAL: __ KG" under the last item in Nama Barang, if a ruled row is still free.
+    if not include_faktur_number and lines and len(lines) < layout.row_count:
+        _draw_fitted(
+            pdf,
+            layout.x(layout.preprinted_name_left),
+            layout.y(first_row_top + len(lines) * layout.row_height),
+            f"TOTAL: {_format_quantity(_total_mass_kg(lines))} KG",
+            FONT_BOLD,
+            layout.font_row,
+            layout.preprinted_name_right - layout.preprinted_name_left,
+            layout.font_min,
+            layout.min_horiz_scale,
         )
 
     # Grand total — full mode sits in the Jumlah Harga totals cell (right of JUMLAH).
