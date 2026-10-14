@@ -210,6 +210,7 @@ export type CustomerProductPrice = {
   customer_name: string
   product_packaging: number
   packaging_label: string
+  packaging_net_mass_kg: string
   variant_name: string
   /** Harga jual per kemasan (bukan per kg). */
   selling_price_idr: number

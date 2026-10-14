@@ -123,6 +123,9 @@ class CustomerProductPriceSerializer(serializers.ModelSerializer):
     updated_by = serializers.SerializerMethodField()
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     packaging_label = serializers.CharField(source="product_packaging.label", read_only=True)
+    packaging_net_mass_kg = serializers.DecimalField(
+        source="product_packaging.net_mass_kg", max_digits=12, decimal_places=6, read_only=True
+    )
     variant_name = serializers.CharField(source="product_packaging.product.variant_name", read_only=True)
 
     class Meta:
@@ -133,6 +136,7 @@ class CustomerProductPriceSerializer(serializers.ModelSerializer):
             "customer_name",
             "product_packaging",
             "packaging_label",
+            "packaging_net_mass_kg",
             "variant_name",
             "selling_price_idr",
             "note",
@@ -146,6 +150,7 @@ class CustomerProductPriceSerializer(serializers.ModelSerializer):
             "id",
             "customer_name",
             "packaging_label",
+            "packaging_net_mass_kg",
             "variant_name",
             "created_at",
             "updated_at",

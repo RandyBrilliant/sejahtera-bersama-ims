@@ -15,6 +15,7 @@ import {
   useProductPackagingListQuery,
 } from '@/hooks/use-inventory-query'
 import { alert } from '@/lib/alert'
+import { packagingLabelWithMass } from '@/lib/format-packaging-mass'
 import { cn } from '@/lib/utils'
 import type { IngredientInventory, ProductPackaging } from '@/types/inventory'
 
@@ -315,7 +316,7 @@ export function ProductionBatchWizard({ onCancel, onSaved }: Props) {
       return {
         title: 'Berapa hasil utama?',
         description: pkg
-          ? `${pkg.product_variant_name} · ${pkg.label}`
+          ? `${pkg.product_variant_name} · ${packagingLabelWithMass(pkg.label, pkg.net_mass_kg)}`
           : 'Kemasan',
         unitLabel: 'kemasan',
         initialValue: line?.quantity_produced || '',
@@ -700,7 +701,7 @@ export function ProductionBatchWizard({ onCancel, onSaved }: Props) {
                     >
                       <span className="text-on-surface font-medium">
                         {pkg
-                          ? `${pkg.product_variant_name} · ${pkg.label}`
+                          ? `${pkg.product_variant_name} · ${packagingLabelWithMass(pkg.label, pkg.net_mass_kg)}`
                           : 'Kemasan'}
                       </span>
                       <span className="text-on-surface text-right font-semibold tabular-nums">

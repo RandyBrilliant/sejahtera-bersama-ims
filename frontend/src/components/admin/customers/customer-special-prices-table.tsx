@@ -40,6 +40,7 @@ import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { alert } from '@/lib/alert'
 import { formatIdr } from '@/lib/format-idr'
+import { packagingLabelWithMass } from '@/lib/format-packaging-mass'
 import type { CustomerProductPrice, CustomerProductPricesListParams } from '@/types/purchase'
 
 const NO_PKG = '__none__' as const
@@ -244,7 +245,9 @@ export function CustomerSpecialPricesTable({ customerId, canWrite }: Props) {
               {rows.map((row) => (
                 <TableRow key={row.id} className="border-outline-variant">
                   <TableCell className="font-medium">{row.variant_name}</TableCell>
-                  <TableCell>{row.packaging_label}</TableCell>
+                  <TableCell>
+                    {packagingLabelWithMass(row.packaging_label, row.packaging_net_mass_kg)}
+                  </TableCell>
                   <TableCell className="tabular-nums">
                     {formatIdr(row.selling_price_idr)}
                   </TableCell>
@@ -321,7 +324,8 @@ export function CustomerSpecialPricesTable({ customerId, canWrite }: Props) {
                   <SelectItem value={NO_PKG}>— Pilih —</SelectItem>
                   {packagings.map((pkg) => (
                     <SelectItem key={pkg.id} value={String(pkg.id)}>
-                      {pkg.product_variant_name} · {pkg.label} (default{' '}
+                      {pkg.product_variant_name} ·{' '}
+                      {packagingLabelWithMass(pkg.label, pkg.net_mass_kg)} (default{' '}
                       {formatIdr(pkg.total_price_idr)})
                     </SelectItem>
                   ))}
@@ -402,7 +406,10 @@ export function CustomerSpecialPricesTable({ customerId, canWrite }: Props) {
             <DialogDescription>
               Harga untuk{' '}
               <span className="font-semibold">
-                {deleteRow?.variant_name} · {deleteRow?.packaging_label}
+                {deleteRow?.variant_name} ·{' '}
+                {deleteRow
+                  ? packagingLabelWithMass(deleteRow.packaging_label, deleteRow.packaging_net_mass_kg)
+                  : null}
               </span>{' '}
               akan dihapus. Pesanan baru akan memakai harga default produk.
             </DialogDescription>

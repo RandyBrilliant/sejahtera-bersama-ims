@@ -157,9 +157,10 @@ class ProductPackaging(AuditModel):
         verbose_name_plural = _("product packaging")
         ordering = ["product__name", "net_mass_kg", "label"]
         constraints = [
+            # Same label may repeat with a different berat (e.g. "1 ONS" as 0.1 kg and as 20 kg).
             models.UniqueConstraint(
-                fields=["product", "label"],
-                name="uq_product_packaging_label_per_product",
+                fields=["product", "label", "net_mass_kg"],
+                name="uq_product_packaging_label_mass_per_product",
             ),
         ]
         indexes = [

@@ -28,6 +28,7 @@ import {
 import { useProductStockMovementsQuery } from '@/hooks/use-inventory-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
+import { packagingLabelWithMass } from '@/lib/format-packaging-mass'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
 import type { ProductStockMovement, ProductStockMovementListParams, StockMovementType } from '@/types/inventory'
@@ -86,7 +87,10 @@ export function ProductStockMovementsTable() {
             <span className="font-medium">{row.original.product_variant_name}</span>
             <span className="text-on-surface-variant block text-xs">
               {row.original.product_packaging_label.trim()
-                ? row.original.product_packaging_label
+                ? packagingLabelWithMass(
+                    row.original.product_packaging_label,
+                    row.original.product_packaging_net_mass_kg
+                  )
                 : 'Mutasi massa (tanpa SKU)'}
             </span>
           </div>

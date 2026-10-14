@@ -381,3 +381,35 @@ class ProductDeleteInUseTests(TestCase):
         self.assertEqual(body["code"], "in_use")
         self.assertIn("1 KG", body["detail"])
         self.assertIn("mutasi stok (1)", body["detail"])
+
+
+class ProductPackagingLabelMassTests(TestCase):
+    """Same label may repeat on a product as long as the berat differs."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            "pkg_label_admin", full_name="Admin", role=UserRole.ADMIN, password="pass"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        self.product = Product.objects.create(
+            name="Bawang Goreng", variant_name="Nyonya Merah", price_per_kg_idr=100000
+        )
+        ProductPackaging.objects.create(product=self.product, label="1 ONS", net_mass_kg=Decimal("0.1"))
+
+    def _create(self, label, net_mass_kg):
+        return self.client.post(
+            "/api/inventory/product-packaging/",
+            {"product": self.product.id, "label": label, "net_mass_kg": net_mass_kg},
+            format="json",
+        )
+
+    def test_same_label_with_different_mass_is_allowed(self):
+        resp = self._create("1 ONS", "20")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(ProductPackaging.objects.filter(product=self.product, label="1 ONS").count(), 2)
+
+    def test_same_label_and_mass_is_rejected(self):
+        resp = self._create("1 ons", "0.1")
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("berat yang sama", str(resp.content.decode()))

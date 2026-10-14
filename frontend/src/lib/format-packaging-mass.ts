@@ -10,6 +10,16 @@ export function formatKgId(kg: number): string {
   return `${formatDecimalId(kg)} kg`
 }
 
+/** Kemasan label + berat, e.g. "1 ONS · 20 kg" — a label alone can repeat across berat. */
+export function packagingLabelWithMass(
+  label: string,
+  netMassKg: string | number | null | undefined
+): string {
+  const kg = parseDecimalLike(String(netMassKg ?? ''))
+  if (!Number.isFinite(kg) || kg <= 0) return label
+  return `${label} · ${formatKgId(kg)}`
+}
+
 /** e.g. "1 kemasan = 0,1 kg (1 ons)". */
 export function formatOneKemasanMass(netMassKg: string | number | undefined): string {
   const kg = parseDecimalLike(String(netMassKg ?? ''))

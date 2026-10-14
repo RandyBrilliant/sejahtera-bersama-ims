@@ -35,6 +35,7 @@ import {
   formatOneKemasanMass,
   kgFromPackageQty,
   packageQtyFromKg,
+  packagingLabelWithMass,
 } from '@/lib/format-packaging-mass'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
 import { cn } from '@/lib/utils'
@@ -632,8 +633,11 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                       <span className="text-on-surface-variant truncate text-xs">
                         {p.product_variant_name}
                       </span>
-                      <span className="text-on-surface truncate font-medium">{p.label}</span>
-                      <span className="text-on-surface-variant text-xs">
+                      {/* Label + berat at the same size: one label can exist with several berat. */}
+                      <span className="text-on-surface truncate text-base leading-tight font-bold">
+                        {p.label}
+                      </span>
+                      <span className="text-on-surface text-base leading-tight font-bold tabular-nums">
                         {fmtKgLabel(p.net_mass_kg)}
                       </span>
                       <span className="text-primary mt-1 font-semibold tabular-nums">
@@ -822,7 +826,7 @@ function SalesOrderFormInner({ mode, orderId, initial, onCancel, onSaved }: Inne
                           <div className="min-w-0">
                             <p className="text-on-surface truncate text-sm font-medium">
                               {pkg
-                                ? `${pkg.product_variant_name} · ${pkg.label}`
+                                ? `${pkg.product_variant_name} · ${packagingLabelWithMass(pkg.label, pkg.net_mass_kg)}`
                                 : `#${it.product_packaging}`}
                             </p>
                             <p className="text-on-surface-variant text-xs leading-relaxed">

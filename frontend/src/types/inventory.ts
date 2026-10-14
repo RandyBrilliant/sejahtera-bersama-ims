@@ -170,6 +170,7 @@ export type ProductStockMovement = {
   product: number
   product_packaging: number | null
   product_packaging_label: string
+  product_packaging_net_mass_kg: string | null
   product_variant_name: string
   movement_type: StockMovementType
   mass_grams: string

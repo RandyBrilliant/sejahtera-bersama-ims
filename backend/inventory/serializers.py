@@ -146,6 +146,8 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
             "created_by",
             "updated_by",
         ]
+        # Duplicate check lives in validate() for an Indonesian message.
+        validators = []
 
     def get_remaining_stock(self, obj):
         annotated = getattr(obj, "remaining_stock", None)
@@ -169,6 +171,23 @@ class ProductPackagingSerializer(serializers.ModelSerializer):
         if not cleaned:
             raise serializers.ValidationError("Label kemasan wajib diisi.")
         return cleaned
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        product = attrs.get("product") or getattr(self.instance, "product", None)
+        label = attrs.get("label", getattr(self.instance, "label", None))
+        net_mass_kg = attrs.get("net_mass_kg", getattr(self.instance, "net_mass_kg", None))
+        if product is not None and label and net_mass_kg is not None:
+            duplicate = ProductPackaging.objects.filter(
+                product=product, label__iexact=label, net_mass_kg=net_mass_kg
+            )
+            if self.instance is not None:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                raise serializers.ValidationError(
+                    {"label": "Kemasan dengan label dan berat yang sama sudah ada untuk produk ini."}
+                )
+        return attrs
 
 
 class IngredientSerializer(serializers.ModelSerializer):
@@ -293,6 +312,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     product_packaging_label = serializers.SerializerMethodField(read_only=True)
+    product_packaging_net_mass_kg = serializers.SerializerMethodField(read_only=True)
     product_variant_name = serializers.CharField(source="product.variant_name", read_only=True)
     total_mass_grams = serializers.SerializerMethodField(read_only=True)
 
@@ -303,6 +323,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
             "product",
             "product_packaging",
             "product_packaging_label",
+            "product_packaging_net_mass_kg",
             "product_variant_name",
             "movement_type",
             "mass_grams",
@@ -321,6 +342,7 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "product_packaging_label",
+            "product_packaging_net_mass_kg",
             "product_variant_name",
             "total_mass_grams",
             "tepung_mass_grams",
@@ -337,6 +359,11 @@ class ProductStockMovementSerializer(serializers.ModelSerializer):
         if obj.product_packaging_id:
             return obj.product_packaging.label
         return ""
+
+    def get_product_packaging_net_mass_kg(self, obj):
+        if obj.product_packaging_id:
+            return str(obj.product_packaging.net_mass_kg)
+        return None
 
     def get_total_mass_grams(self, obj):
         return obj.mass_grams + obj.bonus_mass_grams
