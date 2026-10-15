@@ -39,7 +39,7 @@ export function AdminQuickActionsDropdown({
         <div className="border-outline-variant bg-surface-container-low border-b px-3 py-2">
           <p className="text-on-surface text-sm font-semibold">Aksi cepat</p>
           <p className="text-on-surface-variant text-xs">
-            Operasional harian — sama dengan ikon kotak di bilah atas.
+            Pintasan transaksi harian.
           </p>
         </div>
         <div className="max-h-[min(70vh,28rem)] overflow-y-auto py-1">

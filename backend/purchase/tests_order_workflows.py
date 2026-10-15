@@ -388,12 +388,15 @@ class PreprintedReceiptLayoutTests(TestCase):
         for text in address_lines:
             self.assertGreaterEqual(drawn[text][2], 8.0, text)
 
-    def test_address_is_left_aligned_with_name(self):
+    def test_address_first_line_follows_pad_line_rest_align_with_name(self):
         from purchase.receipt_pdf import DEFAULT_LAYOUT
 
         drawn = self._draw()
-        address_lines = [k for k in drawn if k.startswith("JL.") or "ACEH" in k]
-        for text in address_lines:
+        first = [k for k in drawn if k.startswith("JL.")]
+        self.assertEqual(len(first), 1)
+        self.assertAlmostEqual(drawn[first[0]][0], DEFAULT_LAYOUT.preprinted_address_first_left, places=3)
+        rest = [k for k in drawn if "ACEH" in k and not k.startswith("JL.")]
+        for text in rest:
             self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.kepada_value_x, places=3)
 
     def test_total_kg_is_printed_under_items(self):

@@ -1,29 +1,24 @@
 import { isAxiosError } from 'axios'
-import { RefreshCw } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { id as localeId } from 'date-fns/locale'
+import { Lock, RefreshCw } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DateRangePickerInput } from '@/components/ui/date-range-picker-input'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { useHppProfitReportQuery } from '@/hooks/use-purchase-query'
-import { formatIdr, toFiniteNumber } from '@/lib/format-idr'
 import {
-  type ReportPresetId,
-  REPORT_PRESET_LABELS,
-  getDateRangeForPreset,
-  validateDateRange,
-} from '@/lib/report-presets'
-
-const PRESET_ORDER: ReportPresetId[] = [
-  'last_7_days',
-  'last_30_days',
-  'this_month',
-  'last_month',
-  'this_quarter',
-  'this_year',
-]
+  Panel,
+  PanelHeader,
+  PeriodFilterBar,
+  SectionError,
+  StatTile,
+} from '@/components/admin/analytics/analytics-ui'
+import { HppWaterfallChart } from '@/components/admin/hpp/hpp-waterfall-chart'
+import { Button } from '@/components/ui/button'
+import { useHppProfitReportQuery } from '@/hooks/use-purchase-query'
+import { CHART, compactIdr } from '@/lib/dashboard-chart'
+import { formatIdr, toFiniteNumber } from '@/lib/format-idr'
+import { type ReportPresetId, getDateRangeForPreset, validateDateRange } from '@/lib/report-presets'
+import { cn } from '@/lib/utils'
+import type { HppProfitReportPayload } from '@/types/reports'
 
 function httpErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
@@ -34,52 +29,103 @@ function httpErrorMessage(error: unknown): string {
   return 'Gagal memuat data.'
 }
 
-function SectionError({ message }: { message: string }) {
+function fmtDate(iso: string, pattern = 'd MMM yyyy'): string {
+  try {
+    return format(parseISO(iso), pattern, { locale: localeId })
+  } catch {
+    return iso
+  }
+}
+
+function pctOf(value: number, base: number): number | null {
+  return base > 0 ? (value / base) * 100 : null
+}
+
+function fmtPct(p: number | null): string {
+  if (p == null) return '—'
+  return `${p.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`
+}
+
+function fmtKg(v: string | number): string {
+  return toFiniteNumber(v).toLocaleString('id-ID', { maximumFractionDigits: 1 })
+}
+
+/* -------------------------------------------------------------------------- */
+/* P&L statement                                                              */
+/* -------------------------------------------------------------------------- */
+
+type StatementLine =
+  | { kind: 'total'; label: string; value: number }
+  | { kind: 'line'; label: string; value: number; hint?: string }
+  | { kind: 'subtotal'; label: string; value: number }
+
+function statementLines(d: HppProfitReportPayload): StatementLine[] {
+  return [
+    { kind: 'total', label: 'Pendapatan penjualan', value: d.revenue_idr },
+    { kind: 'line', label: 'Bahan baku', value: -d.cogs.material_idr },
+    { kind: 'line', label: 'Tenaga kerja kupas', value: -d.cogs.labor_kupas_idr },
+    { kind: 'line', label: 'Upah harian produksi', value: -d.cogs.labor_daily_production_idr },
+    { kind: 'subtotal', label: 'Total HPP', value: -d.cogs.total_idr },
+    { kind: 'total', label: 'Laba kotor', value: d.gross_profit_idr },
+    { kind: 'line', label: 'Biaya operasional', value: -d.opex.expenses_idr, hint: 'di luar bahan & gaji' },
+    { kind: 'line', label: 'Upah non-produksi', value: -d.opex.labor_nonproduction_idr },
+    { kind: 'subtotal', label: 'Total OPEX', value: -d.opex.total_idr },
+    { kind: 'total', label: 'Laba bersih', value: d.net_profit_idr },
+  ]
+}
+
+function PlStatement({ data }: { data: HppProfitReportPayload }) {
+  const lines = statementLines(data)
   return (
-    <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm">
-      {message}
-    </div>
+    <table className="w-full text-[13px]">
+      <thead>
+        <tr className="text-on-surface-variant border-outline-variant/60 border-b text-[11px] font-medium">
+          <th className="pb-2 text-left font-medium">Pos</th>
+          <th className="pb-2 text-right font-medium">Nilai</th>
+          <th className="w-16 pb-2 text-right font-medium">% pend.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map((l) => {
+          const pct = pctOf(Math.abs(l.value), data.revenue_idr)
+          const isTotal = l.kind === 'total'
+          const negativeTotal = isTotal && l.value < 0
+          return (
+            <tr
+              key={l.label}
+              className={cn(
+                isTotal && 'border-outline-variant/60 border-t first:border-t-0',
+                l.kind === 'subtotal' && 'text-on-surface-variant'
+              )}
+            >
+              <td className={cn('py-2', l.kind === 'line' && 'text-on-surface-variant pl-4', isTotal && 'text-on-surface font-semibold')}>
+                {l.label}
+                {l.kind === 'line' && l.hint ? <span className="ml-1.5 text-[11px] text-slate-400">{l.hint}</span> : null}
+              </td>
+              <td
+                className={cn(
+                  'py-2 text-right whitespace-nowrap tabular-nums',
+                  isTotal ? 'font-semibold' : 'text-on-surface',
+                  negativeTotal ? 'text-red-700' : isTotal && 'text-on-surface',
+                  l.kind === 'subtotal' && 'font-medium'
+                )}
+              >
+                {formatIdr(l.value)}
+              </td>
+              <td className="text-on-surface-variant py-2 text-right text-xs tabular-nums">
+                {l.label === 'Pendapatan penjualan' ? '100%' : fmtPct(pct)}
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 
-function KpiPlaceholder() {
-  return <div className="bg-muted h-8 w-28 animate-pulse rounded-md" />
-}
-
-/** One row in the P&L waterfall table. */
-function PlRow({
-  label,
-  value,
-  hint,
-  tone = 'default',
-  indent = false,
-  strong = false,
-}: {
-  label: string
-  value: number
-  hint?: string
-  tone?: 'default' | 'muted' | 'positive' | 'negative'
-  indent?: boolean
-  strong?: boolean
-}) {
-  const toneClass =
-    tone === 'positive'
-      ? 'text-emerald-600'
-      : tone === 'negative'
-        ? 'text-destructive'
-        : tone === 'muted'
-          ? 'text-muted-foreground'
-          : 'text-foreground'
-  return (
-    <tr className={strong ? 'bg-muted/40 font-semibold' : ''}>
-      <td className={`px-4 py-2 ${indent ? 'pl-8 text-muted-foreground' : ''}`}>
-        {label}
-        {hint ? <span className="text-muted-foreground ml-2 text-xs">{hint}</span> : null}
-      </td>
-      <td className={`px-4 py-2 text-right tabular-nums ${toneClass}`}>{formatIdr(value)}</td>
-    </tr>
-  )
-}
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
 
 export function AdminHppPage() {
   const initialRange = useMemo(() => getDateRangeForPreset('this_month'), [])
@@ -107,252 +153,247 @@ export function AdminHppPage() {
 
   const data = report.data
   const loading = report.isPending && rangeValid
-  const marginPct =
-    data && data.revenue_idr > 0
-      ? (data.net_profit_idr / data.revenue_idr) * 100
-      : null
+  const grossMargin = data ? pctOf(data.gross_profit_idr, data.revenue_idr) : null
+  const netMargin = data ? pctOf(data.net_profit_idr, data.revenue_idr) : null
+
+  const variants = useMemo(
+    () =>
+      [...(data?.by_variant ?? [])]
+        .map((r) => {
+          const kg = toFiniteNumber(r.kg)
+          return {
+            ...r,
+            kgNum: kg,
+            hppPerKg: kg > 0 ? r.hpp_idr / kg : null,
+            margin: pctOf(r.gross_profit_idr, r.revenue_idr),
+          }
+        })
+        .sort((a, b) => b.revenue_idr - a.revenue_idr),
+    [data]
+  )
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-6 lg:space-y-8">
+      {/* Header */}
+      <header className="dash-rise flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
-            HPP & laba
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Laba rugi berdasarkan order terverifikasi: pendapatan dikurangi HPP (biaya bahan +
-            tenaga kerja produksi) menghasilkan laba kotor, dikurangi biaya operasional (OPEX)
-            menghasilkan laba bersih. Khusus pemilik.
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-on-surface text-[26px] leading-tight font-bold tracking-[-0.02em] md:text-[30px]">
+              HPP & laba
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+              <Lock className="size-3" /> Khusus pemilik
+            </span>
+          </div>
+          <p className="text-on-surface-variant mt-1 text-[13px]">
+            Laba rugi dari order terverifikasi (menurut tanggal verifikasi)
+            {rangeValid ? (
+              <>
+                {' · '}
+                <span className="text-on-surface font-medium">
+                  {fmtDate(startDate, 'd MMM')} – {fmtDate(endDate)}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="shrink-0 gap-2"
+          className="h-9 gap-2 self-start rounded-lg bg-white text-[13px] md:self-auto"
           disabled={!rangeValid || report.isFetching}
           onClick={() => void report.refetch()}
         >
-          <RefreshCw className={`size-4 ${report.isFetching ? 'animate-spin' : ''}`} />
+          <RefreshCw className={cn('size-4', report.isFetching && 'animate-spin')} />
           Muat ulang
         </Button>
-      </div>
+      </header>
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base">Rentang tanggal</CardTitle>
-          <CardDescription>
-            Berdasarkan tanggal verifikasi order. Data dimuat otomatis saat rentang valid.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {PRESET_ORDER.map((id) => (
-              <Button
-                key={id}
-                type="button"
-                size="sm"
-                variant={presetSelection === id ? 'default' : 'outline'}
-                onClick={() => applyPreset(id)}
-              >
-                {REPORT_PRESET_LABELS[id]}
-              </Button>
-            ))}
-          </div>
-          <div className="max-w-md">
-            <Label htmlFor="hpp-range">Rentang kustom</Label>
-            <DateRangePickerInput
-              id="hpp-range"
-              className="mt-2"
-              startDate={startDate}
-              endDate={endDate}
-              onChange={onRangeChange}
-            />
-          </div>
-          {rangeError ? (
-            <p className="text-destructive text-sm">{rangeError}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs">
-              Periode aktif: <span className="text-foreground font-medium">{startDate}</span> —{' '}
-              <span className="text-foreground font-medium">{endDate}</span>
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
+      <PeriodFilterBar
+        id="hpp-range"
+        preset={presetSelection}
+        startDate={startDate}
+        endDate={endDate}
+        onPreset={applyPreset}
+        onRangeChange={onRangeChange}
+      />
+      {rangeError ? <SectionError message={rangeError} /> : null}
       {report.isError ? <SectionError message={httpErrorMessage(report.error)} /> : null}
 
       {/* KPI strip */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Pendapatan</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
-              {loading ? <KpiPlaceholder /> : data ? formatIdr(data.revenue_idr) : '—'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Laba kotor</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
-              {loading ? <KpiPlaceholder /> : data ? formatIdr(data.gross_profit_idr) : '—'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Laba bersih {marginPct != null ? `(${marginPct.toFixed(1)}%)` : ''}</CardDescription>
-            <CardTitle
-              className={`text-2xl font-semibold tabular-nums ${
-                data && data.net_profit_idr < 0 ? 'text-destructive' : ''
-              }`}
-            >
-              {loading ? <KpiPlaceholder /> : data ? formatIdr(data.net_profit_idr) : '—'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>HPP / kg (rata-rata)</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
-              {loading ? (
-                <KpiPlaceholder />
-              ) : data ? (
-                <>
-                  {formatIdr(data.hpp_per_kg_idr)}
-                  <span className="text-muted-foreground ml-2 text-sm font-normal">
-                    · {toFiniteNumber(data.kg_sold).toLocaleString('id-ID')} kg
-                  </span>
-                </>
-              ) : (
-                '—'
-              )}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-5 xl:grid-cols-4">
+        <StatTile
+          label="Pendapatan"
+          loading={loading}
+          delay={80}
+          value={data ? formatIdr(data.revenue_idr) : '—'}
+          hint={
+            data
+              ? `${data.verified_order_count.toLocaleString('id-ID')} order · ${fmtKg(data.kg_sold)} kg terjual`
+              : undefined
+          }
+        />
+        <StatTile
+          label="Laba kotor"
+          loading={loading}
+          delay={120}
+          tone={data && data.gross_profit_idr < 0 ? 'negative' : 'default'}
+          value={data ? formatIdr(data.gross_profit_idr) : '—'}
+          hint={data ? `Margin kotor ${fmtPct(grossMargin)}` : undefined}
+        />
+        <StatTile
+          label="Laba bersih"
+          loading={loading}
+          delay={160}
+          tone={data && data.net_profit_idr < 0 ? 'negative' : 'default'}
+          value={data ? formatIdr(data.net_profit_idr) : '—'}
+          hint={data ? `Margin bersih ${fmtPct(netMargin)}` : undefined}
+        />
+        <StatTile
+          label="HPP per kg"
+          loading={loading}
+          delay={200}
+          value={data ? formatIdr(data.hpp_per_kg_idr) : '—'}
+          hint={data ? `Rata-rata dari ${fmtKg(data.kg_sold)} kg` : undefined}
+        />
       </div>
 
-      <Separator />
-
-      {/* P&L waterfall */}
-      <section className="space-y-4">
-        <h2 className="font-heading text-lg font-semibold">Laba rugi (P&L)</h2>
-        {data ? (
-          <Card>
-            <CardContent className="overflow-x-auto px-0">
-              <table className="w-full text-sm">
-                <tbody className="[&_tr]:border-border [&_tr]:border-b last:[&_tr]:border-0">
-                  <PlRow label="Pendapatan penjualan" value={data.revenue_idr} strong />
-                  <PlRow
-                    label="HPP — bahan baku"
-                    value={-data.cogs.material_idr}
-                    indent
-                    tone="muted"
-                  />
-                  <PlRow
-                    label="HPP — tenaga kerja kupas"
-                    value={-data.cogs.labor_kupas_idr}
-                    indent
-                    tone="muted"
-                  />
-                  <PlRow
-                    label="HPP — upah harian produksi"
-                    value={-data.cogs.labor_daily_production_idr}
-                    indent
-                    tone="muted"
-                  />
-                  <PlRow label="Total HPP" value={-data.cogs.total_idr} />
-                  <PlRow
-                    label="Laba kotor"
-                    value={data.gross_profit_idr}
-                    tone={data.gross_profit_idr < 0 ? 'negative' : 'positive'}
-                    strong
-                  />
-                  <PlRow
-                    label="OPEX — biaya operasional"
-                    value={-data.opex.expenses_idr}
-                    hint="di luar bahan & gaji"
-                    indent
-                    tone="muted"
-                  />
-                  <PlRow
-                    label="OPEX — upah non-produksi"
-                    value={-data.opex.labor_nonproduction_idr}
-                    indent
-                    tone="muted"
-                  />
-                  <PlRow label="Total OPEX" value={-data.opex.total_idr} />
-                  <PlRow
-                    label="Laba bersih"
-                    value={data.net_profit_idr}
-                    tone={data.net_profit_idr < 0 ? 'negative' : 'positive'}
-                    strong
-                  />
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        ) : loading ? (
-          <div className="bg-muted/40 h-72 animate-pulse rounded-xl" />
-        ) : null}
-      </section>
-
-      <Separator />
-
-      {/* Per-variant breakdown */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="font-heading text-lg font-semibold">Per varian</h2>
-          <p className="text-muted-foreground text-sm">
-            COGS bahan eksak per varian; tenaga kerja produksi dialokasikan berdasarkan porsi kg.
-          </p>
-        </div>
-        {data ? (
-          data.by_variant.length > 0 ? (
-            <Card>
-              <CardContent className="max-h-96 overflow-auto px-0">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 sticky top-0">
-                    <tr className="text-left [&_th]:px-4 [&_th]:py-2">
-                      <th>Varian</th>
-                      <th className="text-right">Kg</th>
-                      <th className="text-right">Pendapatan</th>
-                      <th className="text-right">HPP</th>
-                      <th className="text-right">Laba kotor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="[&_td]:border-border [&_td]:px-4 [&_td]:py-1.5 [&_tr]:border-b">
-                    {data.by_variant.map((r) => (
-                      <tr key={r.product_id}>
-                        <td>{r.variant_name}</td>
-                        <td className="text-right tabular-nums">
-                          {toFiniteNumber(r.kg).toLocaleString('id-ID')}
-                        </td>
-                        <td className="text-right tabular-nums">{formatIdr(r.revenue_idr)}</td>
-                        <td className="text-right tabular-nums">{formatIdr(r.hpp_idr)}</td>
-                        <td
-                          className={`text-right tabular-nums ${
-                            r.gross_profit_idr < 0 ? 'text-destructive' : 'text-emerald-600'
-                          }`}
-                        >
-                          {formatIdr(r.gross_profit_idr)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+      {/* Waterfall + statement */}
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 xl:grid-cols-12">
+        <Panel className="xl:col-span-7" delay={240}>
+          <PanelHeader
+            title="Dari pendapatan ke laba bersih"
+            subtitle="Setiap biaya mengurangi pendapatan secara bertahap"
+            action={
+              <div className="text-on-surface-variant flex items-center gap-4 text-[11px] font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-[3px]" style={{ background: CHART.series1 }} />
+                  Total & laba
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-[3px]" style={{ background: CHART.series2 }} />
+                  Biaya
+                </span>
+              </div>
+            }
+          />
+          {loading ? (
+            <div className="bg-surface-container-low/70 h-[360px] animate-pulse rounded-xl" />
+          ) : data && data.revenue_idr > 0 ? (
+            <HppWaterfallChart data={data} />
           ) : (
-            <p className="text-muted-foreground text-sm">
-              Tidak ada penjualan terverifikasi pada periode ini.
-            </p>
-          )
-        ) : loading ? (
-          <div className="bg-muted/40 h-48 animate-pulse rounded-xl" />
-        ) : null}
-      </section>
+            <div className="text-on-surface-variant border-outline-variant/70 flex h-[360px] items-center justify-center rounded-xl border border-dashed text-sm">
+              Belum ada penjualan terverifikasi pada periode ini.
+            </div>
+          )}
+        </Panel>
+
+        <Panel className="xl:col-span-5" delay={280}>
+          <PanelHeader title="Laporan laba rugi" subtitle="Persentase terhadap pendapatan" />
+          {loading ? (
+            <div className="space-y-2.5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-surface-container-low h-6 animate-pulse rounded" />
+              ))}
+            </div>
+          ) : data ? (
+            <PlStatement data={data} />
+          ) : null}
+        </Panel>
+      </div>
+
+      {/* Per variant */}
+      <Panel className="p-0 md:p-0" delay={320}>
+        <div className="px-5 pt-5 md:px-6 md:pt-6">
+          <PanelHeader
+            title="Profitabilitas per varian"
+            subtitle="HPP bahan dihitung eksak per varian; tenaga kerja produksi dialokasikan menurut porsi kg."
+          />
+        </div>
+        {loading ? (
+          <div className="space-y-2 px-6 pb-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-surface-container-low h-10 animate-pulse rounded" />
+            ))}
+          </div>
+        ) : variants.length === 0 ? (
+          <p className="text-on-surface-variant px-6 pb-6 text-sm">Tidak ada penjualan terverifikasi pada periode ini.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-[13px]">
+              <thead>
+                <tr className="text-on-surface-variant border-outline-variant/60 border-y bg-slate-900/[0.015] text-left text-[11px] font-medium [&_th]:px-3 [&_th]:py-2.5 [&_th:first-child]:pl-5 md:[&_th:first-child]:pl-6 [&_th:last-child]:pr-5 md:[&_th:last-child]:pr-6">
+                  <th className="font-medium">Varian</th>
+                  <th className="text-right font-medium">Terjual</th>
+                  <th className="text-right font-medium">Pendapatan</th>
+                  <th className="text-right font-medium">HPP</th>
+                  <th className="text-right font-medium">HPP / kg</th>
+                  <th className="text-right font-medium">Laba kotor</th>
+                  <th className="w-[180px] font-medium">Margin kotor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-outline-variant/40 divide-y [&_td]:px-3 [&_td]:py-3 [&_td:first-child]:pl-5 md:[&_td:first-child]:pl-6 [&_td:last-child]:pr-5 md:[&_td:last-child]:pr-6">
+                {variants.map((r, i) => {
+                  const loss = r.gross_profit_idr < 0
+                  const width = r.margin == null ? 0 : Math.min(100, Math.abs(r.margin))
+                  return (
+                    <tr key={r.product_id} className="hover:bg-slate-900/[0.02]">
+                      <td className="text-on-surface font-medium">{r.variant_name}</td>
+                      <td className="text-on-surface-variant text-right whitespace-nowrap tabular-nums">{fmtKg(r.kg)} kg</td>
+                      <td className="text-on-surface text-right whitespace-nowrap tabular-nums">{formatIdr(r.revenue_idr)}</td>
+                      <td className="text-on-surface-variant text-right whitespace-nowrap tabular-nums">{formatIdr(r.hpp_idr)}</td>
+                      <td className="text-on-surface-variant text-right whitespace-nowrap tabular-nums">
+                        {r.hppPerKg == null ? '—' : `Rp ${compactIdr(r.hppPerKg)}`}
+                      </td>
+                      <td className={cn('text-right font-semibold whitespace-nowrap tabular-nums', loss ? 'text-red-700' : 'text-on-surface')}>
+                        {formatIdr(r.gross_profit_idr)}
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-900/[0.05]">
+                            <div
+                              className="dash-bar-grow h-full rounded-full"
+                              style={{
+                                width: `${Math.max(width, r.margin ? 2 : 0)}%`,
+                                background: loss ? '#d03b3b' : CHART.series1,
+                                animationDelay: `${360 + i * 50}ms`,
+                              }}
+                            />
+                          </div>
+                          <span className={cn('w-12 text-right text-xs font-semibold tabular-nums', loss ? 'text-red-700' : 'text-on-surface')}>
+                            {fmtPct(r.margin)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {data && variants.length > 1 ? (
+                <tfoot>
+                  <tr className="border-outline-variant/60 border-t font-semibold [&_td]:px-3 [&_td]:py-3 [&_td:first-child]:pl-5 md:[&_td:first-child]:pl-6 [&_td:last-child]:pr-5 md:[&_td:last-child]:pr-6">
+                    <td className="text-on-surface">Total</td>
+                    <td className="text-on-surface-variant text-right tabular-nums">
+                      {fmtKg(variants.reduce((s, r) => s + r.kgNum, 0))} kg
+                    </td>
+                    <td className="text-on-surface text-right tabular-nums">
+                      {formatIdr(variants.reduce((s, r) => s + r.revenue_idr, 0))}
+                    </td>
+                    <td className="text-on-surface-variant text-right tabular-nums">
+                      {formatIdr(variants.reduce((s, r) => s + r.hpp_idr, 0))}
+                    </td>
+                    <td />
+                    <td className="text-on-surface text-right tabular-nums">
+                      {formatIdr(variants.reduce((s, r) => s + r.gross_profit_idr, 0))}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              ) : null}
+            </table>
+          </div>
+        )}
+      </Panel>
     </div>
   )
 }

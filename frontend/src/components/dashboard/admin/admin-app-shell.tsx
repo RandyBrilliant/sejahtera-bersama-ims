@@ -31,7 +31,6 @@ export function AdminAppShell() {
       <AdminSidebar
         className="hidden h-full md:flex"
         collapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
       />
 
       {mobileNavOpen ? (
@@ -57,7 +56,11 @@ export function AdminAppShell() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <AdminHeader onMenuClick={() => setMobileNavOpen(true)} />
+        <AdminHeader
+          onMenuClick={() => setMobileNavOpen(true)}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+        />
         <main className="bg-surface-app flex-1 overflow-y-auto p-4 lg:p-8">
           <div className="page-enter mx-auto max-w-[1440px]">
             <Outlet />

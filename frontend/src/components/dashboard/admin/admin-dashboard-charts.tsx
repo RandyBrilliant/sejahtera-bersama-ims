@@ -1,41 +1,31 @@
 import { format, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo } from 'react'
 import {
   Area,
   AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 
+import { CHART, compactIdr } from '@/lib/dashboard-chart'
 import { formatIdr } from '@/lib/format-idr'
 import { formatProductMassKgFromGrams } from '@/lib/format-product-mass'
-import { cn } from '@/lib/utils'
 import type {
   DashboardCashDayRow,
   DashboardRevenueDayRow,
 } from '@/types/account-dashboard'
 import type { Product } from '@/types/inventory'
 
-const COMPACT = new Intl.NumberFormat('id-ID', {
-  notation: 'compact',
-  compactDisplay: 'short',
-  maximumFractionDigits: 1,
-})
-
-function compactAxis(n: number): string {
-  return COMPACT.format(n)
-}
-
 function dayLabel(iso: string): string {
   try {
-    return format(parseISO(iso), 'EEE', { locale: localeId })
+    return format(parseISO(iso), 'EEE d', { locale: localeId })
   } catch {
     return iso.slice(5)
   }
@@ -43,396 +33,329 @@ function dayLabel(iso: string): string {
 
 function dayTitle(iso: string): string {
   try {
-    return format(parseISO(iso), 'EEEE, d MMM yyyy', { locale: localeId })
+    return format(parseISO(iso), 'EEEE, d MMMM yyyy', { locale: localeId })
   } catch {
     return iso
   }
 }
 
-const PRIMARY = '#1f108e'
-const INCOME = '#0f766e'
-const EXPENSE = '#b91c1c'
-const MUTED_BAR = '#c4bfd9'
+const AXIS_TICK = { fontSize: 11, fill: CHART.axis }
 
-type TrendMode = 'revenue' | 'cash'
+const REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-type DashboardTrendChartProps = {
-  revenueByDay: DashboardRevenueDayRow[]
-  cashByDay: DashboardCashDayRow[]
-  loading?: boolean
+function ChartSkeleton({ height }: { height: number }) {
+  return (
+    <div
+      className="bg-surface-container-low/70 w-full animate-pulse rounded-xl"
+      style={{ height }}
+    />
+  )
 }
 
-export function DashboardTrendChart({
-  revenueByDay,
-  cashByDay,
-  loading,
-}: DashboardTrendChartProps) {
-  const [mode, setMode] = useState<TrendMode>('revenue')
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
-  const uid = useId().replace(/:/g, '')
-
-  const revenueData = useMemo(
-    () =>
-      revenueByDay.map((r) => ({
-        ...r,
-        label: dayLabel(r.date),
-        title: dayTitle(r.date),
-      })),
-    [revenueByDay]
-  )
-
-  const cashData = useMemo(
-    () =>
-      cashByDay.map((r) => ({
-        ...r,
-        label: dayLabel(r.date),
-        title: dayTitle(r.date),
-      })),
-    [cashByDay]
-  )
-
-  const empty =
-    mode === 'revenue'
-      ? revenueData.every((d) => d.revenue_idr === 0)
-      : cashData.every((d) => d.income_idr === 0 && d.expense_idr === 0)
-
+function ChartEmpty({ height, children }: { height: number; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-on-surface font-heading text-lg font-semibold">
-            Tren 7 hari
-          </h2>
-          <p className="text-on-surface-variant mt-0.5 text-xs">
-            {mode === 'revenue'
-              ? 'Pendapatan penjualan terverifikasi per hari'
-              : 'Pemasukan vs pengeluaran kas operasional'}
-          </p>
-        </div>
-        <div
-          className="bg-surface-container-low inline-flex rounded-lg p-0.5"
-          role="tablist"
-          aria-label="Jenis grafik"
-        >
-          {(
-            [
-              { id: 'revenue', label: 'Pendapatan' },
-              { id: 'cash', label: 'Kas' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={mode === tab.id}
-              onClick={() => {
-                setMode(tab.id)
-                setActiveIndex(null)
-              }}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-[11px] font-semibold tracking-wider uppercase transition-colors',
-                mode === tab.id
-                  ? 'bg-surface-container-lowest text-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="bg-surface-container-low/60 h-[280px] animate-pulse rounded-lg" />
-      ) : empty ? (
-        <div className="text-on-surface-variant flex h-[280px] items-center justify-center text-sm">
-          Belum ada data untuk grafik ini pada 7 hari terakhir.
-        </div>
-      ) : mode === 'revenue' ? (
-        <div className="h-[280px] min-w-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={revenueData}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-              onMouseMove={(state) => {
-                if (state?.activeTooltipIndex != null) {
-                  setActiveIndex(Number(state.activeTooltipIndex))
-                }
-              }}
-              onMouseLeave={() => setActiveIndex(null)}
-            >
-              <defs>
-                <linearGradient id={`revFill-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={PRIMARY} stopOpacity={0.28} />
-                  <stop offset="100%" stopColor={PRIMARY} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="rgb(31 16 142 / 0.08)"
-              />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 11, fill: '#6b6b80' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={compactAxis}
-                tick={{ fontSize: 11, fill: '#6b6b80' }}
-                width={44}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                cursor={{ stroke: PRIMARY, strokeWidth: 1, strokeDasharray: '4 4' }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.[0]) return null
-                  const p = payload[0].payload as (typeof revenueData)[0]
-                  return (
-                    <div className="border-outline-variant bg-surface-container-lowest rounded-lg border px-3 py-2 shadow-md">
-                      <p className="text-on-surface-variant text-xs capitalize">
-                        {p.title}
-                      </p>
-                      <p className="text-on-surface mt-1 text-sm font-semibold tabular-nums">
-                        {formatIdr(p.revenue_idr)}
-                      </p>
-                      <p className="text-on-surface-variant text-xs tabular-nums">
-                        {p.order_count.toLocaleString('id-ID')} pesanan terverifikasi
-                      </p>
-                    </div>
-                  )
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="revenue_idr"
-                stroke={PRIMARY}
-                strokeWidth={2.25}
-                fill={`url(#revFill-${uid})`}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: PRIMARY }}
-                animationDuration={700}
-                animationEasing="ease-out"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-          {activeIndex != null && revenueData[activeIndex] ? (
-            <p className="text-on-surface-variant mt-2 text-center text-xs tabular-nums">
-              {revenueData[activeIndex].title}:{' '}
-              <span className="text-on-surface font-medium">
-                {formatIdr(revenueData[activeIndex].revenue_idr)}
-              </span>
-            </p>
-          ) : (
-            <p className="text-on-surface-variant mt-2 text-center text-xs">
-              Arahkan kursor ke titik untuk detail harian
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="h-[280px] min-w-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={cashData}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-              barGap={2}
-              onMouseMove={(state) => {
-                if (state?.activeTooltipIndex != null) {
-                  setActiveIndex(Number(state.activeTooltipIndex))
-                }
-              }}
-              onMouseLeave={() => setActiveIndex(null)}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="rgb(31 16 142 / 0.08)"
-              />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 11, fill: '#6b6b80' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={compactAxis}
-                tick={{ fontSize: 11, fill: '#6b6b80' }}
-                width={44}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                cursor={{ fill: 'rgb(31 16 142 / 0.04)' }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.[0]) return null
-                  const p = payload[0].payload as (typeof cashData)[0]
-                  return (
-                    <div className="border-outline-variant bg-surface-container-lowest rounded-lg border px-3 py-2 shadow-md">
-                      <p className="text-on-surface-variant text-xs capitalize">
-                        {p.title}
-                      </p>
-                      <dl className="mt-1.5 space-y-0.5 text-xs tabular-nums">
-                        <div className="flex justify-between gap-6">
-                          <dt className="text-on-surface-variant">Masuk</dt>
-                          <dd className="font-medium" style={{ color: INCOME }}>
-                            {formatIdr(p.income_idr)}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between gap-6">
-                          <dt className="text-on-surface-variant">Keluar</dt>
-                          <dd className="font-medium" style={{ color: EXPENSE }}>
-                            {formatIdr(p.expense_idr)}
-                          </dd>
-                        </div>
-                        <div className="border-outline-variant flex justify-between gap-6 border-t pt-1">
-                          <dt className="text-on-surface-variant">Net</dt>
-                          <dd
-                            className={cn(
-                              'font-semibold',
-                              p.net_idr >= 0 ? 'text-trend-positive' : 'text-error-app'
-                            )}
-                          >
-                            {formatIdr(p.net_idr)}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-                  )
-                }}
-              />
-              <Bar
-                dataKey="income_idr"
-                name="Pemasukan"
-                fill={INCOME}
-                radius={[3, 3, 0, 0]}
-                maxBarSize={18}
-                animationDuration={650}
-              />
-              <Bar
-                dataKey="expense_idr"
-                name="Pengeluaran"
-                fill={EXPENSE}
-                radius={[3, 3, 0, 0]}
-                maxBarSize={18}
-                animationDuration={650}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="text-on-surface-variant mt-2 flex justify-center gap-4 text-[11px] font-medium">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 rounded-sm" style={{ background: INCOME }} />
-              Pemasukan
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 rounded-sm" style={{ background: EXPENSE }} />
-              Pengeluaran
-            </span>
-          </div>
-        </div>
-      )}
+    <div
+      className="text-on-surface-variant border-outline-variant/70 flex w-full items-center justify-center rounded-xl border border-dashed text-sm"
+      style={{ height }}
+    >
+      {children}
     </div>
   )
 }
 
-type ProductStockChartProps = {
-  rows: Product[]
-  loading?: boolean
+function TooltipCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border-outline-variant/80 min-w-[180px] rounded-xl border bg-white/95 px-3.5 py-2.5 shadow-[0_8px_24px_-8px_rgb(31_16_142/0.25)] backdrop-blur">
+      <p className="text-on-surface-variant text-[11px] font-medium capitalize">{title}</p>
+      <div className="mt-1.5">{children}</div>
+    </div>
+  )
 }
 
-export function ProductStockChart({ rows, loading }: ProductStockChartProps) {
-  const [activeId, setActiveId] = useState<number | null>(null)
+function SwatchRow({ color, label, value }: { color: string; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-6 text-xs">
+      <span className="text-on-surface-variant inline-flex items-center gap-1.5">
+        <span className="size-2 rounded-[3px]" style={{ background: color }} />
+        {label}
+      </span>
+      <span className="text-on-surface font-semibold tabular-nums">{value}</span>
+    </div>
+  )
+}
 
+/* -------------------------------------------------------------------------- */
+/* Revenue — single series area with crosshair + peak label                   */
+/* -------------------------------------------------------------------------- */
+
+export function RevenueAreaChart({
+  rows,
+  loading,
+  height = 248,
+}: {
+  rows: DashboardRevenueDayRow[]
+  loading?: boolean
+  height?: number
+}) {
+  const uid = useId().replace(/:/g, '')
   const data = useMemo(
-    () =>
-      rows.slice(0, 8).map((row) => {
-        const grams = Number(row.remaining_mass_grams)
-        const kg = Number.isNaN(grams) ? 0 : grams / 1000
-        return {
-          id: row.id,
-          name: row.variant_name,
-          fullName: `${row.name} · ${row.variant_name}`,
-          qty: kg,
-        }
-      }),
+    () => rows.map((r) => ({ ...r, label: dayLabel(r.date), title: dayTitle(r.date) })),
+    [rows]
+  )
+  const peak = useMemo(
+    () => data.reduce<(typeof data)[number] | null>((best, d) => (!best || d.revenue_idr > best.revenue_idr ? d : best), null),
+    [data]
+  )
+
+  if (loading) return <ChartSkeleton height={height} />
+  if (data.length === 0 || data.every((d) => d.revenue_idr === 0)) {
+    return <ChartEmpty height={height}>Belum ada pendapatan terverifikasi minggu ini.</ChartEmpty>
+  }
+
+  return (
+    <div className="min-w-0" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 28, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`rev-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CHART.series1} stopOpacity={0.16} />
+              <stop offset="100%" stopColor={CHART.series1} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke={CHART.grid} />
+          <XAxis
+            dataKey="label"
+            tick={AXIS_TICK}
+            axisLine={false}
+            tickLine={false}
+            tickMargin={10}
+            interval={0}
+            padding={{ left: 12, right: 12 }}
+          />
+          <YAxis
+            tickFormatter={compactIdr}
+            tick={AXIS_TICK}
+            width={48}
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+          />
+          <Tooltip
+            cursor={{ stroke: CHART.axis, strokeWidth: 1 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null
+              const p = payload[0].payload as (typeof data)[number]
+              return (
+                <TooltipCard title={p.title}>
+                  <p className="text-on-surface text-sm font-semibold tabular-nums">
+                    {formatIdr(p.revenue_idr)}
+                  </p>
+                  <p className="text-on-surface-variant mt-0.5 text-[11px] tabular-nums">
+                    {p.order_count.toLocaleString('id-ID')} pesanan terverifikasi
+                  </p>
+                </TooltipCard>
+              )
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="revenue_idr"
+            stroke={CHART.series1}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill={`url(#rev-${uid})`}
+            dot={false}
+            activeDot={{ r: 5, strokeWidth: 2, stroke: CHART.surface, fill: CHART.series1 }}
+            isAnimationActive={!REDUCED_MOTION}
+            animationDuration={900}
+            animationEasing="ease-out"
+          />
+          {peak && peak.revenue_idr > 0 ? (
+            <ReferenceDot
+              x={peak.label}
+              y={peak.revenue_idr}
+              r={4}
+              fill={CHART.series1}
+              stroke={CHART.surface}
+              strokeWidth={2}
+              label={{
+                value: `Puncak ${compactIdr(peak.revenue_idr)}`,
+                position: 'top',
+                offset: 10,
+                fontSize: 11,
+                fontWeight: 600,
+                fill: '#464553',
+              }}
+            />
+          ) : null}
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cash flow — grouped columns, income vs expense                             */
+/* -------------------------------------------------------------------------- */
+
+export function CashFlowChart({
+  rows,
+  loading,
+  height = 320,
+}: {
+  rows: DashboardCashDayRow[]
+  loading?: boolean
+  height?: number
+}) {
+  const data = useMemo(
+    () => rows.map((r) => ({ ...r, label: dayLabel(r.date), title: dayTitle(r.date) })),
     [rows]
   )
 
-  const maxQty = Math.max(1, ...data.map((d) => d.qty))
-
-  if (loading) {
-    return <div className="bg-surface-container-low/60 h-[260px] animate-pulse rounded-lg" />
+  if (loading) return <ChartSkeleton height={height} />
+  if (data.length === 0 || data.every((d) => d.income_idr === 0 && d.expense_idr === 0)) {
+    return <ChartEmpty height={height}>Belum ada transaksi kas minggu ini.</ChartEmpty>
   }
 
-  if (data.length === 0) {
+  return (
+    <div className="min-w-0" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barGap={2} barCategoryGap="28%">
+          <CartesianGrid vertical={false} stroke={CHART.grid} />
+          <XAxis
+            dataKey="label"
+            tick={AXIS_TICK}
+            axisLine={{ stroke: '#d9d7e3' }}
+            tickLine={false}
+            tickMargin={10}
+            interval={0}
+            padding={{ left: 12, right: 12 }}
+          />
+          <YAxis
+            tickFormatter={compactIdr}
+            tick={AXIS_TICK}
+            width={48}
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+          />
+          <Tooltip
+            cursor={{ fill: 'rgb(31 16 142 / 0.04)', radius: 8 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null
+              const p = payload[0].payload as (typeof data)[number]
+              return (
+                <TooltipCard title={p.title}>
+                  <div className="space-y-1">
+                    <SwatchRow color={CHART.series1} label="Pemasukan" value={formatIdr(p.income_idr)} />
+                    <SwatchRow color={CHART.series2} label="Pengeluaran" value={formatIdr(p.expense_idr)} />
+                  </div>
+                  <div className="border-outline-variant/70 mt-2 flex items-center justify-between gap-6 border-t pt-1.5 text-xs">
+                    <span className="text-on-surface-variant">Net</span>
+                    <span className="text-on-surface font-semibold tabular-nums">
+                      {p.net_idr >= 0 ? '+' : ''}
+                      {formatIdr(p.net_idr)}
+                    </span>
+                  </div>
+                </TooltipCard>
+              )
+            }}
+          />
+          <Bar
+            dataKey="income_idr"
+            name="Pemasukan"
+            fill={CHART.series1}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={20}
+            isAnimationActive={!REDUCED_MOTION}
+            animationDuration={700}
+          />
+          <Bar
+            dataKey="expense_idr"
+            name="Pengeluaran"
+            fill={CHART.series2}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={20}
+            isAnimationActive={!REDUCED_MOTION}
+            animationDuration={700}
+            animationBegin={120}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Product stock — ranked horizontal bars (HTML, every value labelled)        */
+/* -------------------------------------------------------------------------- */
+
+export function ProductStockBars({ rows, loading }: { rows: Product[]; loading?: boolean }) {
+  const data = useMemo(
+    () =>
+      rows
+        .map((row) => {
+          const grams = Number(row.remaining_mass_grams)
+          return {
+            id: row.id,
+            name: row.name,
+            variant: row.variant_name,
+            grams: Number.isFinite(grams) ? Math.max(0, grams) : 0,
+          }
+        })
+        .sort((a, b) => b.grams - a.grams)
+        .slice(0, 6),
+    [rows]
+  )
+  const max = Math.max(1, ...data.map((d) => d.grams))
+
+  if (loading) {
     return (
-      <div className="text-on-surface-variant flex h-[260px] items-center justify-center text-sm">
-        Belum ada produk aktif.
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <div className="bg-surface-container-low h-3 w-1/3 animate-pulse rounded" />
+            <div className="bg-surface-container-low h-2 animate-pulse rounded-full" />
+          </div>
+        ))}
       </div>
     )
   }
 
+  if (data.length === 0) {
+    return <ChartEmpty height={200}>Belum ada produk aktif.</ChartEmpty>
+  }
+
   return (
-    <div className="h-[260px] min-w-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          layout="vertical"
-          data={data}
-          margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
-          onMouseMove={(state) => {
-            const idx = state?.activeTooltipIndex
-            if (idx != null && data[Number(idx)]) {
-              setActiveId(data[Number(idx)].id)
-            }
-          }}
-          onMouseLeave={() => setActiveId(null)}
-        >
-          <XAxis
-            type="number"
-            domain={[0, maxQty]}
-            tickFormatter={compactAxis}
-            tick={{ fontSize: 10, fill: '#6b6b80' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={72}
-            tick={{ fontSize: 10, fill: '#6b6b80' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip
-            cursor={{ fill: 'rgb(31 16 142 / 0.04)' }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.[0]) return null
-              const p = payload[0].payload as (typeof data)[0]
-              return (
-                <div className="border-outline-variant bg-surface-container-lowest max-w-[220px] rounded-lg border px-3 py-2 shadow-md">
-                  <p className="text-on-surface text-xs font-medium leading-snug">
-                    {p.fullName}
-                  </p>
-                  <p className="text-primary mt-1 text-sm font-semibold tabular-nums">
-                    {formatProductMassKgFromGrams(p.qty * 1000, 3)} kg
-                  </p>
-                </div>
-              )
-            }}
-          />
-          <Bar dataKey="qty" radius={[0, 4, 4, 0]} maxBarSize={16} animationDuration={700}>
-            {data.map((entry) => (
-              <Cell
-                key={entry.id}
-                fill={
-                  activeId === entry.id || activeId == null ? PRIMARY : MUTED_BAR
-                }
-                style={{ transition: 'fill 180ms ease' }}
+    <ul className="space-y-4">
+      {data.map((d, i) => {
+        const pct = (d.grams / max) * 100
+        return (
+          <li key={d.id} className="group">
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <p className="text-on-surface min-w-0 truncate text-[13px] font-medium">
+                {d.name}
+                <span className="text-on-surface-variant font-normal"> · {d.variant}</span>
+              </p>
+              <span className="text-on-surface shrink-0 text-[13px] font-semibold tabular-nums">
+                {formatProductMassKgFromGrams(d.grams, 1)} kg
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[#efedf8]">
+              <div
+                className="dash-bar-grow h-full rounded-full transition-[filter] duration-200 group-hover:brightness-110"
+                style={{
+                  width: `${Math.max(pct, 1.5)}%`,
+                  background: CHART.series1,
+                  animationDelay: `${120 + i * 60}ms`,
+                }}
               />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
   )
 }

@@ -123,8 +123,11 @@ class ReceiptLayout:
     preprinted_buyer_top: float = 17.6
     preprinted_buyer_right: float = 145.0
     # Baseline tops of the alamat lines under the name: the two pad lines, then one
-    # spare line above the table so long alamat stays readable at the narrower width.
+    # spare line above the table so long alamat stays readable.
     preprinted_address_tops: tuple[float, ...] = (24.0, 30.2, 36.2)
+    # First alamat line follows the full-width pad line (starts under the hari);
+    # the following lines start at the name's left edge (``kepada_value_x``).
+    preprinted_address_first_left: float = 83.0
     font_preprinted_buyer: float = 11.5
     font_buyer_address: float = 11.0
     font_buyer_address_min: float = 8.0
@@ -730,17 +733,18 @@ def _draw_values(
         address = " ".join(_address_lines(order.customer, max_lines=12))
         if address:
             tops = layout.preprinted_address_tops
+            lefts = [layout.preprinted_address_first_left] + [name_x] * (len(tops) - 1)
             addr_lines, addr_size = _wrap_into_slots(
                 pdf,
                 _caps(address),
                 FONT,
                 layout.font_buyer_address,
                 layout.font_buyer_address_min,
-                [layout.preprinted_buyer_right - name_x] * len(tops),
+                [layout.preprinted_buyer_right - left for left in lefts],
             )
             pdf.setFont(FONT, addr_size)
-            for raw, top in zip(addr_lines, tops):
-                pdf.drawString(layout.x(name_x), layout.y(top), raw)
+            for raw, top, left in zip(addr_lines, tops, lefts):
+                pdf.drawString(layout.x(left), layout.y(top), raw)
 
     # Bon / Faktur number (full mode only; pad already has the red serial).
     if include_faktur_number:
