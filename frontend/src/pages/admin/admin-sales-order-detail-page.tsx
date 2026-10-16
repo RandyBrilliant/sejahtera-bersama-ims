@@ -218,7 +218,7 @@ export function AdminSalesOrderDetailPage() {
           <h2 className="text-on-surface font-heading text-xl font-semibold tracking-tight">
             {order.order_code}
           </h2>
-          <p className="text-on-surface-variant mt-1 text-sm">{order.customer_name}</p>
+          <p className="text-on-surface mt-1 text-lg font-semibold">{order.customer_name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canEdit && !isFinanceReadOnly ? (
