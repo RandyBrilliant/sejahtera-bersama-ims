@@ -47,29 +47,29 @@ class EnvelopeLayout:
     summary_top: float = 20.0
     # Crowded orders start higher so every row stays clear of Kpd. Yth.
     summary_top_min: float = 10.0
-    summary_line_height: float = 7.0
+    summary_line_height: float = 8.5
     summary_line_height_min: float = 3.0
-    font_summary: float = 14.0
+    font_summary: float = 18.0
 
     # Product block under the summary, indented like the Excel sheet: the product
     # name (``BAWANG GORENG``) then each distinct variant on its own row.
     product_left: float = 90.0
     # Baseline distance from the last summary row to the product name.
-    product_gap: float = 10.0
-    product_gap_min: float = 6.0
+    product_gap: float = 11.0
+    product_gap_min: float = 9.0
     # Keep the summary + product clear of the Kpd. Yth. label.
-    kepada_clearance: float = 8.0
-    font_product: float = 15.0
-    font_product_item: float = 14.0
+    kepada_clearance: float = 10.0
+    font_product: float = 20.0
+    font_product_item: float = 18.0
 
     # Kpd. Yth. block (bottom-right).
     kepada_left: float = 107.0
-    kepada_top: float = 66.0
-    kepada_line_height: float = 8.0
-    font_kepada_label: float = 13.0
-    font_kepada_name: float = 17.0
-    font_kepada: float = 14.0
-    font_kepada_min: float = 9.0
+    kepada_top: float = 64.0
+    kepada_line_height: float = 9.5
+    font_kepada_label: float = 15.0
+    font_kepada_name: float = 22.0
+    font_kepada: float = 18.0
+    font_kepada_min: float = 11.0
     address_max_lines: int = 3
 
     font_min: float = 7.0
