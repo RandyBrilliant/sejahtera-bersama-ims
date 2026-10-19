@@ -20,6 +20,34 @@ class AttendanceVerifierAccess(permissions.BasePermission):
         return has_role(request.user, UserRole.ADMIN, UserRole.LEADERSHIP)
 
 
+class AttendanceScannerAccess(permissions.BasePermission):
+    """
+    Pemindai presensi (login): semua staf yang bisa masuk aplikasi.
+
+    Pemindai tercatat sebagai verifikator (``verified_by`` / ``verified_out_by``).
+    Staf kupas tidak punya akses aplikasi sehingga tidak termasuk.
+    """
+
+    message = "Anda tidak memiliki izin memindai presensi."
+
+    def has_permission(self, request, view) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return has_role(
+            request.user,
+            UserRole.ADMIN,
+            UserRole.LEADERSHIP,
+            UserRole.WAREHOUSE_STAFF,
+            UserRole.SALES_STAFF,
+            UserRole.FINANCE_STAFF,
+        )
+
+
+def can_scan_own_badge(user) -> bool:
+    """Admin / pemilik boleh memindai kartu sendiri; staf lain harus dipindai rekan."""
+    return has_role(user, UserRole.ADMIN, UserRole.LEADERSHIP)
+
+
 class AttendanceKioskAccess(permissions.BasePermission):
     """
     Public QR kiosk: open by default.

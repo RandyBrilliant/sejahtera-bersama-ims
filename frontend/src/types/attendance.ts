@@ -80,4 +80,7 @@ export type MyAttendanceRow = {
   is_late: boolean
   minutes_late: number | null
   checked_out_at: string | null
+  /** Nama staf yang memindai kartu saat masuk / pulang. */
+  verified_in_by?: string
+  verified_out_by?: string | null
 }

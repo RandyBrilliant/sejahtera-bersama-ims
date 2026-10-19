@@ -12,6 +12,7 @@ import {
   LogOut,
   Package,
   QrCode,
+  ScanLine,
   Settings,
   ShoppingCart,
   TrendingUp,
@@ -74,6 +75,9 @@ const adminSections: NavSection[] = [
   },
 ]
 
+/** Scan kartu rekan kerja — pemindai tercatat sebagai verifikator. */
+const scanNavItem: NavItem = { to: '/admin/absensi/scan', label: 'Scan presensi', icon: ScanLine }
+
 const ownerNavItem: NavItem = { to: '/admin/hpp', label: 'HPP & laba', icon: TrendingUp }
 
 const warehouseSections: NavSection[] = [
@@ -90,6 +94,7 @@ const warehouseSections: NavSection[] = [
     label: 'Pesanan',
     items: [{ to: '/admin/pesanan/penjualan', label: 'Penjualan', icon: ShoppingCart }],
   },
+  { label: 'Presensi', items: [scanNavItem] },
 ]
 
 const salesSections: NavSection[] = [
@@ -100,6 +105,7 @@ const salesSections: NavSection[] = [
       { to: '/admin/pesanan/penjualan', label: 'Pesanan penjualan', icon: ShoppingCart },
     ],
   },
+  { label: 'Presensi', items: [scanNavItem] },
 ]
 
 const financeSections: NavSection[] = [
@@ -114,7 +120,8 @@ const financeSections: NavSection[] = [
     items: [
       { to: '/admin/kas', label: 'Kas operasional', icon: Wallet },
       { to: '/admin/gaji', label: 'Payroll', icon: Banknote },
-      { to: '/admin/absensi', label: 'Presensi', icon: QrCode },
+      { to: '/admin/absensi', label: 'Laporan presensi', icon: QrCode },
+      scanNavItem,
     ],
   },
   {

@@ -233,11 +233,59 @@ class SalesCancelVerifyTests(TestCase):
         self.assertTrue(b"".join(res.streaming_content).startswith(b"%PDF"))
 
     def test_envelope_text(self):
-        from purchase.envelope_pdf import _product_text, _summary_text
+        from purchase.envelope_pdf import _product_name_text, _summary_text, _variant_texts
 
         line = self.order.lines.get()
         self.assertEqual(_summary_text(line), "4 KTK X 0.25 KG = 1 KG")
-        self.assertEqual(_product_text([line]), "BAWANG GORENG CAP NYONYA")
+        self.assertEqual(_product_name_text([line]), "BAWANG GORENG")
+        # Variant name only (no qty / kemasan), listed once even across lines.
+        self.assertEqual(_variant_texts([line, line]), ["ORIGINAL"])
+
+    def test_envelope_long_order_stays_clear_of_kepada(self):
+        from unittest import mock
+
+        from purchase import envelope_pdf
+        from purchase.envelope_pdf import DEFAULT_ENVELOPE_LAYOUT as L
+
+        line = self.order.lines.get()
+        product = line.product_packaging.product
+        for i in range(5):
+            line.pk = None
+            line.product_packaging = ProductPackaging.objects.create(
+                product=product, label=f"KEMASAN {i}", net_mass_kg=Decimal(i + 2)
+            )
+            line.save()
+        tops: list[tuple[float, str]] = []
+        real = envelope_pdf._draw_left
+
+        def spy(pdf, layout, x_mm, top_mm, text, font, size):
+            tops.append((top_mm, text))
+            return real(pdf, layout, x_mm, top_mm, text, font, size)
+
+        with mock.patch.object(envelope_pdf, "_draw_left", side_effect=spy):
+            envelope_pdf.build_sales_order_envelope_pdf(self.order)
+        above = [top for top, text in tops if top < L.kepada_top]
+        self.assertEqual(len(above), 6 + 1 + 1)  # summary rows + name + one shared variant
+        self.assertLessEqual(max(above), L.kepada_top - L.kepada_clearance + 1e-6)
+
+    def test_envelope_omits_phone_number(self):
+        from unittest import mock
+
+        from purchase import envelope_pdf
+
+        self.order.customer.phone = "0812 3456 7890"
+        self.order.customer.save()
+        drawn: list[str] = []
+        real = envelope_pdf._draw_left
+
+        def spy(pdf, layout, x_mm, top_mm, text, font, size):
+            drawn.append(text)
+            return real(pdf, layout, x_mm, top_mm, text, font, size)
+
+        with mock.patch.object(envelope_pdf, "_draw_left", side_effect=spy):
+            envelope_pdf.build_sales_order_envelope_pdf(self.order)
+        self.assertTrue(drawn)
+        self.assertFalse(any("0812" in t for t in drawn), drawn)
 
 
 class SalesLinePackagingTypeTests(TestCase):
@@ -388,7 +436,7 @@ class PreprintedReceiptLayoutTests(TestCase):
         for text in address_lines:
             self.assertGreaterEqual(drawn[text][2], 8.0, text)
 
-    def test_address_first_line_follows_pad_line_rest_align_with_name(self):
+    def test_all_address_lines_share_the_first_line_left_edge(self):
         from purchase.receipt_pdf import DEFAULT_LAYOUT
 
         drawn = self._draw()
@@ -396,8 +444,9 @@ class PreprintedReceiptLayoutTests(TestCase):
         self.assertEqual(len(first), 1)
         self.assertAlmostEqual(drawn[first[0]][0], DEFAULT_LAYOUT.preprinted_address_first_left, places=3)
         rest = [k for k in drawn if "ACEH" in k and not k.startswith("JL.")]
+        self.assertTrue(rest, "expected the alamat to wrap onto a second line")
         for text in rest:
-            self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.kepada_value_x, places=3)
+            self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.preprinted_address_first_left, places=3)
 
     def test_total_kg_is_printed_under_items(self):
         self._draw()

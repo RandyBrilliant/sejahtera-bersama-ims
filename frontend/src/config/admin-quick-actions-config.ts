@@ -122,11 +122,11 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickActionItem[] = [
   },
   {
     id: 'attendance-scan',
-    label: 'Presensi tablet',
-    description: 'Pindai QR kartu staf',
+    label: 'Scan presensi',
+    description: 'Pindai QR kartu rekan kerja',
     to: '/admin/absensi/scan',
     icon: QrCode,
-    allowedRoles: ['ADMIN', 'LEADERSHIP'],
+    allowedRoles: ['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF', 'SALES_STAFF', 'FINANCE_STAFF'],
   },
   {
     id: 'attendance-settings',

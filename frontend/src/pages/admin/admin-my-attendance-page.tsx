@@ -137,11 +137,21 @@ export function AdminMyAttendancePage() {
               {sortedRows.map((r) => (
                 <TableRow key={r.work_date}>
                   <TableCell className="tabular-nums">{r.work_date}</TableCell>
-                  <TableCell className="tabular-nums">{fmtDt(r.checked_in_at)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {fmtDt(r.checked_in_at)}
+                    {r.verified_in_by ? (
+                      <span className="text-on-surface-variant block text-xs">oleh {r.verified_in_by}</span>
+                    ) : null}
+                  </TableCell>
                   <TableCell>
                     {r.is_late ? `Ya (${r.minutes_late ?? '—'} m)` : 'Tidak'}
                   </TableCell>
-                  <TableCell className="tabular-nums">{fmtDt(r.checked_out_at)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {fmtDt(r.checked_out_at)}
+                    {r.verified_out_by ? (
+                      <span className="text-on-surface-variant block text-xs">oleh {r.verified_out_by}</span>
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

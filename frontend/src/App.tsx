@@ -334,7 +334,9 @@ export default function App() {
             <Route
               path="/admin/absensi/scan"
               element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'LEADERSHIP']}>
+                <ProtectedRoute
+                  allowedRoles={['ADMIN', 'LEADERSHIP', 'WAREHOUSE_STAFF', 'SALES_STAFF', 'FINANCE_STAFF']}
+                >
                   <AdminAttendanceScanPage />
                 </ProtectedRoute>
               }

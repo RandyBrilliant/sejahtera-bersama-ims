@@ -14,8 +14,10 @@ from attendance.models import AttendanceDailyCheckIn, StaffAttendanceBadge
 from attendance.permissions import (
     AttendanceKioskAccess,
     AttendanceReportAccess,
+    AttendanceScannerAccess,
     AttendanceSettingsAccess,
     AttendanceVerifierAccess,
+    can_scan_own_badge,
 )
 from attendance.serializers import (
     AttendanceSettingsSerializer,
@@ -49,7 +51,18 @@ def _invalid_badge_token_response():
     )
 
 
-def _preview_for_raw(raw: str):
+SELF_SCAN_DETAIL = "Tidak dapat memindai kartu sendiri. Minta rekan kerja untuk memindai kartu Anda."
+
+
+def _self_scan_response():
+    return Response(error_response(detail=SELF_SCAN_DETAIL, code=ApiCode.PERMISSION_DENIED), status=403)
+
+
+def _is_blocked_self_scan(scanner, employee_id: int) -> bool:
+    return scanner is not None and scanner.pk == employee_id and not can_scan_own_badge(scanner)
+
+
+def _preview_for_raw(raw: str, scanner=None):
     token = parse_badge_token(raw)
     if token is None:
         return None, _invalid_badge_token_response()
@@ -57,13 +70,22 @@ def _preview_for_raw(raw: str):
         badge = resolve_employee_from_badge_token(token)
     except AttendanceError as e:
         return None, Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
+    if _is_blocked_self_scan(scanner, badge.user_id):
+        return None, _self_scan_response()
     return build_tablet_preview(badge, jakarta_today_date()), None
 
 
-def _confirm_for_raw(raw: str, intent: str, verifier_id: int):
+def _confirm_for_raw(raw: str, intent: str, verifier_id: int, scanner=None):
     token = parse_badge_token(raw)
     if token is None:
         return None, _invalid_badge_token_response()
+    if scanner is not None:
+        try:
+            badge = resolve_employee_from_badge_token(token)
+        except AttendanceError as e:
+            return None, Response(error_response(detail=e.detail, code=ApiCode.NOT_FOUND), status=404)
+        if _is_blocked_self_scan(scanner, badge.user_id):
+            return None, _self_scan_response()
     try:
         if intent == "check_in":
             row, created = confirm_check_in(token, verifier_id)
@@ -201,19 +223,23 @@ class StaffBadgeReissueView(APIView):
 
 
 class AdminAttendancePreviewView(APIView):
-    permission_classes = [IsAuthenticated, AttendanceVerifierAccess]
+    """Pemindai login — semua staf aplikasi; pemindai dicatat sebagai verifikator."""
+
+    permission_classes = [IsAuthenticated, AttendanceScannerAccess]
 
     def post(self, request):
         ser = RawScanSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        data, err = _preview_for_raw(ser.validated_data["raw"])
+        data, err = _preview_for_raw(ser.validated_data["raw"], scanner=request.user)
         if err is not None:
             return err
         return Response(success_response(data=data), status=200)
 
 
 class AdminAttendanceConfirmView(APIView):
-    permission_classes = [IsAuthenticated, AttendanceVerifierAccess]
+    """Konfirmasi masuk/pulang; ``request.user`` disimpan sebagai verifikator."""
+
+    permission_classes = [IsAuthenticated, AttendanceScannerAccess]
 
     def post(self, request):
         ser = TabletConfirmSerializer(data=request.data)
@@ -222,6 +248,7 @@ class AdminAttendanceConfirmView(APIView):
             ser.validated_data["raw"],
             ser.validated_data["intent"],
             request.user.pk,
+            scanner=request.user,
         )
         if err is not None:
             return err
@@ -413,11 +440,15 @@ class AttendanceMeRowsView(APIView):
                 status=400,
             )
 
-        qs = AttendanceDailyCheckIn.objects.filter(
-            employee_id=request.user.pk,
-            work_date__gte=date_from,
-            work_date__lte=date_to,
-        ).order_by("-work_date")
+        qs = (
+            AttendanceDailyCheckIn.objects.select_related("verified_by", "verified_out_by")
+            .filter(
+                employee_id=request.user.pk,
+                work_date__gte=date_from,
+                work_date__lte=date_to,
+            )
+            .order_by("-work_date")
+        )
 
         rows = [
             {
@@ -426,6 +457,8 @@ class AttendanceMeRowsView(APIView):
                 "is_late": r.is_late,
                 "minutes_late": r.minutes_late,
                 "checked_out_at": r.checked_out_at.isoformat() if r.checked_out_at else None,
+                "verified_in_by": r.verified_by.full_name,
+                "verified_out_by": r.verified_out_by.full_name if r.verified_out_by_id else None,
             }
             for r in qs
         ]
