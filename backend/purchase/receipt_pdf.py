@@ -399,9 +399,15 @@ def _wrap_into_slots(
     """Word-wrap ``text`` across lines of the given widths (mm), one line per slot.
 
     Shrinks from ``preferred`` to ``min_size`` until everything fits; otherwise the
-    last slot ends with an ellipsis.
+    last slot ends with an ellipsis. A lone letter stays with the next word so
+    abbreviations like ``B ACEH`` (Banda Aceh) never split across lines.
     """
-    words = text.split()
+    words: list[str] = []
+    for word in text.split():
+        if words and len(words[-1]) == 1 and words[-1].isalpha():
+            words[-1] = f"{words[-1]} {word}"
+        else:
+            words.append(word)
 
     def fill(size: float) -> tuple[list[str], int]:
         lines: list[str] = []

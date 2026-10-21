@@ -448,6 +448,16 @@ class PreprintedReceiptLayoutTests(TestCase):
         for text in rest:
             self.assertAlmostEqual(drawn[text][0], DEFAULT_LAYOUT.preprinted_address_first_left, places=3)
 
+    def test_single_letter_stays_with_next_word(self):
+        from reportlab.pdfgen import canvas
+
+        from purchase.receipt_pdf import FONT, PAGE_SIZE, _wrap_into_slots
+
+        pdf = canvas.Canvas(BytesIO(), pagesize=PAGE_SIZE)
+        lines, _ = _wrap_into_slots(pdf, "JL PA JALIL, KP BARU, B ACEH", FONT, 11, 8, [55, 55])
+        self.assertFalse(any(line.endswith(" B") for line in lines), lines)
+        self.assertTrue(any("B ACEH" in line for line in lines), lines)
+
     def test_total_kg_is_printed_under_items(self):
         self._draw()
         # 1000 kemasan x 0.2 kg.

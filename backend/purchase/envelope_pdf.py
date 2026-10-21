@@ -31,6 +31,7 @@ from .receipt_pdf import (
     _wrap_into_slots,
 )
 
+
 @dataclass(frozen=True)
 class EnvelopeLayout:
     """Tunable coordinates in millimetres, measured from the top-left corner."""
