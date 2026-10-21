@@ -308,7 +308,9 @@ def _total_mass_kg(lines) -> Decimal:
 
 
 def _price_per_kg_idr(line) -> int:
-    """Effective harga per kg for a sales line (unit package price ÷ net mass)."""
+    """Harga per kg for a sales line: the exact stored value, else package price ÷ net mass."""
+    if getattr(line, "unit_price_per_kg_idr", None):
+        return int(line.unit_price_per_kg_idr)
     packaging = line.product_packaging
     net = Decimal(str(packaging.net_mass_kg)) if packaging is not None else Decimal("0")
     if net <= 0:

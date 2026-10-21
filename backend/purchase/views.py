@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models import Case, Count, DecimalField, ExpressionWrapper, F, Sum, Value, When
 from django.db.models.functions import Cast, Coalesce
 from django.http import FileResponse
 from django.utils import timezone
@@ -67,6 +67,27 @@ from .serializers import (
     WilayahSerializer,
 )
 
+
+def _sales_line_revenue_expr(output_field):
+    """Line revenue in SQL: kg x exact per-kg price when stored, else qty x package price.
+
+    Mirrors ``SalesOrderLine.line_total_idr`` (minus its per-line rounding).
+    """
+    dec0 = DecimalField(max_digits=24, decimal_places=0)
+    return Case(
+        When(
+            unit_price_per_kg_idr__isnull=False,
+            then=ExpressionWrapper(
+                F("quantity") * F("product_packaging__net_mass_kg") * Cast(F("unit_price_per_kg_idr"), dec0),
+                output_field=output_field,
+            ),
+        ),
+        default=ExpressionWrapper(
+            F("quantity") * Cast(F("unit_price_idr"), dec0),
+            output_field=output_field,
+        ),
+        output_field=output_field,
+    )
 
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
@@ -346,10 +367,7 @@ class SalesRevenueReportView(APIView):
         money_dec = DecimalField(max_digits=24, decimal_places=3)
         zero_qty = Value(Decimal("0"), output_field=qty_field)
         zero_idr = Value(Decimal("0"), output_field=money_dec)
-        line_revenue_expr = ExpressionWrapper(
-            F("quantity") * Cast(F("unit_price_idr"), DecimalField(max_digits=24, decimal_places=0)),
-            output_field=money_dec,
-        )
+        line_revenue_expr = _sales_line_revenue_expr(money_dec)
         by_packaging = list(
             line_qs.values(
                 "product_packaging_id",
@@ -424,10 +442,7 @@ class HppProfitReportView(APIView):
         kg_dec = DecimalField(max_digits=20, decimal_places=6)
         zero_idr = Value(Decimal("0"), output_field=money_dec)
         zero_kg = Value(Decimal("0"), output_field=kg_dec)
-        line_revenue_expr = ExpressionWrapper(
-            F("quantity") * Cast(F("unit_price_idr"), DecimalField(max_digits=24, decimal_places=0)),
-            output_field=money_dec,
-        )
+        line_revenue_expr = _sales_line_revenue_expr(money_dec)
         line_kg_expr = ExpressionWrapper(
             F("quantity") * F("product_packaging__net_mass_kg"),
             output_field=kg_dec,

@@ -332,13 +332,16 @@ def _price_from_per_kg(per_kg, net_mass_kg) -> int:
 
 def _resolve_sales_unit_price(
     customer, packaging: ProductPackaging, explicit_per_kg, *, allow_custom: bool = True
-) -> int:
+) -> tuple[int, int | None]:
     """
-    Resolve the per-package unit price for a sales line.
+    Resolve ``(per-package unit price, exact per-kg price or None)`` for a sales line.
 
     Priority: explicit custom price per kg (applies to this order) →
-    customer special price → product's fixed price per kg. All per-kg inputs
-    are multiplied by the kemasan net mass (kg) to get the package total.
+    customer special price → product's fixed price per kg. Per-kg prices are kept
+    exactly as entered so the line total is ``kg x per kg`` (no rounding of the
+    per-package price, e.g. 16.667/kg on a 0,1 kg kemasan). The package price is
+    still stored, rounded, for display. Customer special prices are per kemasan,
+    so they carry no per-kg value.
     """
     net_mass_kg = packaging.net_mass_kg
     if explicit_per_kg is not None and explicit_per_kg != "":
@@ -355,7 +358,7 @@ def _resolve_sales_unit_price(
             raise serializers.ValidationError(
                 {"unit_price_per_kg_idr": ["Harga per kg harus lebih dari 0."]}
             )
-        return _price_from_per_kg(per_kg, net_mass_kg)
+        return _price_from_per_kg(per_kg, net_mass_kg), per_kg
     cpp = (
         CustomerProductPrice.objects.filter(
             customer=customer,
@@ -366,13 +369,13 @@ def _resolve_sales_unit_price(
         .first()
     )
     if cpp:
-        return int(cpp.selling_price_idr)
+        return int(cpp.selling_price_idr), None
     price_per_kg = packaging.product.price_per_kg_idr or 0
     if price_per_kg < 1:
         raise serializers.ValidationError(
             {"unit_price_per_kg_idr": ["Harga per kg produk belum diatur. Atur harga produk terlebih dulu."]}
         )
-    return _price_from_per_kg(price_per_kg, net_mass_kg)
+    return _price_from_per_kg(price_per_kg, net_mass_kg), int(price_per_kg)
 
 
 class SalesOrderLineSerializer(serializers.ModelSerializer):
@@ -390,9 +393,9 @@ class SalesOrderLineSerializer(serializers.ModelSerializer):
         source="product_packaging.product.price_per_kg_idr", read_only=True
     )
     line_total_idr = serializers.SerializerMethodField()
-    unit_price_per_kg_idr = serializers.IntegerField(
-        required=False, allow_null=True, min_value=1, write_only=True
-    )
+    # Write: custom harga per kg for this order. Read: the exact per-kg price applied
+    # (null for lines priced per kemasan, e.g. customer special prices / old lines).
+    unit_price_per_kg_idr = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
     class Meta:
         model = SalesOrderLine
@@ -551,7 +554,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         for row in lines_data:
             packaging = row["product_packaging"]
             explicit = row.get("unit_price_per_kg_idr")
-            unit_price = _resolve_sales_unit_price(
+            unit_price, per_kg = _resolve_sales_unit_price(
                 customer, packaging, explicit, allow_custom=allow_custom
             )
             SalesOrderLine.objects.create(
@@ -560,6 +563,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
                 packaging_type=row.get("packaging_type", PackagingType.BAL),
                 quantity=row["quantity"],
                 unit_price_idr=unit_price,
+                unit_price_per_kg_idr=per_kg,
                 created_by=user,
                 updated_by=updated_by,
             )
@@ -614,7 +618,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
             for row in lines_data:
                 packaging = row["product_packaging"]
                 explicit = row.get("unit_price_per_kg_idr")
-                unit_price = _resolve_sales_unit_price(
+                unit_price, per_kg = _resolve_sales_unit_price(
                     customer, packaging, explicit, allow_custom=allow_custom
                 )
                 SalesOrderLine.objects.create(
@@ -623,6 +627,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
                     packaging_type=row.get("packaging_type", PackagingType.BAL),
                     quantity=row["quantity"],
                     unit_price_idr=unit_price,
+                    unit_price_per_kg_idr=per_kg,
                     created_by=user,
                     updated_by=user,
                 )

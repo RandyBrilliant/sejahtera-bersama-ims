@@ -1,5 +1,5 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -323,6 +323,17 @@ class SalesOrderLine(AuditModel):
         _("unit price (IDR)"),
         validators=[MinValueValidator(1)],
     )
+    unit_price_per_kg_idr = models.PositiveBigIntegerField(
+        _("unit price per kg (IDR)"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_(
+            "Harga per kg persis seperti diinput (atau harga katalog per kg). Bila diisi, "
+            "subtotal = kg x harga per kg sehingga tidak ada pembulatan harga per kemasan. "
+            "Kosong untuk baris lama / harga khusus pelanggan per kemasan."
+        ),
+    )
     cogs_material_idr = models.PositiveBigIntegerField(
         _("material COGS (IDR)"),
         validators=[MinValueValidator(0)],
@@ -350,4 +361,8 @@ class SalesOrderLine(AuditModel):
 
     @property
     def line_total_idr(self) -> int:
+        net = self.product_packaging.net_mass_kg if self.product_packaging_id else None
+        if self.unit_price_per_kg_idr and net:
+            total = Decimal(str(self.quantity)) * Decimal(str(net)) * int(self.unit_price_per_kg_idr)
+            return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         return int(self.quantity * self.unit_price_idr)

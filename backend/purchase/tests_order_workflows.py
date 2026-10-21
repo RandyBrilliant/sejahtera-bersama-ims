@@ -315,6 +315,25 @@ class SalesLinePackagingTypeTests(TestCase):
             format="json",
         )
 
+    def test_custom_per_kg_price_is_kept_exactly(self):
+        # 16.667/kg on a 0,1 kg kemasan used to come back as 16.670/kg (package price rounded).
+        ons = ProductPackaging.objects.create(product=self.product, label="1 ONS", net_mass_kg=Decimal("0.1"))
+        resp = self._create(
+            [{"product_packaging": ons.pk, "quantity": "2000", "unit_price_per_kg_idr": 16667}]
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        line = resp.data["lines"][0]
+        self.assertEqual(line["unit_price_per_kg_idr"], 16667)
+        # 2000 x 0,1 kg = 200 kg x 16.667 = 3.333.400 (not 2000 x 1.667 = 3.334.000).
+        self.assertEqual(line["line_total_idr"], 3333400)
+        order = SalesOrder.objects.get(pk=resp.data["id"])
+        self.assertEqual(order.total_idr, 3333400)
+
+    def test_catalog_price_is_stored_per_kg(self):
+        resp = self._create([{"product_packaging": self.pkg.pk, "quantity": "3"}])
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.data["lines"][0]["unit_price_per_kg_idr"], 100000)
+
     def test_defaults_to_bal(self):
         resp = self._create([{"product_packaging": self.pkg.pk, "quantity": "2"}])
         self.assertEqual(resp.status_code, 201, resp.content)

@@ -47,7 +47,10 @@ function fmtDt(iso: string | null | undefined) {
 }
 
 /** Effective harga/kg charged on this line (from resolved package price ÷ net mass). */
-function effectivePricePerKgIdr(line: Pick<SalesOrderLine, 'unit_price_idr' | 'net_mass_kg'>): number {
+function effectivePricePerKgIdr(
+  line: Pick<SalesOrderLine, 'unit_price_idr' | 'unit_price_per_kg_idr' | 'net_mass_kg'>
+): number {
+  if (line.unit_price_per_kg_idr != null) return line.unit_price_per_kg_idr
   const mass = Number(String(line.net_mass_kg ?? '').replace(',', '.'))
   if (Number.isFinite(mass) && mass > 0) {
     return Math.round(line.unit_price_idr / mass)
@@ -65,6 +68,9 @@ function catalogPackagePriceIdr(line: Pick<SalesOrderLine, 'price_per_kg_idr' | 
 
 /** True when charged package price differs from product catalog default. */
 function isCustomLinePrice(line: SalesOrderLine): boolean {
+  if (line.unit_price_per_kg_idr != null && line.price_per_kg_idr != null) {
+    return line.unit_price_per_kg_idr !== line.price_per_kg_idr
+  }
   const catalog = catalogPackagePriceIdr(line)
   if (catalog == null) return false
   return line.unit_price_idr !== catalog

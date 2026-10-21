@@ -85,8 +85,10 @@ export type SalesOrderLine = {
   /** Harga tetap per kg (IDR) dari produk induk. */
   price_per_kg_idr?: number
   quantity: string
-  /** Harga per kemasan hasil resolusi (per kg × berat). */
+  /** Harga per kemasan hasil resolusi (per kg × berat), dibulatkan — hanya untuk tampilan. */
   unit_price_idr: number
+  /** Harga per kg persis yang dipakai (subtotal = kg × harga ini); null untuk baris lama / harga per kemasan. */
+  unit_price_per_kg_idr?: number | null
   line_total_idr: number
   created_at: string
   updated_at: string

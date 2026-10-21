@@ -171,17 +171,26 @@ function cartFromInitial(order: SalesOrder | null, allowCustomPrice: boolean): C
     }
     const mass = Number(String(l.net_mass_kg ?? '').replace(',', '.'))
     const perKgDefault = l.price_per_kg_idr ?? null
-    const defaultUnit =
-      perKgDefault != null && Number.isFinite(mass) && mass > 0
-        ? Math.round(perKgDefault * mass)
-        : null
-    const isCustom = defaultUnit == null || l.unit_price_idr !== defaultUnit
+    // Newer lines store the exact per-kg price; older ones only have the rounded package price.
+    const storedPerKg = l.unit_price_per_kg_idr ?? null
+    let isCustom: boolean
+    if (storedPerKg != null) {
+      isCustom = perKgDefault == null || storedPerKg !== perKgDefault
+    } else {
+      const defaultUnit =
+        perKgDefault != null && Number.isFinite(mass) && mass > 0
+          ? Math.round(perKgDefault * mass)
+          : null
+      isCustom = defaultUnit == null || l.unit_price_idr !== defaultUnit
+    }
+    const customPerKg =
+      storedPerKg != null ? String(storedPerKg) : perKgFromLine(l.unit_price_idr, l.net_mass_kg)
     return {
       uid: newCartUid(),
       product_packaging: l.product_packaging,
       packaging_type: l.packaging_type,
       massKg,
-      unit_price_per_kg_idr: isCustom ? perKgFromLine(l.unit_price_idr, l.net_mass_kg) : '',
+      unit_price_per_kg_idr: isCustom ? customPerKg : '',
     }
   })
 }
