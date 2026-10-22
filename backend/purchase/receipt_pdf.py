@@ -164,9 +164,10 @@ class ReceiptLayout:
     col_total: Column = field(default_factory=lambda: Column(118.0, 142.0))
 
     cell_padding: float = 1.6
-    # Preprinted pad columns differ from the full-mode grid: Nama Barang runs from the
-    # Banyaknya rule (~25 mm) to ~94 mm. Banyaknya stays blank on the pad — the nama
-    # barang already carries the kg / kemasan detail.
+    # Preprinted pad columns differ from the full-mode grid: the Banyaknya rule sits at
+    # ~25 mm and Nama Barang runs from there to ~94 mm (Oct 2026 photo).
+    preprinted_qty_left: float = 7.5
+    preprinted_qty_right: float = 23.5
     preprinted_name_left: float = 26.5
     preprinted_name_right: float = 93.5
 
@@ -175,10 +176,12 @@ class ReceiptLayout:
     font_preprinted_date: float = 12.0
     font_buyer: float = 9.5
     font_row: float = 9.5
-    # Pad @ Rp / Jumlah Harga amounts; _sized_text shrinks them to stay inside the rules.
+    # Pad @ Rp / Jumlah Harga amounts; _draw_fitted condenses them to stay inside the rules.
     font_preprinted_price: float = 11.0
     # Pad nama barang (and the TOTAL KG line under it).
     font_preprinted_name: float = 11.0
+    # Pad Banyaknya (``4 BAL X 10 KG``) — same size as nama barang, condensed to fit.
+    font_preprinted_qty: float = 11.0
     font_total: float = 11.5
     font_faktur: float = 12.0
     # Shrink before ellipsis when cell text is too wide (totals, etc.).
@@ -187,6 +190,8 @@ class ReceiptLayout:
     min_horiz_scale: float = 70.0
     # Nama barang may condense further so long names keep the larger pad font.
     name_min_horiz_scale: float = 60.0
+    # Banyaknya is only ~16 mm wide, so it condenses hardest to keep its larger font.
+    qty_min_horiz_scale: float = 50.0
 
     # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0
@@ -249,7 +254,7 @@ def _caps(text: str) -> str:
 
 
 def _packaging_jenis(line) -> str:
-    """Jenis kemasan code chosen on the sales line (KTK / BAL)."""
+    """Jenis kemasan code chosen on the sales line (KTK / BAL / PCS)."""
     cleaned = str(getattr(line, "packaging_type", "") or "").strip().upper()
     if cleaned in PackagingType.values:
         return cleaned
@@ -364,11 +369,14 @@ def _draw_fitted(
     max_width: float,
     min_size: float,
     min_scale: float,
+    align: str = "left",
 ) -> float:
-    """Draw ``text`` left-aligned within ``max_width`` mm; return its printed width (mm).
+    """Draw ``text`` within ``max_width`` mm; return its printed width (mm).
 
-    Narrow pad cells keep a readable height by condensing glyphs horizontally
-    first (down to ``min_scale`` %), then shrinking the font, then truncating.
+    ``x`` is the left edge, centre or right edge for ``align`` ``"left"``,
+    ``"center"`` or ``"right"``. Narrow pad cells keep a readable height by
+    condensing glyphs horizontally first (down to ``min_scale`` %), then
+    shrinking the font, then truncating.
     """
     limit = max_width * mm
     size = preferred
@@ -379,6 +387,11 @@ def _draw_fitted(
         while size > min_size and _printed_width(pdf, text, font, size) * scale / 100 > limit:
             size -= 0.5
         text = _fit_text(pdf, text, font, size, max_width * 100 / scale)
+    drawn_width = pdf.stringWidth(text, font, size) * scale / 100
+    if align == "right":
+        x -= drawn_width
+    elif align == "center":
+        x -= drawn_width / 2
     # Horizontal scale is PDF graphics state; scope it so later text is not condensed.
     pdf.saveState()
     text_obj = pdf.beginText(x, y)
@@ -777,9 +790,9 @@ def _draw_values(
     for index, line in enumerate(lines):
         baseline = layout.y(first_row_top + index * layout.row_height)
 
+        qty_raw = _caps(_line_qty_display(line))
         name_raw = _caps(_line_name_display(line))
         if include_faktur_number:
-            qty_raw = _caps(_line_qty_display(line))
             qty_text, qty_size = _sized_text(
                 pdf, qty_raw, FONT, layout.font_row, qty_width, layout.font_min
             )
@@ -792,7 +805,18 @@ def _draw_values(
             pdf.setFont(FONT, name_size)
             pdf.drawString(layout.x(layout.col_name.left + layout.cell_padding), baseline, name_text)
         else:
-            # Pad: Banyaknya left blank. Condense before shrinking so text stays inside the rules.
+            # Pad cells are narrow: condense before shrinking so text stays inside the rules.
+            _draw_fitted(
+                pdf,
+                layout.x(layout.preprinted_qty_left),
+                baseline,
+                qty_raw,
+                FONT,
+                layout.font_preprinted_qty,
+                layout.preprinted_qty_right - layout.preprinted_qty_left,
+                layout.font_min,
+                layout.qty_min_horiz_scale,
+            )
             _draw_fitted(
                 pdf,
                 layout.x(layout.preprinted_name_left),
@@ -805,40 +829,55 @@ def _draw_values(
                 layout.name_min_horiz_scale,
             )
 
-        price_font = layout.font_row if include_faktur_number else layout.font_preprinted_price
-        unit_text, unit_size = _sized_text(
-            pdf,
-            _format_thousands(_price_per_kg_idr(line)),
-            FONT,
-            price_font,
-            unit_width,
-            layout.font_min,
-        )
-        pdf.setFont(FONT, unit_size)
+        unit_raw = _format_thousands(_price_per_kg_idr(line))
+        line_total_raw = _format_thousands(int(line.line_total_idr))
         if include_faktur_number:
+            unit_text, unit_size = _sized_text(
+                pdf, unit_raw, FONT, layout.font_row, unit_width, layout.font_min
+            )
+            pdf.setFont(FONT, unit_size)
             pdf.drawRightString(
                 layout.x(layout.col_unit.right - layout.cell_padding),
                 baseline,
                 unit_text,
             )
-        else:
-            # Preprinted pad: sit nearer the middle of the @ Rp column.
-            pdf.drawCentredString(layout.x(layout.col_unit.center), baseline, unit_text)
 
-        line_total_text, line_total_size = _sized_text(
-            pdf,
-            _format_thousands(int(line.line_total_idr)),
-            FONT,
-            price_font,
-            total_width,
-            layout.font_min,
-        )
-        pdf.setFont(FONT, line_total_size)
-        pdf.drawRightString(
-            layout.x(layout.col_total.right - layout.cell_padding),
-            baseline,
-            line_total_text,
-        )
+            line_total_text, line_total_size = _sized_text(
+                pdf, line_total_raw, FONT, layout.font_row, total_width, layout.font_min
+            )
+            pdf.setFont(FONT, line_total_size)
+            pdf.drawRightString(
+                layout.x(layout.col_total.right - layout.cell_padding),
+                baseline,
+                line_total_text,
+            )
+        else:
+            # Pad: condense long amounts (8+ digits) instead of shrinking so every
+            # row prints at the same height. @ Rp sits near the middle of its column.
+            _draw_fitted(
+                pdf,
+                layout.x(layout.col_unit.center),
+                baseline,
+                unit_raw,
+                FONT,
+                layout.font_preprinted_price,
+                unit_width,
+                layout.font_min,
+                layout.min_horiz_scale,
+                align="center",
+            )
+            _draw_fitted(
+                pdf,
+                layout.x(layout.col_total.right - layout.cell_padding),
+                baseline,
+                line_total_raw,
+                FONT,
+                layout.font_preprinted_price,
+                total_width,
+                layout.font_min,
+                layout.min_horiz_scale,
+                align="right",
+            )
 
     # Pad: "TOTAL: __ KG" under the last item in Nama Barang, if a ruled row is still free.
     if not include_faktur_number and lines and len(lines) < layout.row_count:
@@ -873,18 +912,20 @@ def _draw_values(
             grand_text,
         )
     else:
+        # Condense rather than shrink so the grand total keeps its size at 8+ digits.
         total_right = layout.preprinted_total_value_right
-        total_top = layout.preprinted_total_value_top
-        grand_text, grand_size = _sized_text(
+        _draw_fitted(
             pdf,
+            layout.x(total_right),
+            layout.y(layout.preprinted_total_value_top),
             grand,
             FONT_BOLD,
             layout.font_total,
             total_right - layout.preprinted_total_value_left,
             layout.font_min,
+            layout.min_horiz_scale,
+            align="right",
         )
-        pdf.setFont(FONT_BOLD, grand_size)
-        pdf.drawRightString(layout.x(total_right), layout.y(total_top), grand_text)
 
 
 def build_sales_order_receipt_pdf(

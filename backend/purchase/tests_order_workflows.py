@@ -289,7 +289,7 @@ class SalesCancelVerifyTests(TestCase):
 
 
 class SalesLinePackagingTypeTests(TestCase):
-    """Jenis kemasan (Bal / Kotak) is chosen per sales line, not on the kemasan master."""
+    """Jenis kemasan (Bal / Kotak / Pcs) is chosen per sales line, not on the kemasan master."""
 
     def setUp(self):
         self.owner = User.objects.create_user(
@@ -339,16 +339,17 @@ class SalesLinePackagingTypeTests(TestCase):
         self.assertEqual(resp.status_code, 201, resp.content)
         self.assertEqual(resp.data["lines"][0]["packaging_type"], "BAL")
 
-    def test_same_kemasan_with_both_types_is_allowed(self):
+    def test_same_kemasan_with_every_type_is_allowed(self):
         resp = self._create(
             [
                 {"product_packaging": self.pkg.pk, "packaging_type": "BAL", "quantity": "2"},
                 {"product_packaging": self.pkg.pk, "packaging_type": "KTK", "quantity": "3"},
+                {"product_packaging": self.pkg.pk, "packaging_type": "PCS", "quantity": "4"},
             ]
         )
         self.assertEqual(resp.status_code, 201, resp.content)
         types = sorted(line["packaging_type"] for line in resp.data["lines"])
-        self.assertEqual(types, ["BAL", "KTK"])
+        self.assertEqual(types, ["BAL", "KTK", "PCS"])
 
     def test_same_kemasan_and_type_is_rejected(self):
         resp = self._create(
@@ -387,6 +388,9 @@ class SalesLinePackagingTypeTests(TestCase):
             unit_price_idr=50000,
         )
         self.assertEqual(_line_qty_display(line), "4 KTK X 0.5 KG")
+
+        line.packaging_type = "PCS"
+        self.assertEqual(_line_qty_display(line), "4 PCS X 0.5 KG")
 
 
 class PreprintedReceiptLayoutTests(TestCase):
@@ -482,7 +486,11 @@ class PreprintedReceiptLayoutTests(TestCase):
         # 1000 kemasan x 0.2 kg.
         self.assertTrue(any("TOTAL: 200 KG" in code for code in self.codes), self.codes)
 
-    def test_banyaknya_is_left_blank(self):
+    def test_banyaknya_is_printed_condensed(self):
         self._draw()
         self.assertTrue(any("NYONYA MERAH" in code for code in self.codes))
-        self.assertFalse(any("BAL X" in code for code in self.codes), self.codes)
+        qty_codes = [code for code in self.codes if "(1000 BAL X 0.2 KG)" in code]
+        self.assertEqual(len(qty_codes), 1, self.codes)
+        # Condensed to the floor before shrinking, and still larger than the old 8pt.
+        self.assertIn("50 Tz", qty_codes[0])
+        self.assertIn("/F1 8.5 Tf", qty_codes[0])

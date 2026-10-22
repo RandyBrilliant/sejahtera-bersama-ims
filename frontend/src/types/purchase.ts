@@ -78,7 +78,7 @@ export type SalesOrderLine = {
   product_name?: string
   product_variant_name: string
   packaging_label: string
-  /** Jenis kemasan luar (BAL / KTK), dipilih per baris order. */
+  /** Jenis kemasan luar (BAL / KTK / PCS), dipilih per baris order. */
   packaging_type: PackagingType
   /** Berat bersih per kemasan (kg), untuk menghitung total kg order. */
   net_mass_kg?: string

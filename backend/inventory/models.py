@@ -126,6 +126,7 @@ class PackagingType(models.TextChoices):
 
     KOTAK = "KTK", _("Kotak")
     BAL = "BAL", _("Bal")
+    PCS = "PCS", _("Pcs")
 
 
 class ProductPackaging(AuditModel):

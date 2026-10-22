@@ -27,7 +27,7 @@ export type Product = {
 }
 
 /** Jenis kemasan luar, dipilih per baris order penjualan. */
-export type PackagingType = 'BAL' | 'KTK'
+export type PackagingType = 'BAL' | 'KTK' | 'PCS'
 
 export type ProductPackaging = {
   id: number

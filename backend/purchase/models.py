@@ -311,7 +311,7 @@ class SalesOrderLine(AuditModel):
         max_length=5,
         choices=PackagingType.choices,
         default=PackagingType.BAL,
-        help_text=_("Jenis kemasan luar (Bal / Kotak) for this line; does not affect stock."),
+        help_text=_("Jenis kemasan luar (Bal / Kotak / Pcs) for this line; does not affect stock."),
     )
     quantity = models.DecimalField(
         _("quantity"),
