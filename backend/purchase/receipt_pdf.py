@@ -166,7 +166,8 @@ class ReceiptLayout:
     cell_padding: float = 1.6
     # Preprinted pad columns differ from the full-mode grid: the Banyaknya rule sits at
     # ~25 mm and Nama Barang runs from there to ~94 mm (Oct 2026 photo).
-    preprinted_qty_left: float = 7.5
+    # Banyaknya starts near the pad's left edge (Oct 2026 print left ~6 mm unused).
+    preprinted_qty_left: float = 4.0
     preprinted_qty_right: float = 23.5
     preprinted_name_left: float = 26.5
     preprinted_name_right: float = 93.5
@@ -180,8 +181,9 @@ class ReceiptLayout:
     font_preprinted_price: float = 11.0
     # Pad nama barang (and the TOTAL KG line under it).
     font_preprinted_name: float = 11.0
-    # Pad Banyaknya (``4 BAL X 10 KG``) — same size as nama barang, condensed to fit.
-    font_preprinted_qty: float = 11.0
+    # Pad Banyaknya (``4 BAL X 10 KG``) — taller than nama barang to fill the row,
+    # condensed horizontally to fit.
+    font_preprinted_qty: float = 12.0
     font_total: float = 11.5
     font_faktur: float = 12.0
     # Shrink before ellipsis when cell text is too wide (totals, etc.).
@@ -190,8 +192,8 @@ class ReceiptLayout:
     min_horiz_scale: float = 70.0
     # Nama barang may condense further so long names keep the larger pad font.
     name_min_horiz_scale: float = 60.0
-    # Banyaknya is only ~16 mm wide, so it condenses hardest to keep its larger font.
-    qty_min_horiz_scale: float = 50.0
+    # Banyaknya is only ~19 mm wide, so it condenses hardest to keep its larger font.
+    qty_min_horiz_scale: float = 40.0
 
     # Footer (outside the table — tanda terima / notice; totals in attached box).
     tanda_terima_top: float = 97.0

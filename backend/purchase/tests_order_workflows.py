@@ -491,6 +491,6 @@ class PreprintedReceiptLayoutTests(TestCase):
         self.assertTrue(any("NYONYA MERAH" in code for code in self.codes))
         qty_codes = [code for code in self.codes if "(1000 BAL X 0.2 KG)" in code]
         self.assertEqual(len(qty_codes), 1, self.codes)
-        # Condensed to the floor before shrinking, and still larger than the old 8pt.
-        self.assertIn("50 Tz", qty_codes[0])
-        self.assertIn("/F1 8.5 Tf", qty_codes[0])
+        # Condensed horizontally so it keeps the full 12pt height.
+        self.assertIn("/F1 12 Tf", qty_codes[0])
+        self.assertIn("44 Tz", qty_codes[0])

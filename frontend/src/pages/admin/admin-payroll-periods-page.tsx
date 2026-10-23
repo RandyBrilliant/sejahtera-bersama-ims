@@ -126,7 +126,7 @@ export function AdminPayrollPeriodsPage() {
         cadence,
         pay_date: payDate,
         cutoff_date: cutoffDate.trim() || undefined,
-        notes: notes.trim() || undefined,
+        notes: notes.trim().toUpperCase() || undefined,
       })
       setNotes('')
       setCutoffDate('')
@@ -227,10 +227,10 @@ export function AdminPayrollPeriodsPage() {
           <textarea
             id="py-notes"
             value={notes}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value.toUpperCase())}
             rows={2}
             className={cn(
-              'border-input bg-field placeholder:text-muted-foreground min-h-[4.5rem] w-full rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow]',
+              'border-input bg-field placeholder:text-muted-foreground min-h-[4.5rem] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none transition-[color,box-shadow]',
               'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
               'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
             )}

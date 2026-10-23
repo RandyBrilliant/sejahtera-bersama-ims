@@ -112,7 +112,7 @@ export function AdminPayrollPeriodDetailPage() {
       const p = await fetchPayrollPeriod(idNum)
       const e = await fetchPayrollEntries(idNum)
       setPeriod(p)
-      setNotes(p.notes ?? '')
+      setNotes(p.notes?.toUpperCase() ?? '')
       setEntries(e)
       const next: Record<number, EntryDraft> = {}
       for (const row of e) {
@@ -139,7 +139,7 @@ export function AdminPayrollPeriodDetailPage() {
     if (!period) return
     setBusy(true)
     try {
-      const p = await patchPayrollPeriodNotes(period.id, notes)
+      const p = await patchPayrollPeriodNotes(period.id, notes.toUpperCase())
       setPeriod(p)
       alert.success('Catatan disimpan.')
     } catch (e) {
@@ -316,10 +316,10 @@ export function AdminPayrollPeriodDetailPage() {
               id="per-notes"
               disabled={busy}
               value={notes}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value.toUpperCase())}
               rows={3}
               className={cn(
-                'border-input bg-field placeholder:text-muted-foreground min-h-[5.25rem] w-full rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow]',
+                'border-input bg-field placeholder:text-muted-foreground min-h-[5.25rem] w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none transition-[color,box-shadow]',
                 'focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[3px]',
                 'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
               )}
