@@ -18,10 +18,6 @@ NC='\033[0m'
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${APP_DIR:-$PROJECT_DIR}"
-DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
-HTTP_CONF="nginx/${DOMAIN}.http-only.conf"
-SSL_CONF="nginx/${DOMAIN}.conf"
-SSL_DIR="nginx/ssl/${DOMAIN}"
 
 echo -e "${BLUE}=========================================="
 echo "Sejahtera Bersama IMS - Deployment"
@@ -42,7 +38,7 @@ cd "$APP_DIR" || {
     exit 1
 }
 
-# Compose: block storage + SSL overrides are added automatically when present.
+# Compose: block storage override is added automatically when present.
 source "$SCRIPT_DIR/lib/common.sh"
 PROJECT_ROOT="$APP_DIR"
 export PROJECT_ROOT
@@ -50,13 +46,11 @@ COMPOSE_OPTS="$(compose_opts_string)"
 
 echo -e "${BLUE}[1/7] Creating necessary directories...${NC}"
 mkdir -p logs
-mkdir -p nginx/logs
-mkdir -p nginx/certbot-www
 mkdir -p media
 mkdir -p staticfiles
-mkdir -p nginx/ssl
+ensure_frontend_releases_dir
 # Ensure logs directory is writable by API container (runs as UID 1000)
-chmod 755 logs nginx/logs nginx/certbot-www media staticfiles nginx/ssl 2>/dev/null || true
+chmod 755 logs media staticfiles 2>/dev/null || true
 chown -R 1000:1000 logs 2>/dev/null || true
 # Create log file if it doesn't exist (to avoid permission issues)
 touch logs/django.log 2>/dev/null || true
@@ -80,28 +74,18 @@ docker compose $COMPOSE_OPTS build --no-cache api celery celery-beat || {
 echo -e "${GREEN}✓ Application built${NC}"
 
 echo ""
-echo -e "${BLUE}[4/7] Checking SSL certificates and configuring Nginx...${NC}"
-if [ ! -f "$APP_DIR/$HTTP_CONF" ]; then
-    echo -e "${RED}Error: HTTP-only nginx config not found!${NC}"
+echo -e "${BLUE}[4/7] Checking Caddy configuration...${NC}"
+if [ ! -f "$APP_DIR/caddy/Caddyfile" ]; then
+    echo -e "${RED}Error: caddy/Caddyfile not found!${NC}"
     exit 1
 fi
-
-if ssl_certs_present; then
-    if [ ! -f "$APP_DIR/$SSL_CONF" ]; then
-        echo -e "${RED}Error: SSL nginx config not found!${NC}"
-        exit 1
-    fi
-    echo "  ✓ SSL certificates found — using docker-compose.prod.ssl.yml override"
-    COMPOSE_OPTS="$(compose_opts_string)"
-else
-    echo "  ⚠ SSL certificates not found, using HTTP-only configuration"
-fi
-echo -e "${GREEN}✓ Nginx configuration ready${NC}"
+echo "  Caddy obtains and renews TLS certificates automatically once DNS points at this server."
+echo -e "${GREEN}✓ Caddy configuration ready${NC}"
 
 echo ""
 echo -e "${BLUE}[5/7] Starting services...${NC}"
 # Non-interactive: auto-accept "Recreate?" when volume config changed (e.g. switching to block storage)
-echo y | docker compose $COMPOSE_OPTS up -d
+echo y | docker compose $COMPOSE_OPTS up -d --remove-orphans
 echo -e "${GREEN}✓ Services started${NC}"
 
 echo ""
@@ -159,20 +143,20 @@ echo ""
 echo "3. Create superuser (if needed):"
 echo -e "   ${YELLOW}docker compose $COMPOSE_OPTS exec api python manage.py createsuperuser${NC}"
 echo ""
-echo "4. Setup SSL (after DNS is configured):"
-echo -e "   ${YELLOW}sudo ./deploy/ssl-setup.sh${NC}"
+echo "4. HTTPS is automatic — point DNS (api, www, apex) at this server and Caddy issues certificates."
+echo -e "   ${YELLOW}docker compose $COMPOSE_OPTS logs -f caddy${NC}"
 echo ""
 
 # Health check
 echo -e "${BLUE}Performing health check...${NC}"
 sleep 5
 
-# Check nginx configuration
-if docker compose $COMPOSE_OPTS exec -T nginx nginx -t > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
+# Check Caddy configuration
+if docker compose $COMPOSE_OPTS exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Caddy configuration is valid${NC}"
 else
-    echo -e "${RED}✗ Nginx configuration error!${NC}"
-    docker compose $COMPOSE_OPTS exec -T nginx nginx -t
+    echo -e "${RED}✗ Caddy configuration error!${NC}"
+    docker compose $COMPOSE_OPTS exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
     exit 1
 fi
 

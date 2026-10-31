@@ -29,7 +29,7 @@ Use these scripts when you have:
 **What it does:**
 - Stops and removes containers/volumes/images
 - Clears generated files (logs, static, media cache)
-- Resets Nginx compose mount to HTTP-only mode
+- Removes the `caddy_data` volume (Caddy re-issues TLS certificates on next start)
 - Keeps source code and restores `.env` backup
 
 **Usage:**

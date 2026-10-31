@@ -92,7 +92,7 @@ sudo ./deploy/deploy.sh
 - Creates necessary directories
 - Pulls Docker images
 - Builds application images
-- Starts all services (API, Database, Redis, Celery, Nginx)
+- Starts all services (API, Database, Redis, Celery, Caddy)
 - Runs database migrations
 - Collects static files
 
@@ -120,26 +120,18 @@ Follow the prompts to create your admin account.
 
 ---
 
-### Step 5: Setup SSL Certificate
+### Step 5: HTTPS (automatic via Caddy)
 
-**⚠️ Important:** Make sure your DNS A record is pointing to your server IP before running this!
-
-**Run the SSL setup:**
+Caddy (`caddy/Caddyfile`) obtains and renews Let's Encrypt certificates automatically for every site in the Caddyfile
+(`api.`, `www.` and the apex domain). Point each DNS A record at the server and watch issuance:
 
 ```bash
-sudo ./deploy/ssl-setup.sh
+docker compose -f docker-compose.prod.yml logs -f caddy
 ```
 
-**What this does:**
-- Checks DNS configuration
-- Generates Let's Encrypt SSL certificate
-- Copies certificates to nginx directory
-- Updates Docker Compose to use SSL
-- Configures auto-renewal
+Certificates are stored in the `caddy_data` Docker volume — no certbot, cron or renewal hooks needed.
 
-**Expected time:** 2-3 minutes
-
-**After SSL setup, update your `.env` file:**
+**Once HTTPS works, update your `.env` file:**
 
 ```bash
 nano .env
@@ -165,11 +157,11 @@ docker compose -f docker-compose.prod.yml restart api
 **Test your API:**
 
 ```bash
-# Test HTTP (should redirect to HTTPS after SSL)
-curl -I http://data.sejahterabersama.my.id/health/
+# Test HTTP (Caddy redirects to HTTPS)
+curl -I http://api.sejahterabersama.my.id/health/
 
-# Test HTTPS (after SSL setup)
-curl https://data.sejahterabersama.my.id/health/
+# Test HTTPS
+curl https://api.sejahterabersama.my.id/health/
 ```
 
 **Check service logs:**
@@ -180,7 +172,7 @@ docker compose -f docker-compose.prod.yml logs -f
 
 # Specific service
 docker compose -f docker-compose.prod.yml logs -f api
-docker compose -f docker-compose.prod.yml logs -f nginx
+docker compose -f docker-compose.prod.yml logs -f caddy
 ```
 
 ---
@@ -221,7 +213,7 @@ docker compose -f docker-compose.prod.yml logs -f
 
 # Specific service
 docker compose -f docker-compose.prod.yml logs -f api
-docker compose -f docker-compose.prod.yml logs -f nginx
+docker compose -f docker-compose.prod.yml logs -f caddy
 docker compose -f docker-compose.prod.yml logs -f db
 ```
 
@@ -245,7 +237,7 @@ docker compose -f docker-compose.prod.yml restart
 
 # Restart specific service
 docker compose -f docker-compose.prod.yml restart api
-docker compose -f docker-compose.prod.yml restart nginx
+docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile  # zero-downtime config reload
 ```
 
 ---
@@ -377,19 +369,19 @@ If you see an error like `failed to bind host port 0.0.0.0:80/tcp: address alrea
 
 ### SSL Certificate Issues
 
-1. **Check certificate status:**
+1. **Check issuance/renewal logs:**
    ```bash
-   sudo certbot certificates
+   docker compose -f docker-compose.prod.yml logs caddy | grep -iE 'certificate|acme|error'
    ```
 
-2. **Test certificate renewal:**
+2. **Confirm DNS points at this server** (ports 80 and 443 must be reachable):
    ```bash
-   sudo certbot renew --dry-run
+   dig +short api.sejahterabersama.my.id
    ```
 
-3. **Check nginx SSL config:**
+3. **Validate the Caddyfile:**
    ```bash
-   docker compose -f docker-compose.prod.yml exec nginx nginx -t
+   docker compose -f docker-compose.prod.yml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
    ```
 
 ### Out of Memory Issues
@@ -435,13 +427,10 @@ backend/
 │   ├── setup.sh          # Initial server setup (one-time)
 │   ├── deploy.sh         # Main deployment script
 │   ├── update.sh         # Update script for code changes
-│   ├── ssl-setup.sh      # SSL certificate setup
 │   └── DEPLOYMENT_GUIDE.md
-├── nginx/
-│   ├── nginx.conf        # Main nginx config (includes rate-limit zones)
-│   ├── data.sejahterabersama.my.id.conf           # SSL config
-│   ├── data.sejahterabersama.my.id.http-only.conf # HTTP-only config (default)
-│   └── ssl/              # SSL certificates (created by ssl-setup.sh)
+├── caddy/
+│   └── Caddyfile         # Edge proxy: API + SPA, automatic HTTPS
+├── frontend-releases/    # SPA builds uploaded by CI (gitignored); current → <sha>
 ├── docker-compose.prod.yml
 ├── .env                  # Create from env.example
 └── ...
@@ -455,7 +444,7 @@ backend/
 - [ ] Strong `SECRET_KEY` set
 - [ ] Strong database password
 - [ ] `ALLOWED_HOSTS` includes your domain
-- [ ] SSL certificate installed
+- [ ] HTTPS working (Caddy issued certificates)
 - [ ] `SECURE_SSL_REDIRECT=1` after SSL setup
 - [ ] `SESSION_COOKIE_SECURE=1` after SSL setup
 - [ ] `CSRF_COOKIE_SECURE=1` after SSL setup
@@ -474,9 +463,6 @@ sudo ./deploy/deploy.sh
 
 # Update
 sudo ./deploy/update.sh
-
-# Setup SSL
-sudo ./deploy/ssl-setup.sh
 
 # View logs
 docker compose -f docker-compose.prod.yml logs -f
@@ -502,8 +488,8 @@ docker compose -f docker-compose.prod.yml exec api python manage.py collectstati
 ## 🎉 You're Done!
 
 Your KMS-Connect Backend should now be running on:
-- **HTTP:** http://data.sejahterabersama.my.id (redirects to HTTPS after SSL)
-- **HTTPS:** https://data.sejahterabersama.my.id
+- **API:** https://api.sejahterabersama.my.id
+- **App:** https://www.sejahterabersama.my.id
 
 **Next Steps:**
 - Test your API endpoints

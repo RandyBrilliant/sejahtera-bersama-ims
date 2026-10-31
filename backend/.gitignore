@@ -46,8 +46,7 @@ Thumbs.db
 staticfiles/
 
 # Production deployment files
-nginx/ssl/
-nginx/logs/
+frontend-releases/
 
 # Service account credentials (Firebase, Google Cloud Vision, etc.)
 firebase-service-account.json

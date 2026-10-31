@@ -2,6 +2,7 @@
 # Bootstrap:  ./deploy/deploy.sh  (first-time local build)
 # CI deploy:   APP_IMAGE=ghcr.io/<owner>/sejahtera-ims-api:<sha> ./deploy/deploy-registry.sh
 # .env: SECRET_KEY, DEBUG=False, ALLOWED_HOSTS, SQL_*, APP_IMAGE (set after successful registry deploy)
+# Edge: Caddy terminates TLS (auto Let's Encrypt) for the API and serves the SPA from ./frontend-releases/current.
 # Migrations: applied by API container entrypoint.sh before Gunicorn (deploy scripts do not run migrate).
 
 services:
@@ -14,23 +15,29 @@ services:
     networks:
       - kms-network
 
-  nginx:
-    image: nginx:alpine
-    container_name: ims-nginx
+  caddy:
+    image: caddy:2.11-alpine
+    container_name: ims-caddy
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-admin@sejahterabersama.my.id}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/api.sejahterabersama.my.id.http-only.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/certbot-www:/var/www/certbot
-      - static_volume:/app/staticfiles:ro
-      - ./logs/nginx:/var/log/nginx
-    depends_on:
-      - api
+      - ./caddy:/etc/caddy:ro
+      - ./frontend-releases:/srv/frontend:ro
+      - static_volume:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
     networks:
       - kms-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/caddy-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   api:
     build:
@@ -147,6 +154,8 @@ volumes:
   media_volume:
   static_volume:
   redis_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   kms-network:

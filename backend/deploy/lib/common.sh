@@ -16,7 +16,9 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-ims-api}"
 APP_PORT_DEFAULT="${APP_PORT_DEFAULT:-8000}"
 WORKER_SERVICES="${WORKER_SERVICES:-celery celery-beat}"
-DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
+PROXY_SERVICE="${PROXY_SERVICE:-caddy}"
+LEGACY_PROXY_CONTAINER="${LEGACY_PROXY_CONTAINER:-ims-nginx}"
+FRONTEND_RELEASES_DIR="${FRONTEND_RELEASES_DIR:-frontend-releases}"
 
 # Set by require_project_root
 PROJECT_ROOT=""
@@ -72,15 +74,7 @@ compose_args() {
     if [ -f "$PROJECT_ROOT/docker-compose.prod.block.yml" ]; then
         args+=(-f "$PROJECT_ROOT/docker-compose.prod.block.yml")
     fi
-    if ssl_certs_present; then
-        args+=(-f "$PROJECT_ROOT/docker-compose.prod.ssl.yml")
-    fi
     printf '%s\n' "${args[@]}"
-}
-
-ssl_certs_present() {
-    local ssl_dir="$PROJECT_ROOT/nginx/ssl/${DOMAIN}"
-    [ -f "$ssl_dir/fullchain.pem" ] && [ -f "$ssl_dir/privkey.pem" ]
 }
 
 compose_opts_string() {
@@ -102,7 +96,7 @@ restore_tracked_compose_files() {
     fi
 
     if ! git -C "$repo_root" diff --quiet -- "$compose_path" 2>/dev/null; then
-        print_warning "Discarding local edits to $compose_path (SSL uses docker-compose.prod.ssl.yml)"
+        print_warning "Discarding local edits to $compose_path (VPS must match git)"
         git -C "$repo_root" checkout -- "$compose_path"
     fi
 }
@@ -267,9 +261,30 @@ restart_workers() {
     compose up -d --no-deps $WORKER_SERVICES
 }
 
-reload_nginx_if_needed() {
-    if [ -n "${CHANGED_FILES:-}" ] && echo "$CHANGED_FILES" | grep -qE '(^|/)nginx/'; then
-        print_warning "Nginx config changed — reloading nginx"
-        compose up -d --no-deps nginx
+ensure_frontend_releases_dir() {
+    # Must exist before Caddy starts, otherwise Docker creates the bind-mount source as root
+    # and the CI rsync (non-root deploy user) cannot write releases into it.
+    mkdir -p "$PROJECT_ROOT/$FRONTEND_RELEASES_DIR"
+}
+
+# Start/refresh the Caddy edge proxy. Idempotent: `up` is a no-op when the container is current.
+ensure_proxy() {
+    ensure_frontend_releases_dir
+
+    if docker inspect "$LEGACY_PROXY_CONTAINER" >/dev/null 2>&1; then
+        print_warning "Removing legacy $LEGACY_PROXY_CONTAINER container (replaced by Caddy)"
+        docker rm -f "$LEGACY_PROXY_CONTAINER" >/dev/null
     fi
+
+    compose up -d --no-deps "$PROXY_SERVICE"
+
+    if [ -n "${CHANGED_FILES:-}" ] && echo "$CHANGED_FILES" | grep -qE '(^|/)caddy/'; then
+        print_warning "Caddy config changed — reloading Caddy"
+        reload_proxy
+    fi
+}
+
+# Graceful, atomic reload: an invalid Caddyfile is rejected and the running config stays active.
+reload_proxy() {
+    compose exec -T "$PROXY_SERVICE" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 }

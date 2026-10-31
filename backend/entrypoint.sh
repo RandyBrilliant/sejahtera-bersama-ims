@@ -34,7 +34,7 @@ fi
 # Run Django migrations as appuser (migrations are committed in git — never makemigrations here).
 gosu ${APP_UID}:${APP_GID} python manage.py migrate --noinput
 
-# Production: collect static files (for nginx to serve)
+# Production: collect static files (served by Caddy)
 if [ "${DEBUG:-0}" = "0" ]; then
     gosu ${APP_UID}:${APP_GID} python manage.py collectstatic --noinput --clear 2>/dev/null || true
 fi

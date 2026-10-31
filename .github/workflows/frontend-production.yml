@@ -1,0 +1,192 @@
+name: Frontend — Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-production.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-production.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('frontend-pr-{0}', github.ref) || 'frontend-production-deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+  RELEASES_TO_KEEP: '5'
+
+jobs:
+  build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: frontend/package.json
+
+      # tsc / vite CLIs run on Node via their shebangs; Vite 8 needs a recent LTS.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('frontend/bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Non-blocking until the existing react-hooks lint errors are fixed; tsc in the build still gates deploys.
+      - name: ESLint
+        run: bun run lint
+        continue-on-error: true
+
+      - name: Type-check & build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_ATTENDANCE_KIOSK_KEY: ${{ secrets.VITE_ATTENDANCE_KIOSK_KEY }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::Repository variable VITE_API_URL is not set"
+            exit 1
+          fi
+          bun run build
+
+      # Caddy serves .br/.gz siblings directly (file_server precompressed) — max compression, zero runtime CPU.
+      - name: Precompress assets
+        run: |
+          command -v brotli >/dev/null || sudo apt-get install -y -qq brotli
+          find dist -type f -size +1k \
+            \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \
+               -o -name '*.json' -o -name '*.webmanifest' -o -name '*.txt' \) -print0 \
+            | xargs -0 -P "$(nproc)" -I{} sh -c 'gzip -9 -k -n -f "$1" && brotli -q 11 -k -f "$1"' _ {}
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      RELEASE: ${{ github.sha }}
+      SSH_TARGET: ${{ secrets.DO_USERNAME }}@${{ secrets.DO_HOST }}
+      SSH_PORT: ${{ secrets.DO_SSH_PORT }}
+      RELEASES_DIR: ${{ secrets.DO_PROJECT_PATH }}/frontend-releases
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          SSH_KEY_B64: ${{ secrets.DO_SSH_PRIVATE_KEY_B64 }}
+        run: |
+          install -m 700 -d ~/.ssh
+          if [ -n "$SSH_KEY_B64" ]; then
+            echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          else
+            printf '%s\n' "$SSH_KEY" | sed 's/\r$//' > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H -p "$SSH_PORT" "${{ secrets.DO_HOST }}" >> ~/.ssh/known_hosts
+          echo "SSH_CMD=ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -p $SSH_PORT" >> "$GITHUB_ENV"
+
+      # New directory per commit; unchanged files are hard-linked from the live release (no re-upload, no extra disk).
+      - name: Upload release
+        run: |
+          HAS_CURRENT="$($SSH_CMD "$SSH_TARGET" "mkdir -p '$RELEASES_DIR' && test -d '$RELEASES_DIR/current' && echo yes || true")"
+          LINK_DEST=()
+          if [ "$HAS_CURRENT" = yes ]; then
+            LINK_DEST=(--link-dest=../current/)
+          fi
+          rsync -az --delete "${LINK_DEST[@]}" -e "$SSH_CMD" dist/ "$SSH_TARGET:$RELEASES_DIR/$RELEASE/"
+
+      - name: Activate release
+        run: |
+          $SSH_CMD "$SSH_TARGET" \
+            "RELEASES_DIR='$RELEASES_DIR' RELEASE='$RELEASE' KEEP='$RELEASES_TO_KEEP' bash -s" << 'EOF'
+          set -euo pipefail
+          cd "$RELEASES_DIR"
+
+          test -f "$RELEASE/index.html" || { echo "index.html missing in release $RELEASE"; exit 1; }
+          # Every hashed asset referenced by index.html must exist before going live.
+          grep -oE '/assets/[^"]+' "$RELEASE/index.html" | sort -u | while read -r asset; do
+            [ -f "$RELEASE$asset" ] || { echo "Missing $asset in release $RELEASE"; exit 1; }
+          done
+
+          PREVIOUS="$(readlink current 2>/dev/null || true)"
+          activate() { ln -sfn "$1" current.next && mv -Tf current.next current; }
+          activate "$RELEASE"
+          touch "$RELEASE"
+          echo "Active release: $RELEASE (previous: ${PREVIOUS:-none})"
+
+          # Smoke test through Caddy's internal origin — independent of public DNS/TLS state.
+          if [ "$(docker inspect -f '{{.State.Running}}' ims-caddy 2>/dev/null)" != true ]; then
+            echo "::warning::ims-caddy is not running — release staged; it is served once Caddy starts (backend deploy)."
+          else
+            ok=false
+            for _ in 1 2 3 4 5; do
+              if docker exec ims-caddy wget -qO- http://127.0.0.1:8081/ 2>/dev/null | cmp -s - "$RELEASE/index.html"; then
+                ok=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$ok" != true ]; then
+              echo "Smoke test failed: Caddy is not serving release $RELEASE"
+              if [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$RELEASE" ]; then
+                activate "$PREVIOUS"
+                echo "Rolled back to $PREVIOUS"
+              fi
+              exit 1
+            fi
+            echo "Smoke test passed"
+          fi
+
+          # Keep the newest releases plus whatever was live before this deploy.
+          find . -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' | sort -rn | tail -n +"$((KEEP + 1))" | cut -d' ' -f2- \
+            | while read -r old; do
+                if [ "$old" != "$RELEASE" ] && [ "$old" != "$PREVIOUS" ]; then
+                  rm -rf -- "$old"
+                fi
+              done
+          EOF
+
+      - name: Public check
+        continue-on-error: true
+        run: |
+          if curl -fsS --max-time 15 https://www.sejahterabersama.my.id/ | cmp -s - dist/index.html; then
+            echo "Public site serves release $RELEASE"
+          else
+            echo "::warning::https://www.sejahterabersama.my.id does not serve this release yet (DNS still on Vercel, or CDN/cache in between)."
+          fi

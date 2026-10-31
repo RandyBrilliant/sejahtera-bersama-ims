@@ -167,7 +167,7 @@ jobs:
             COMPOSE_PATH="backend/docker-compose.prod.yml"
           fi
           if ! git -C "\$REPO_ROOT" diff --quiet -- "\$COMPOSE_PATH" 2>/dev/null; then
-            echo "Discarding local edits to \$COMPOSE_PATH (SSL uses docker-compose.prod.ssl.yml)"
+            echo "Discarding local edits to \$COMPOSE_PATH (VPS must match git)"
             git -C "\$REPO_ROOT" checkout -- "\$COMPOSE_PATH"
           fi
           git -C "\$REPO_ROOT" pull origin main

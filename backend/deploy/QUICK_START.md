@@ -25,9 +25,10 @@ sudo ./deploy/deploy.sh
 docker compose -f docker-compose.prod.yml exec api python manage.py createsuperuser
 ```
 
-### 5. Setup SSL (After DNS is configured)
+### 5. HTTPS (automatic)
+Point DNS (`api`, `www`, apex) at the server — Caddy issues and renews Let's Encrypt certificates on its own:
 ```bash
-sudo ./deploy/ssl-setup.sh
+docker compose -f docker-compose.prod.yml logs -f caddy
 ```
 
 Then update `.env`:
@@ -113,8 +114,8 @@ docker compose -f docker-compose.prod.yml restart
 
 **SSL issues?**
 ```bash
-sudo certbot certificates
-docker compose -f docker-compose.prod.yml logs nginx
+docker compose -f docker-compose.prod.yml logs caddy | grep -iE 'certificate|acme|error'
+dig +short api.sejahterabersama.my.id   # must be this server's IP
 ```
 
 ---

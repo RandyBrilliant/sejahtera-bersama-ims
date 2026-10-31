@@ -1,0 +1,93 @@
+# Sejahtera Bersama IMS — edge proxy (API + SPA) with automatic HTTPS.
+# Certificates are issued/renewed by Caddy and persisted in the caddy_data volume.
+# Reload after edits (zero downtime): docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
+# CI does this automatically when files under backend/caddy/ change.
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# Static SPA served from the active release (frontend-releases/current → <sha>).
+# Hashed build output is immutable; everything else revalidates so deploys show up immediately.
+(spa) {
+	root * /srv/frontend/current
+	encode zstd gzip
+
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=(), interest-cohort=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.sejahterabersama.my.id https://data.sejahterabersama.my.id https://*.sejahterabersama.my.id; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+	}
+
+	@public_files path *.svg *.png *.jpg *.jpeg *.webp *.avif *.ico *.webmanifest *.woff *.woff2 *.txt
+	header @public_files Cache-Control "public, max-age=86400, stale-while-revalidate=604800"
+
+	# Missing hashed assets must 404 — never fall back to index.html.
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server {
+			precompressed br gzip
+		}
+	}
+
+	handle {
+		header ?Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server {
+			precompressed br gzip
+		}
+	}
+}
+
+api.sejahterabersama.my.id {
+	import security_headers
+	header X-Frame-Options "DENY"
+	encode zstd gzip
+	log
+
+	request_body {
+		max_size 50MB
+	}
+
+	handle_path /static/* {
+		root * /srv/static
+		header Cache-Control "public, max-age=2592000"
+		file_server
+	}
+
+	handle {
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 10s
+				response_header_timeout 90s
+			}
+		}
+	}
+}
+
+sejahterabersama.my.id {
+	redir https://www.sejahterabersama.my.id{uri} permanent
+}
+
+www.sejahterabersama.my.id {
+	import security_headers
+	log
+	import spa
+}
+
+# Internal origin (port not published): container healthcheck + CI smoke test of the active release.
+http://:8081 {
+	handle /caddy-health {
+		respond "ok" 200
+	}
+	import spa
+}

@@ -64,8 +64,7 @@ apt-get install -y -qq \
     wget \
     git \
     ufw \
-    certbot \
-    python3-certbot-nginx \
+    rsync \
     dnsutils \
     htop \
     nano \
@@ -75,16 +74,16 @@ apt-get install -y -qq \
     ca-certificates \
     gnupg \
     lsb-release
-# dnsutils provides dig (used by ssl-setup.sh for DNS checks)
+# rsync receives frontend releases from CI; dnsutils provides dig for DNS checks
 echo -e "${GREEN}✓ Essential packages installed${NC}"
 
 echo ""
-echo -e "${BLUE}[3/9] Disabling system nginx/apache (Docker nginx will use ports 80/443)...${NC}"
+echo -e "${BLUE}[3/9] Disabling system nginx/apache (Docker Caddy will use ports 80/443)...${NC}"
 systemctl stop nginx 2>/dev/null || true
 systemctl disable nginx 2>/dev/null || true
 systemctl stop apache2 2>/dev/null || true
 systemctl disable apache2 2>/dev/null || true
-echo -e "${GREEN}✓ Ports 80 and 443 left for Docker nginx${NC}"
+echo -e "${GREEN}✓ Ports 80 and 443 left for Docker Caddy${NC}"
 
 echo ""
 echo -e "${BLUE}[4/9] Installing Docker...${NC}"
@@ -158,6 +157,7 @@ ufw allow 22/tcp
 # Allow HTTP and HTTPS
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 443/udp  # HTTP/3
 # Enable firewall (non-interactive)
 ufw --force enable
 echo -e "${GREEN}✓ Firewall configured${NC}"
@@ -183,12 +183,10 @@ echo -e "${GREEN}✓ Docker optimized${NC}"
 echo ""
 echo -e "${BLUE}[9/9] Creating necessary directories...${NC}"
 mkdir -p "$PROJECT_DIR/logs"
-mkdir -p "$PROJECT_DIR/nginx/logs"
-mkdir -p "$PROJECT_DIR/nginx/certbot-www"
 mkdir -p "$PROJECT_DIR/media"
 mkdir -p "$PROJECT_DIR/staticfiles"
-mkdir -p "$PROJECT_DIR/nginx/ssl"
-chmod 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/nginx/logs" "$PROJECT_DIR/nginx/certbot-www" "$PROJECT_DIR/media" "$PROJECT_DIR/staticfiles" "$PROJECT_DIR/nginx/ssl"
+mkdir -p "$PROJECT_DIR/frontend-releases"
+chmod 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/media" "$PROJECT_DIR/staticfiles" "$PROJECT_DIR/frontend-releases"
 echo -e "${GREEN}✓ Directories created${NC}"
 
 echo ""

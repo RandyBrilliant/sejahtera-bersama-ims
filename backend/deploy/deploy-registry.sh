@@ -94,6 +94,6 @@ save_last_good_app_image "$TARGET_APP_IMAGE"
 echo ""
 print_header "Restarting workers"
 restart_workers
-reload_nginx_if_needed
+ensure_proxy
 
 print_success "Deployed $TARGET_APP_IMAGE"

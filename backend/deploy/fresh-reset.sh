@@ -16,9 +16,6 @@ NC='\033[0m' # No Color
 # Get current directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
-DOMAIN="${DOMAIN:-api.sejahterabersama.my.id}"
-HTTP_CONF="./nginx/${DOMAIN}.http-only.conf"
-SSL_CONF="./nginx/${DOMAIN}.conf"
 
 echo -e "${RED}=========================================="
 echo "⚠️  COMPLETE FRESH RESET ⚠️"
@@ -141,29 +138,13 @@ if [ -d "$APP_DIR/media" ]; then
     echo "  ✓ Media files cleared"
 fi
 
-# Remove nginx logs
-if [ -d "$APP_DIR/nginx/logs" ]; then
-    rm -rf "$APP_DIR/nginx/logs"/*
-    echo "  ✓ Nginx logs cleared"
-fi
-
 # Remove backup files
 if [ -d "$APP_DIR/backups" ]; then
     rm -rf "$APP_DIR/backups"/*
     echo "  ✓ Backup files removed"
 fi
 
-# Remove nginx backup configs
-find "$APP_DIR/nginx" -name "*.backup*" -delete 2>/dev/null || true
-echo "  ✓ Nginx backup configs removed"
-
-# Remove SSL certificates (they can be regenerated)
-if [ -d "$APP_DIR/nginx/ssl" ]; then
-    rm -rf "$APP_DIR/nginx/ssl"/*
-    echo "  ✓ SSL certificates removed (can be regenerated)"
-fi
-
-echo "  → SSL disabled (docker-compose.prod.ssl.yml is skipped when certs are absent)"
+# TLS certificates live in the caddy_data volume (removed with the other volumes above).
 
 # Remove db.sqlite3 if exists
 if [ -f "$APP_DIR/db.sqlite3" ]; then
