@@ -54,6 +54,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Shipped/build dependencies only; dev tooling (eslint, shadcn CLI) never reaches users.
+      # Non-blocking so a newly published advisory can't hold back an urgent fix — check the job annotations.
+      - name: Dependency audit
+        run: bun audit --prod --audit-level=high
+        continue-on-error: true
+
       # Non-blocking until the existing react-hooks lint errors are fixed; tsc in the build still gates deploys.
       - name: ESLint
         run: bun run lint
