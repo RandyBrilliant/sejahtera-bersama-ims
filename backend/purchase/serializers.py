@@ -19,6 +19,7 @@ from .models import (
     SalesOrderLine,
     Wilayah,
 )
+from .models import _invoice_date_h_plus_one
 from .utils import next_order_code, recompute_order_totals
 
 
@@ -541,7 +542,7 @@ class SalesOrderSerializer(serializers.ModelSerializer):
         validated_data["due_date"] = None
         validated_data["tax_amount_idr"] = 0
         if not validated_data.get("invoice_date"):
-            validated_data["invoice_date"] = timezone.localdate() + timedelta(days=1)
+            validated_data["invoice_date"] = _invoice_date_h_plus_one()
         validated_data["order_code"] = next_order_code(SalesOrder, "SO")
         if not (validated_data.get("invoice_number") or "").strip():
             validated_data["invoice_number"] = _default_invoice_number(validated_data["order_code"])

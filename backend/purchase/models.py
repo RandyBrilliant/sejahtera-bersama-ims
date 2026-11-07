@@ -26,7 +26,11 @@ class SalesOrderStatus(models.TextChoices):
 
 
 def _invoice_date_h_plus_one():
-    return timezone.localdate() + timedelta(days=1)
+    """Default sales invoice date: H+1, skipping Sunday (Saturday orders -> Monday)."""
+    d = timezone.localdate() + timedelta(days=1)
+    if d.weekday() == 6:  # Sunday
+        d += timedelta(days=1)
+    return d
 
 
 class Customer(AuditModel):

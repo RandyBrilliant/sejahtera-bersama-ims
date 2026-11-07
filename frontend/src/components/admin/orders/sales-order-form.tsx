@@ -62,9 +62,11 @@ const listParams = { page: 1, page_size: 500 } as const
 /** Customer picker searches server-side; the API caps pages at 100 rows. */
 const CUSTOMER_PICKER_PAGE_SIZE = 50
 
+/** Default invoice date: H+1, skipping Sunday (orders made on Saturday land on Monday). */
 function isoTomorrowLocal(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1)
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
