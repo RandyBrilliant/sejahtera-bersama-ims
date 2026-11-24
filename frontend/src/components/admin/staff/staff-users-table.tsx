@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom'
 import { USER_ROLE_LABEL, USER_ROLE_PILL_CLASS } from '@/constants/user-roles'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { useSystemUsersQuery } from '@/hooks/use-system-users-query'
 import { formatAuditDate } from '@/lib/format-audit-datetime'
@@ -70,7 +71,7 @@ export function StaffUsersTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'full_name',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [statusTarget, setStatusTarget] = useState<{
     user: SystemUser
     intent: StatusIntent
@@ -84,14 +85,6 @@ export function StaffUsersTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -268,13 +261,9 @@ export function StaffUsersTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               className="border-outline-variant pr-3 pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         <Button
           type="button"

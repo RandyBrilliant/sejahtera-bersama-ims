@@ -49,6 +49,7 @@ import {
 import { ORDER_STATUS_LABEL } from '@/constants/order-status'
 import { PACKAGING_TYPE_LABEL } from '@/constants/packaging-types'
 import { useAuth } from '@/hooks/use-auth'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import {
   useSalesOrdersQuery,
   useUploadSalesPaymentProofByIdMutation,
@@ -109,7 +110,7 @@ export function SalesOrdersTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: '-created_at',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -159,14 +160,6 @@ export function SalesOrdersTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -365,13 +358,9 @@ export function SalesOrdersTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               className="border-outline-variant pr-3 pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         {canCreateSalesOrder ? (
           <Button

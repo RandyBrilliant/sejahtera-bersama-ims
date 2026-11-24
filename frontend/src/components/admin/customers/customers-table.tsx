@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { CustomerDeleteModal } from '@/components/admin/customers/customer-delete-modal'
 import { WilayahManagerModal } from '@/components/admin/customers/wilayah-manager-modal'
 import { useCustomersQuery, useWilayahQuery } from '@/hooks/use-purchase-query'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatRegionalPhonePreview } from '@/lib/regional-phone'
@@ -63,7 +64,7 @@ export function CustomersTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'name',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [statusFilter, setStatusFilter] = useState('all')
   const [wilayahFilter, setWilayahFilter] = useState('__all')
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
@@ -86,14 +87,6 @@ export function CustomersTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -194,14 +187,10 @@ export function CustomersTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Cari nama, wilayah, telepon, alamat…"
               className="border-outline-variant pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         {canEditCustomers ? (
           <Button

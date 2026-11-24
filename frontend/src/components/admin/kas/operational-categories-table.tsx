@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { ENTRY_KIND_LABEL } from '@/constants/expenses'
 import { OperationalCategoryDeleteModal } from '@/components/admin/kas/operational-category-delete-modal'
 import { useOperationalCategoriesQuery } from '@/hooks/use-expenses-query'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { Badge } from '@/components/ui/badge'
@@ -49,7 +50,7 @@ export function OperationalCategoriesTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: 'name',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [kindFilter, setKindFilter] = useState<string>('all')
   const [deleteTarget, setDeleteTarget] = useState<OperationalCategory | null>(null)
 
@@ -70,14 +71,6 @@ export function OperationalCategoriesTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -169,14 +162,10 @@ export function OperationalCategoriesTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Cari nama…"
               className="border-outline-variant pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         <Button
           type="button"

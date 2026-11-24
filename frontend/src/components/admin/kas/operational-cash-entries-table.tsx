@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -15,6 +15,7 @@ import {
   useOperationalCategoriesQuery,
 } from '@/hooks/use-expenses-query'
 import { useTableSorting } from '@/hooks/use-table-sorting'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { formatIdr } from '@/lib/format-idr'
 import { Badge } from '@/components/ui/badge'
@@ -77,7 +78,7 @@ export function OperationalCashEntriesTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: '-occurred_on,-id',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [dirFilter, setDirFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
@@ -137,14 +138,6 @@ export function OperationalCashEntriesTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -272,14 +265,10 @@ export function OperationalCashEntriesTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Cari deskripsi, referensi, kode order…"
               className="border-outline-variant pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         <Button
           type="button"

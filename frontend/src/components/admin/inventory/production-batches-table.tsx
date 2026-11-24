@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/table'
 import { DEFAULT_TABLE_PAGE_SIZE, TABLE_PAGE_SIZES } from '@/constants/table-pagination'
 import { useProductionBatchesQuery } from '@/hooks/use-inventory-query'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { cn } from '@/lib/utils'
@@ -51,7 +52,7 @@ export function ProductionBatchesTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: '-production_date,-id',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
 
   const { data, isLoading, isError, isFetching } = useProductionBatchesQuery(params)
 
@@ -60,14 +61,6 @@ export function ProductionBatchesTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -160,16 +153,10 @@ export function ProductionBatchesTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') runSearch()
-              }}
               placeholder="Cari shift / catatan…"
               className="border-outline-variant pl-9"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch}>
-            Cari
-          </Button>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="grid gap-1">

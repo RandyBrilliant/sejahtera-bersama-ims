@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { resolveMediaUrl } from '@/lib/media-url'
 import {
   flexRender,
@@ -44,6 +44,7 @@ import {
   useVerifyPurchaseInOrderMutation,
 } from '@/hooks/use-purchase-query'
 import { useAuth } from '@/hooks/use-auth'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { useTableSorting } from '@/hooks/use-table-sorting'
 import { createOrderingChangeHandler } from '@/lib/table-sorting'
 import { alert } from '@/lib/alert'
@@ -71,7 +72,7 @@ export function PurchaseInOrdersTable() {
     page_size: DEFAULT_TABLE_PAGE_SIZE,
     ordering: '-created_at',
   })
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useDebouncedSearch(setParams)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [confirmTarget, setConfirmTarget] = useState<{
@@ -88,14 +89,6 @@ export function PurchaseInOrdersTable() {
   const pageSize = params.page_size ?? DEFAULT_TABLE_PAGE_SIZE
   const page = params.page ?? 1
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const runSearch = useCallback(() => {
-    setParams((p) => ({
-      ...p,
-      page: 1,
-      search: searchInput.trim() || undefined,
-    }))
-  }, [searchInput])
 
   const onOrderingChange = useMemo(() => createOrderingChangeHandler(setParams), [])
 
@@ -232,13 +225,9 @@ export function PurchaseInOrdersTable() {
               value={searchInput}
               autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               className="border-outline-variant pr-3 pl-10"
             />
           </div>
-          <Button type="button" variant="outline" onClick={runSearch} className="shrink-0">
-            Cari
-          </Button>
         </div>
         {canManagePurchase ? (
           <Button
